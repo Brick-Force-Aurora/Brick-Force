@@ -1,0 +1,14 @@
+internal enum NM_SECURE_VAR_TYPE
+{
+	S_BYTE = 1,
+	S_SHORT,
+	S_INT,
+	S_LONG,
+	S_INT64,
+	S_FLOAT,
+	S_DOUBLE,
+	S_USHORT,
+	S_UINT,
+	S_ULONG,
+	S_UINT64
+}

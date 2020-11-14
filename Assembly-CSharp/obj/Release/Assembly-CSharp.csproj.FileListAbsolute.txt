@@ -1,0 +1,16 @@
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\bin\Release\Assembly-CSharp.dll
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\bin\Release\Assembly-CSharp.pdb
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\bin\Release\Assembly-CSharp-firstpass.dll
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\bin\Release\Assembly-UnityScript-firstpass.dll
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\bin\Release\Assembly-UnityScript.dll
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\bin\Release\Boo.Lang.dll
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\bin\Release\Mono.Security.dll
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\bin\Release\System.Core.dll
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\bin\Release\System.dll
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\bin\Release\UnityEngine.dll
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\bin\Release\UnityScript.Lang.dll
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\obj\Release\Assembly-CSharp.csprojAssemblyReference.cache
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\obj\Release\Assembly-CSharp.csproj.CoreCompileInputs.cache
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\obj\Release\Assembly-CSharp.csproj.CopyComplete
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\obj\Release\Assembly-CSharp.dll
+G:\bf rewrite\Brick-Force Reverse\Assembly-CSharp\obj\Release\Assembly-CSharp.pdb

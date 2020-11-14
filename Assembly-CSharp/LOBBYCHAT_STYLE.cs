@@ -1,0 +1,7 @@
+public enum LOBBYCHAT_STYLE
+{
+	HIGH,
+	MIDDLE,
+	LOW,
+	CLANMATCH
+}

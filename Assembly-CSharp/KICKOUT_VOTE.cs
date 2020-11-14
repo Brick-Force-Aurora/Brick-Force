@@ -1,0 +1,8 @@
+public enum KICKOUT_VOTE
+{
+	NO_REASON = 0,
+	WHY_BAD_WORD = 1,
+	WHY_BAD_MANNER = 2,
+	WHY_HACK = 4,
+	WHY_ETC = 8
+}
