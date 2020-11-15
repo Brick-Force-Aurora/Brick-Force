@@ -5,6 +5,8 @@
 
 [<p align="center">Gameplay Video</p>](https://www.youtube.com/watch?v=mslPRyCIKgo)
 
+[<p align="center">Tutorial by Amorph (German)</p>](https://www.youtube.com/watch?v=kc9XD6SWT6k)
+
 <p align="center">Full rewrite of the original server emulator project with more features and better stability, now available for everyone!</p>
 
 ## Features
@@ -26,6 +28,7 @@
 - Get into a network (VPN or LAN) with other players (recommended free VPN: ZeroTier)
 - Make sure to allow any firewall exceptions that may pop up in the process
 - One player will act as host, make sure to put his network IP in the Host IP text field after starting the game (default value can be set in Config)
+- You can use localhost as Host IP (127.0.0.1) if you just want to test alone
 - Put your custom username into the regular E-mail text field
 - Host needs to click Host Match, after that the other players click Join Match
 - After connecting, click Play to proceed to the main menu and create a room (others may need to refresh the room list in order to join)
