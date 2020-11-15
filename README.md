@@ -2,6 +2,11 @@
 
 [<p align="center">Join The Discord</p>](https://discord.gg/qktjAYsKwH)
 [<p align="center">Latest Release</p>](https://github.com/WeeaboosPls/Brick-Force-Aurora/releases/latest)
+
+[<p align="center">Gameplay Video</p>](https://www.youtube.com/watch?v=mslPRyCIKgo)
+
+<p align="center">Full rewrite of the original server emulator project with more features and better stability, now available for everyone!</p>
+
 ## Features
 - Play multiplayer over VPN or LAN
 - Host matches from within the game
@@ -62,6 +67,7 @@
 
 ## Limitations
 - Only TDM fully implemented currently, other modes should load but might not fully work
+- Future support for Build Mode is planned
 - Only one room per host to simplify server
 - Item stats are mostly backup values loaded from disk and are different from Infernum servers
 - Most rare weapons and max up variants have empty stats and are therefore useless in game
@@ -69,6 +75,7 @@
 - Can be changed under registry path HKEY_CURRENT_USER\SOFTWARE\EXE Games\BrickForce (set BfVoice & BfLanguage to 1 for english)
 
 ## Notes
+- This is a non-commercial fan project and not associated with any of the companies originally involved in the development and publishing of the game
 - Code in _Emulator folder is newly added to the game
 - Other code is mostly reverse engineered (decompiled) from the original game and refined so it compiles as a VS project
 - Therefore commercial use of this project is not recommended
