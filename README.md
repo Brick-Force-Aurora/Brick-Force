@@ -1,7 +1,7 @@
 ![](https://i.imgur.com/fThs88a.png)
 
 [<p align="center">Join The Discord</p>](https://discord.gg/qktjAYsKwH)
-[<p align="center">Latest Release</p>](https://github.com/WeeaboosPls/Brick-Force-Aurora/releases/latest)
+[<p align="center">Latest Release</p>](https://github.com/Brick-Force-Aurora/Brick-Force/releases/latest)
 
 [<p align="center">Gameplay Video</p>](https://www.youtube.com/watch?v=mslPRyCIKgo)
 
@@ -24,7 +24,8 @@
 ## How To Play
 ![](https://i.imgur.com/OUqQ5dR.png)
 
-- Download the newest release
+- Download the newest [BfLauncher](https://github.com/Brick-Force-Aurora/Launcher/releases)
+- Start it to install the game and receive the newest updates (can be disabled in launcher settings)
 - Get into a network (VPN or LAN) with other players (recommended free VPN: ZeroTier)
 - Make sure to allow any firewall exceptions that may pop up in the process
 - One player will act as host, make sure to put his network IP in the Host IP text field after starting the game (default value can be set in Config)
