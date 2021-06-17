@@ -13,6 +13,7 @@ namespace _Emulator
         }
 
         public Socket socket;
+        public byte[] buffer;
         public string ip;
         public int port;
         public float lastHeartBeatTime;
@@ -25,11 +26,13 @@ namespace _Emulator
         public int assists = 0;
         public int score = 0;
         public bool isBreakingInto;
+        public float toleranceTime;
         public ClientStatus clientStatus;
         public BrickManDesc.STATUS status;
         public SlotData slot;
         public Inventory inventory;
         public DummyData data;
+        private readonly object dataLock = new object();
 
         public ClientReference(Socket _socket, string _name = "", int _seq = -1)
         {
@@ -43,14 +46,19 @@ namespace _Emulator
             ip = socket.RemoteEndPoint.ToString().Split(':')[0];
             isLoaded = false;
             isHost = ServerEmulator.instance.clientList.Count == 0;
+            buffer = new byte[8192];
+            toleranceTime = 0f;
         }
 
         public void Disconnect(bool send = true)
         {
             socket.Shutdown(SocketShutdown.Both);
             socket.Close();
-            ServerEmulator.instance.matchData.RemoveClient(this);
-            ServerEmulator.instance.clientList.Remove(this);
+            lock (dataLock)
+            {
+                ServerEmulator.instance.matchData.RemoveClient(this);
+                ServerEmulator.instance.clientList.Remove(this);
+            }
             if (send)
             {
                 ServerEmulator.instance.SendLeave(this);

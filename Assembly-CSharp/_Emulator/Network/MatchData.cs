@@ -10,6 +10,7 @@ namespace _Emulator
         public int playTime;
         public int blueScore;
         public int redScore;
+        public ClientReference highestKillsClient;
         public int lobbyCountdownTime;
         public int masterSeq;
         public bool isBalance;
@@ -32,6 +33,7 @@ namespace _Emulator
             playTime = 0;
             blueScore = 0;
             redScore = 0;
+            highestKillsClient = null;
             lobbyCountdownTime = 0;
             masterSeq = 0;
             isBalance = false;
@@ -61,6 +63,7 @@ namespace _Emulator
         {
             blueScore = 0;
             redScore = 0;
+            highestKillsClient = null;
             destroyedBricks.Clear();
             usedCannons.Clear();
             usedTrains.Clear();
@@ -86,6 +89,50 @@ namespace _Emulator
 
             else
                 return 1;
+        }
+
+        public ClientReference GetHighestKillsClient()
+        {
+            ClientReference bestClient = null;
+            foreach(ClientReference client in clientList)
+            {
+                if (bestClient == null)
+                    bestClient = client;
+                if (client.kills > bestClient.kills)
+                    bestClient = client;
+            }
+
+            return bestClient;
+        }
+
+        public bool UpdateHighestKillsClient()
+        {
+            ClientReference bestClient = GetHighestKillsClient();
+            if (bestClient != null)
+            {
+                highestKillsClient = bestClient;
+                return true;
+            }
+
+            return false;
+        }
+
+        public void EndMatch()
+        {
+            switch (room.Type)
+            {
+                case Room.ROOM_TYPE.TEAM_MATCH:
+                    ServerEmulator.instance.HandleTeamMatchEnd();
+                    break;
+
+                case Room.ROOM_TYPE.INDIVIDUAL:
+                    ServerEmulator.instance.HandleIndividualMatchEnd();
+                    break;
+
+                default:
+                    ServerEmulator.instance.HandleIndividualMatchEnd();
+                    break;
+            }
         }
 
         public void AddClient(ClientReference client)

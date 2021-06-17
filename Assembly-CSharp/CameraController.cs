@@ -6,9 +6,9 @@ public class CameraController : MonoBehaviour
 
 	private Vector3 eyePositionOnSquatted;
 
-	private float xSpeed = 270f;
+	public static float xSpeed = 270f;
 
-	private float ySpeed = 120f;
+	public static float ySpeed = 120f;
 
 	private float scopeCameraFactor = 1f;
 

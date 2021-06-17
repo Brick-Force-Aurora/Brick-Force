@@ -1,0 +1,22 @@
+Changelog v1.1.0:
+	Game Features:
+	+Added Deathmatch support in server
+	
+	Client Features:
+	+Added small config system
+		+Load/Save
+		+F7 opens config menu
+		+Crosshair Hue
+		+Paintball textures on/off (requires restart)
+		+Mouse axis ratio
+		+Various server utilities
+
+	Bugfixes:
+	-Fixed race conditions in server message handling
+	-Improved server disconnects and handling of dead clients
+	-Improved overall server stability
+	-Removed sending of unnecessary messages for performance boost
+	
+	Other Changes
+	+Added string lookup for CSV loader
+	+Refactored match ending

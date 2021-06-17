@@ -163,6 +163,40 @@ public class CSVLoader
 		return true;
 	}
 
+	public T GetValue<T>(string findRow, int col = 1)
+	{
+		string[] row = _rows.Find(x => x[0] == findRow);
+		if (row != null && row.Length > col)
+		{
+			return (T)Convert.ChangeType(row[col], typeof(T));
+		}
+
+		Debug.LogError("CSVLoader.GetValue: row or column does not exist. " + findRow + ", " + col);
+		return default;
+	}
+
+	public void SetValue<T>(string findRow, T value, int col = 1, bool extend = true)
+	{
+		string[] row = _rows.Find(x => x[0] == findRow);
+		if (row != null)
+		{
+			if (row.Length > col)
+				row[col] = Convert.ToString(value);
+			return;
+		}
+
+		if (extend)
+		{
+			string[] addRow = new string[Cols];
+			addRow[0] = findRow;
+			if (addRow.Length > col)
+				addRow[col] = Convert.ToString(value);
+			_rows.Add(addRow);
+			return;
+		}
+		Debug.LogError("CSVLoader.SetValue: row or column does not exist. " + findRow + ", " + col);
+	}
+
 	public bool SecuredLoadFromBinaryReader(BinaryReader reader)
 	{
 		try
@@ -275,7 +309,7 @@ public class CSVLoader
 		return true;
 	}
 
-	public bool Save(string pathName)
+	public bool Save(string pathName, string header = "x\tCode")
 	{
 		if (!_loaded || _rows == null)
 		{
@@ -288,7 +322,7 @@ public class CSVLoader
 			FileStream fileStream = File.Open(pathName, FileMode.Create, FileAccess.Write);
 			StreamWriter streamWriter = new StreamWriter(fileStream, Encoding.ASCII);
 			streamWriter.BaseStream.Seek(0L, SeekOrigin.Begin);
-			streamWriter.WriteLine("x\tCode");
+			streamWriter.WriteLine(header);
 			for (int row = 0; row < Rows; row++)
 			{
 				string rowString = "";

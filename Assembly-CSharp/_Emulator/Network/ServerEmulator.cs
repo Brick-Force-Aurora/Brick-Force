@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace _Emulator
@@ -11,10 +12,8 @@ namespace _Emulator
     {
 		public static ServerEmulator instance;
 		private readonly object dataLock = new object();
-
 		public List<ClientReference> clientList = new List<ClientReference>();
         private Socket serverSocket;
-		private byte[] buffer = new byte[8192];
 		private byte recvKey = byte.MaxValue;
 		private byte sendKey = byte.MaxValue;
 		private Queue<MsgReference> readQueue = new Queue<MsgReference>();
@@ -32,53 +31,95 @@ namespace _Emulator
 
 		private void Start()
 		{
-			BuildOption.Instance.Props.UseP2pHolePunching = true;
 			matchData = new MatchData();
 			defaultChannel = new Channel(_id: 1, _mode: 2, _name: "Default", _ip: "", _port: 5000, _userCount: 1, _maxUserCount: 16, _country: 1, _minLvRank: 0, _maxLvRank: 66, _xpBonus: 0, _fpBonus: 0, _limitStarRate: 0);
 		}
 
 		public void SetupServer()
 		{
-			if (serverSocket == null)
+			try
 			{
-				serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-				serverSocket.Bind(new IPEndPoint(IPAddress.Any, 5000));
+				if (serverSocket == null)
+				{
+					serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+					serverSocket.Bind(new IPEndPoint(IPAddress.Any, 5000));
+				}
+				serverSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+				serverSocket.Listen(16);
+				serverSocket.BeginAccept(new AsyncCallback(AcceptCallback), null);
+				serverCreated = true;
+				Debug.Log("Server created");
 			}
-			serverSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-			serverSocket.Listen(16);
-			serverSocket.BeginAccept(new AsyncCallback(AcceptCallback), null);
-			serverCreated = true;
+
+			catch (Exception ex)
+			{
+				Debug.LogError("SetupServer: " + ex.Message);
+			}
+
 			regMaps = RegMapManager.Instance.dicRegMap.ToList();
-			Debug.Log("Server created");
 		}
 
 		private void AcceptCallback(IAsyncResult result)
         {
-			Socket clientSocket = serverSocket.EndAccept(result);
-			clientSocket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallback), clientSocket);
-			HandleClientAccepted(new ClientReference(clientSocket));
-            serverSocket.BeginAccept(new AsyncCallback(AcceptCallback), null);
-        }
+			try
+			{
+				Socket clientSocket = serverSocket.EndAccept(result);
+
+				ClientReference client = new ClientReference(clientSocket);
+				if (!Config.instance.blockConnections)
+				{
+					if (HandleClientAccepted(client))
+						clientSocket.BeginReceive(client.buffer, 0, client.buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallback), client);
+					else
+						SendDisconnect(client);
+				}
+
+				else
+					SendDisconnect(client);
+			}
+
+			catch (Exception ex)
+			{
+				Debug.LogError("AcceptCallback: " + ex.Message);
+			}
+
+			finally
+			{
+				serverSocket.BeginAccept(new AsyncCallback(AcceptCallback), null);
+			}
+		}
 
 		private void ReceiveCallback(IAsyncResult result)
 		{
-			Socket clientSocket = (Socket)result.AsyncState;
-			int numBytes = clientSocket.EndReceive(result);
-			Msg4Recv recv = new Msg4Recv(buffer);
-			recv._hdr.FromArray(recv.Buffer);
-			MsgBody msgBody = recv.Flush();
-			msgBody.Decrypt(recvKey);
-
-			lock (dataLock)
+			try
 			{
-				ClientReference client = FindClientBySocket(clientSocket);
-				if (numBytes <= 0)
-					client.Disconnect(true);
-				else
-					readQueue.Enqueue(new MsgReference(new Msg2Handle(recv.GetId(), msgBody), client));
+				ClientReference client = (ClientReference)result.AsyncState;
+				int numBytes = client.socket.EndReceive(result);
+				Msg4Recv recv = new Msg4Recv(client.buffer);
+				recv._hdr.FromArray(recv.Buffer);
+				MsgBody msgBody = recv.Flush();
+				msgBody.Decrypt(recvKey);
+
+				lock (dataLock)
+				{
+					if (numBytes <= 0)
+						client.Disconnect(true);
+					else
+					{
+						readQueue.Enqueue(new MsgReference(new Msg2Handle(recv.GetId(), msgBody), client));
+						HandleMessages();
+					}
+				}
+
+				client.buffer = new byte[8192];
+				if (numBytes > 0)
+					client.socket.BeginReceive(client.buffer, 0, client.buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallback), client);
 			}
 
-			clientSocket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallback), clientSocket);
+			catch(Exception ex)
+			{
+				Debug.LogError("ReceiveCallback: " + ex.Message);
+			}
 		}
 
 		private void SendCallback(IAsyncResult result)
@@ -169,11 +210,14 @@ namespace _Emulator
 
 		public void ShutdownFinally()
 		{
-			waitForShutDown = false;
-			serverSocket.Shutdown(SocketShutdown.Both);
-			serverSocket.Close();
-			ClearBuffers();
-			clientList.Clear();
+			lock (dataLock)
+			{
+				waitForShutDown = false;
+				serverSocket.Shutdown(SocketShutdown.Both);
+				serverSocket.Close();
+				ClearBuffers();
+				clientList.Clear();
+			}
 		}
 
 		public void ClearBuffers()
@@ -190,13 +234,17 @@ namespace _Emulator
 			lock (dataLock)
 			{
 				writeQueue.Enqueue(msg);
+				SendMessages();
 			}
 		}
 
 		public void SayInstant(MsgReference msg)
 		{
-			writeQueue.Enqueue(msg);
-			SendMessages();
+			lock (dataLock)
+			{
+				writeQueue.Enqueue(msg);
+				SendMessages();
+			}
 		}
 
 		private void Update()
@@ -210,8 +258,38 @@ namespace _Emulator
 					ShutdownFinally();
 
 				killLogTimer += Time.deltaTime;
-				HandleMessages();
-				SendMessages();
+				HandleDeadClients();
+				//HandleMessages();
+				//SendMessages();
+			}
+		}
+
+		public void Reset()
+		{
+			ClearBuffers();
+			matchData.Reset();
+			matchData = new MatchData();
+			foreach(ClientReference client in clientList)
+			{
+				SendKick(client);
+				SendRoomList(client);
+			}
+			SendCustomMessage("Reset By Host");
+		}
+
+		private void HandleDeadClients()
+		{
+			if (!Config.instance.autoClearDeadClients)
+				return;
+
+			foreach (ClientReference client in clientList)
+			{
+				if (client.seq == -1)
+				{
+					client.toleranceTime += Time.deltaTime;
+					if (client.toleranceTime >= 3f)
+						client.Disconnect(false);
+				}
 			}
 		}
 
@@ -221,199 +299,211 @@ namespace _Emulator
 				return;
 
 			MsgReference msgRef = readQueue.Peek();
-			switch (msgRef.msg._id)
+
+			try
 			{
-				case 1:
-					HandleLoginRequest(msgRef);
-					break;
+				switch (msgRef.msg._id)
+				{
+					case 1:
+						HandleLoginRequest(msgRef);
+						break;
 
-				case 3:
-					HandleHeartbeat(msgRef);
-					break;
+					case 3:
+						HandleHeartbeat(msgRef);
+						break;
 
-				case 4:
-					HandleRoomListRequest(msgRef);
-					break;
+					case 4:
+						HandleRoomListRequest(msgRef);
+						break;
 
-				case 7:
-					HandleCreateRoomRequest(msgRef);
-					break;
+					case 7:
+						HandleCreateRoomRequest(msgRef);
+						break;
 
-				case 23:
-					HandleLeave(msgRef);
-					break;
+					case 23:
+						HandleLeave(msgRef);
+						break;
 
-				case 24:
-					HandleChatRequest(msgRef);
-					break;
+					case 24:
+						HandleChatRequest(msgRef);
+						break;
 
-				case 28:
-					HandleJoinRequest(msgRef);
-					break;
+					case 28:
+						HandleJoinRequest(msgRef);
+						break;
 
-				case 32:
-					HandleResumeRoomRequest(msgRef);
-					break;
+					case 32:
+						HandleResumeRoomRequest(msgRef);
+						break;
 
-				case 35:
-					HandleEquipRequest(msgRef);
-					break;
+					case 35:
+						HandleEquipRequest(msgRef);
+						break;
 
-				case 42:
-					HandleLoadComplete(msgRef);
-					break;
+					case 42:
+						HandleLoadComplete(msgRef);
+						break;
 
-				case 44:
-					HandleKillLogRequest(msgRef);
-					break;
+					case 44:
+						HandleKillLogRequest(msgRef);
+						break;
 
-				case 47:
-					HandleSetStatusRequest(msgRef);
-					break;
+					case 47:
+						HandleSetStatusRequest(msgRef);
+						break;
 
-				case 49:
-					HandleStartRequest(msgRef);
-					break;
+					case 49:
+						HandleStartRequest(msgRef);
+						break;
 
-				case 63:
-					HandleRespawnTicketRequest(msgRef);
-					break;
+					case 63:
+						HandleRespawnTicketRequest(msgRef);
+						break;
 
-				case 65:
-					HandleTimer(msgRef);
-					break;
+					case 65:
+						HandleTimer(msgRef);
+						break;
 
-				case 71:
-					HandleMatchCountdown(msgRef);
-					break;
+					case 71:
+						HandleMatchCountdown(msgRef);
+						break;
 
-				case 73:
-					HandleBreakIntoRequest(msgRef);
-					break;
+					case 73:
+						HandleBreakIntoRequest(msgRef);
+						break;
 
-				case 75:
-					HandleTeamScoreRequest(msgRef);
-					break;
+					case 75:
+						HandleTeamScoreRequest(msgRef);
+						break;
 
-				case 76:
-					HandleDestroyBrickRequest(msgRef);
-					break;
+					case 76:
+						HandleDestroyBrickRequest(msgRef);
+						break;
 
-				case 80:
-					HandleTeamChangeRequest(msgRef);
-					break;
+					case 80:
+						HandleTeamChangeRequest(msgRef);
+						break;
 
-				case 85:
-					HandleSlotLockRequest(msgRef);
-					break;
+					case 85:
+						HandleSlotLockRequest(msgRef);
+						break;
 
-				case 91:
-					HandleRoomConfig(msgRef);
-					break;
+					case 91:
+						HandleRoomConfig(msgRef);
+						break;
 
-				case 93:
-					HandleTeamChatRequest(msgRef);
-					break;
+					case 93:
+						HandleTeamChatRequest(msgRef);
+						break;
 
-				case 95:
-					HandleRadioMsgRequest(msgRef);
-					break;
+					case 95:
+						HandleRadioMsgRequest(msgRef);
+						break;
 
-				case 135:
-					HandleP2PComplete(msgRef);
-					break;
+					case 135:
+						HandleP2PComplete(msgRef);
+						break;
 
-				case 137:
-					HandleResultDoneRequest(msgRef);
-					break;
+					case 137:
+						HandleResultDoneRequest(msgRef);
+						break;
 
-				case 145:
-					HandleRoamin(msgRef);
-					break;
+					case 145:
+						HandleRoamin(msgRef);
+						break;
 
-				case 158:
-					HandleGetCannonRequest(msgRef);
-					break;
+					case 158:
+						HandleGetCannonRequest(msgRef);
+						break;
 
-				case 160:
-					HandleEmptyCannonRequest(msgRef);
-					break;
+					case 160:
+						HandleEmptyCannonRequest(msgRef);
+						break;
 
-				case 333:
-					HandleSetShooterToolRequest(msgRef);
-					break;
+					case 333:
+						HandleSetShooterToolRequest(msgRef);
+						break;
 
-				case 334:
-					HandleClearShooterTools(msgRef);
-					break;
+					case 334:
+						HandleClearShooterTools(msgRef);
+						break;
 
-				case 337:
-					HandleRegMapInfoRequest(msgRef);
-					break;
+					case 337:
+						HandleRegMapInfoRequest(msgRef);
+						break;
 
-				case 368:
-					HandleWeaponHeldRatioRequest(msgRef);
-					break;
+					case 368:
+						HandleWeaponHeldRatioRequest(msgRef);
+						break;
 
-				case 389:
-					HandleDelegateMasterRequest(msgRef);
-					break;
+					case 389:
+						HandleDelegateMasterRequest(msgRef);
+						break;
 
-				case 414:
-					HandleWeaponChangeRequest(msgRef);
-					break;
+					case 414:
+						HandleWeaponChangeRequest(msgRef);
+						break;
 
-				case 419:
-					HandleSetWeaponSlotRequest(msgRef);
-					break;
+					case 419:
+						HandleSetWeaponSlotRequest(msgRef);
+						break;
 
-				case 420:
-					HandleClearWeaponSlots(msgRef);
-					break;
+					case 420:
+						HandleClearWeaponSlots(msgRef);
+						break;
 
-				case 425:
-					HandleRequestDownloadedMaps(msgRef);
-					break;
+					case 425:
+						HandleRequestDownloadedMaps(msgRef);
+						break;
 
-				case 447:
-					HandleOpenDoorRequest(msgRef);
-					break;
+					case 447:
+						HandleOpenDoorRequest(msgRef);
+						break;
 
-				case 448:
-					HandleCloseDoorRequest(msgRef);
-					break;
+					case 448:
+						HandleCloseDoorRequest(msgRef);
+						break;
 
-				case 469:
-					HandleRoomRequest(msgRef);
-					break;
+					case 469:
+						HandleRoomRequest(msgRef);
+						break;
 
-				case 478:
-					HandleRequestUserList(msgRef);
-					break;
+					case 478:
+						HandleRequestUserList(msgRef);
+						break;
 
-				case 551:
-					HandleGetTrainRequest(msgRef);
-					break;
+					case 551:
+						HandleGetTrainRequest(msgRef);
+						break;
 
-				case 553:
-					HandleEmptyTrainRequest(msgRef);
-					break;
+					case 553:
+						HandleEmptyTrainRequest(msgRef);
+						break;
 
-				case ExtensionOpcodes.opInventoryAck:
-					HandleInventoryCSV(msgRef);
-					break;
+					case ExtensionOpcodes.opInventoryAck:
+						HandleInventoryCSV(msgRef);
+						break;
 
-				case ExtensionOpcodes.opDisconnectReq:
-					HandleDisconnect(msgRef);
-					break;
+					case ExtensionOpcodes.opDisconnectReq:
+						HandleDisconnect(msgRef);
+						break;
 
-				default:
-					if (debugHandle)
-						Debug.LogWarning("Received unhandled message ID " + msgRef.msg._id + " from: " + msgRef.client.GetIdentifier());
-					break;
+					default:
+						if (debugHandle)
+							Debug.LogWarning("Received unhandled message ID " + msgRef.msg._id + " from: " + msgRef.client.GetIdentifier());
+						break;
+				}
 			}
 
-			readQueue.Dequeue();
+			catch (Exception ex)
+			{
+				Debug.LogError("HandleMessages: " + ex.Message);
+			}
+
+			finally
+			{
+				readQueue.Dequeue();
+			}
 		}
 
 		private void SendMessages()
@@ -422,46 +512,65 @@ namespace _Emulator
 				return;
 
 			MsgReference msgRef = writeQueue.Peek();
-			switch (msgRef.sendType)
+
+			try
 			{
-				case SendType.Unicast:
-					UnicastMessage(msgRef);
-					break;
+				switch (msgRef.sendType)
+				{
+					case SendType.Unicast:
+						UnicastMessage(msgRef);
+						break;
 
-				case SendType.Broadcast:
-					BroadcastMessage(msgRef);
-					break;
+					case SendType.Broadcast:
+						BroadcastMessage(msgRef);
+						break;
 
-				case SendType.BroadcastRoom:
-					BroadcastRoomMessage(msgRef);
-					break;
+					case SendType.BroadcastRoom:
+						BroadcastRoomMessage(msgRef);
+						break;
 
-				case SendType.BroadcastRoomExclusive:
-					BroadcastRoomMessageExclusive(msgRef);
-					break;
+					case SendType.BroadcastRoomExclusive:
+						BroadcastRoomMessageExclusive(msgRef);
+						break;
 
-				case SendType.BroadcastRedTeam:
-					BroadcastRedTeamMessage(msgRef);
-					break;
+					case SendType.BroadcastRedTeam:
+						BroadcastRedTeamMessage(msgRef);
+						break;
 
-				case SendType.BroadcastBlueTeam:
-					BroadcastBlueTeamMessage(msgRef);
-					break;
+					case SendType.BroadcastBlueTeam:
+						BroadcastBlueTeamMessage(msgRef);
+						break;
+				}
 			}
 
-			writeQueue.Dequeue();
+			catch (Exception ex)
+			{
+				Debug.LogError("SendMessages: " + ex.Message);
+			}
+
+			finally
+			{
+				writeQueue.Dequeue();
+			}
 		}
 
-		private void HandleClientAccepted(ClientReference client)
+		private bool HandleClientAccepted(ClientReference client)
 		{
-			if (!clientList.Exists(x => x.socket == client.socket))
+			lock (dataLock)
 			{
-				clientList.Add(client);
-				SendConnected(client);
-			}
+				if (!Config.instance.blockConnections && clientList.Count < Config.instance.maxConnections && !clientList.Exists(x => x.socket == client.socket) && (!Config.instance.oneClientPerIP || !clientList.Exists(x => x.ip == client.ip)))
+				{
+					clientList.Add(client);
+					SendConnected(client);
+					return true;
+				}
 
-			else
-				Debug.LogWarning("HandleClientAccepted: Client " + client.socket.RemoteEndPoint.ToString() + " already exists in client list");
+				else
+				{
+					Debug.Log("HandleClientAccepted: Blocked Client " + client.GetIdentifier() + " from Connecting");
+					return false;
+				}
+			}
 		}
 
 		private void HandleHeartbeat(MsgReference msgRef)
@@ -520,7 +629,7 @@ namespace _Emulator
 				Debug.Log("HandleTimer from: " + msgRef.client.GetIdentifier());
 
 			if (matchData.remainTime <= 0)
-				HandleTeamMatchEnd();
+				matchData.EndMatch();
 
 			SendTimer(msgRef.client);
 		}
@@ -860,6 +969,7 @@ namespace _Emulator
 				matchData.clientList[i].status = BrickManDesc.STATUS.PLAYER_LOADING;
 				matchData.clientList[i].clientStatus = ClientReference.ClientStatus.Match;
 				SendSetStatus(matchData.clientList[i]);
+				SendRespawnTicket(matchData.clientList[i]);
 			}
 
 			SendStart();
@@ -960,14 +1070,8 @@ namespace _Emulator
 				killer = damageLog.OrderByDescending(x => x.Value).FirstOrDefault().Key;
 
 			ClientReference killerClient = matchData.clientList.Find(x => x.seq == killer);
-			if (killer != victim) //TDM
+			if (killer != victim)
 			{
-
-				if (victimClient.slot.slotIndex > 7)
-					matchData.redScore++;
-				else
-					matchData.blueScore++;
-
 				killerClient.kills++;
 				SendKillCount(killerClient);
 			}
@@ -996,10 +1100,34 @@ namespace _Emulator
 			KillLogEntry killLogEntry = new KillLogEntry(id, killerType, killer, victimType, victim, (Weapon.BY)weaponBy, slot, category, hitpart, damageLog);
 			matchData.killLog.Add(killLogEntry);
 			SendKillLogEntry(killLogEntry);
-			SendTeamScore();
 
-			if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
-				HandleTeamMatchEnd();
+			if (killer != victim)
+			{
+				switch (matchData.room.Type)
+				{
+					case Room.ROOM_TYPE.TEAM_MATCH:
+						if (victimClient.slot.slotIndex > 7)
+							matchData.redScore++;
+						else
+							matchData.blueScore++;
+						SendTeamScore();
+						if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
+						{
+							HandleTeamMatchEnd();
+						}
+						break;
+
+					case Room.ROOM_TYPE.INDIVIDUAL:
+						matchData.redScore++;
+						SendIndividualScore();
+
+						if (matchData.redScore >= matchData.room.goal)
+						{
+							HandleIndividualMatchEnd();
+						}
+						break;
+				}
+			}
 		}
 
 		private void HandleTeamScoreRequest(MsgReference msgRef)
@@ -1263,6 +1391,14 @@ namespace _Emulator
 			SendRespawnTicket(msgRef.client);
 		}
 
+		public void HandleIndividualMatchEnd()
+		{
+			matchData.room.Status = Room.ROOM_STATUS.WAITING;
+			SendIndividualMatchEnd();
+			matchData.Reset();
+			SendRoom(null, SendType.BroadcastRoom);
+		}
+
 		public void HandleTeamMatchEnd()
 		{
 			matchData.room.Status = Room.ROOM_STATUS.WAITING;
@@ -1380,6 +1516,25 @@ namespace _Emulator
 			}
 		}
 
+		public void SendPremiumItems(ClientReference client)
+		{
+			MsgBody body = new MsgBody();
+
+			body.Write(2);
+			body.Write("s20");
+			body.Write("s21");
+
+			Say(new MsgReference(492, body, client));
+		}
+
+		public void SendKick(ClientReference client, SendType sendType = SendType.Unicast)
+		{
+			MsgBody body = new MsgBody();
+
+			body.Write(client.seq);
+
+			Say(new MsgReference(89, body, client, sendType));
+		}
 		public void SendCannons(ClientReference client)
 		{
 			foreach(KeyValuePair<int, int> entry in matchData.usedCannons)
@@ -1511,6 +1666,33 @@ namespace _Emulator
 			SendWeaponSlotList(client);
 			SendItemProperties(client);
 			SendItemPimps(client);
+			SendPremiumItems(client);
+		}
+		public void SendIndividualMatchEnd()
+		{
+			MsgBody body = new MsgBody();
+
+			body.Write(matchData.clientList.Count);
+			for (int i = 0; i < matchData.clientList.Count; i++)
+			{
+				body.Write(matchData.clientList[i].slot.isRed);
+				body.Write(matchData.clientList[i].seq);
+				body.Write(matchData.clientList[i].name);
+				body.Write(matchData.clientList[i].kills);
+				body.Write(matchData.clientList[i].deaths);
+				body.Write(matchData.clientList[i].assists);
+				body.Write(matchData.clientList[i].score);
+				body.Write(0); //points
+				body.Write(0); //xp
+				body.Write(0); //mission
+				body.Write(matchData.clientList[i].data.xp);
+				body.Write(matchData.clientList[i].data.xp);
+				body.Write((long)0); //buff
+			}
+			Say(new MsgReference(180, body, null, SendType.BroadcastRoom));
+
+			if (debugSend)
+				Debug.Log("Broadcasted SendIndivudalMatchEnd for room no: " + matchData.room.No);
 		}
 
 		public void SendTeamMatchEnd()
@@ -1840,6 +2022,18 @@ namespace _Emulator
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendKillLogEntry for room no: " + matchData.room.No);
+		}
+
+		public void SendIndividualScore()
+		{
+			MsgBody body = new MsgBody();
+
+			body.Write(matchData.redScore);
+
+			Say(new MsgReference(179, body, null, SendType.BroadcastRoom));
+
+			if (debugSend)
+				Debug.Log("Broadcasted SendIndividualScore for room no: " + matchData.room.No);
 		}
 
 		public void SendTeamScore()

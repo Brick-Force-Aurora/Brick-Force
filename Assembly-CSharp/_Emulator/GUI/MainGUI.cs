@@ -57,9 +57,14 @@ namespace _Emulator
                 ServerEmulator.instance.ShutdownInit();
             }
 
+            if (GUILayout.Button("Reset"))
+            {
+                ServerEmulator.instance.Reset();
+            }
+
             if (GUILayout.Button("End Match"))
             {
-                ServerEmulator.instance.HandleTeamMatchEnd();
+                ServerEmulator.instance.matchData.EndMatch();
             }
 
             if (GUILayout.Button("Clear Buffers"))
@@ -73,10 +78,6 @@ namespace _Emulator
             {
                 ServerEmulator.instance.SendCustomMessage(customMessage);
             }
-
-            ServerEmulator.instance.debugHandle = GUILayout.Toggle(ServerEmulator.instance.debugHandle, "Debug Handle");
-            ServerEmulator.instance.debugSend = GUILayout.Toggle(ServerEmulator.instance.debugSend, "Debug Send");
-            ServerEmulator.instance.debugPing = GUILayout.Toggle(ServerEmulator.instance.debugPing, "Debug Ping");
 
             GUILayout.Label("Clients:");
 

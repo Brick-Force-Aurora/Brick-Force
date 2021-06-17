@@ -195,7 +195,7 @@ public class P2PManager : MonoBehaviour
 
 	public const byte PEER_CLIENTINFO = 95;
 
-	private Socket sock;
+	public Socket sock;
 
 	private long prevServerTick = 9223372036854775807L;
 
@@ -339,6 +339,7 @@ public class P2PManager : MonoBehaviour
 
 	private void SendP2pStatus()
 	{
+		return;
 		if (sock != null)
 		{
 			try
@@ -365,6 +366,7 @@ public class P2PManager : MonoBehaviour
 
 	private void SendRandezvousPing()
 	{
+		return;
 		if (sock != null)
 		{
 			try
@@ -486,7 +488,6 @@ public class P2PManager : MonoBehaviour
 			readQueue = new Queue();
 			recv = new P2PMsg4Recv();
 			sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-			//sock.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 			uint num = 2147483648u;
 			uint num2 = 402653184u;
 			uint ioctl_code = num | num2 | 0xC;
@@ -731,7 +732,7 @@ public class P2PManager : MonoBehaviour
 		}
 	}
 
-	private static byte Seq2Slot(uint seq)
+	public static byte Seq2Slot(uint seq)
 	{
 		if (seq == uint.MaxValue)
 		{
@@ -845,6 +846,7 @@ public class P2PManager : MonoBehaviour
 				SendP2pStatus();
 				SendPing();
 			}
+
 			lock (this)
 			{
 				while (readQueue.Count > 0)
@@ -1130,6 +1132,301 @@ public class P2PManager : MonoBehaviour
 						default:
 							Debug.LogError("Unknown msg encountered " + p2PMsg2Handle._id);
 							break;
+						}
+					}
+					readQueue.Dequeue();
+				}
+			}
+		}
+	}
+
+	private void HandleMessages()
+	{
+		if (sock != null && recv != null && readQueue != null)
+		{
+			lock (this)
+			{
+				while (readQueue.Count > 0)
+				{
+					P2PMsg2Handle p2PMsg2Handle = (P2PMsg2Handle)readQueue.Peek();
+					ushort meta = p2PMsg2Handle._meta;
+					bool flag = true;
+					if (meta != 65535)
+					{
+						SendPEER_RELIABLE_ACK(meta);
+						if (processedReliableIndex >= meta)
+						{
+							flag = false;
+						}
+						else
+						{
+							processedReliableIndex = meta;
+						}
+					}
+					if (flag)
+					{
+						switch (p2PMsg2Handle._id)
+						{
+							case 26:
+								HandlePEER_INITIATE(p2PMsg2Handle._msg);
+								break;
+							case 2:
+								HandlePEER_MOVE(p2PMsg2Handle._msg);
+								break;
+							case 5:
+								HandlePEER_THROW(p2PMsg2Handle._msg);
+								break;
+							case 6:
+								HandlePEER_SWAP_WEAPON(p2PMsg2Handle._msg);
+								break;
+							case 7:
+								HandlePEER_RELOAD(p2PMsg2Handle._msg);
+								break;
+							case 8:
+								HandlePEER_FIRE(p2PMsg2Handle._msg);
+								break;
+							case 9:
+								HandlePEER_SHOOT(p2PMsg2Handle._msg);
+								break;
+							case 10:
+								HandlePEER_DIE(p2PMsg2Handle._msg);
+								break;
+							case 11:
+								HandlePEER_RESPAWN(p2PMsg2Handle._msg);
+								break;
+							case 12:
+								HandlePEER_SLASH(p2PMsg2Handle._msg);
+								break;
+							case 13:
+								HandlePEER_PIERCE(p2PMsg2Handle._msg);
+								break;
+							case 14:
+								HandlePEER_PROJECTILE(p2PMsg2Handle._msg);
+								break;
+							case 15:
+								HandlePEER_BOMBED(p2PMsg2Handle._msg);
+								break;
+							case 16:
+								HandlePEER_PROJECTILE_FLY(p2PMsg2Handle._msg);
+								break;
+							case 17:
+								HandlePEER_PROJECTILE_KABOOM(p2PMsg2Handle._msg);
+								break;
+							case 18:
+								HandlePEER_PING(p2PMsg2Handle._msg);
+								break;
+							case 21:
+								HandlePEER_BRICK_HITPOINT(p2PMsg2Handle._msg);
+								break;
+							case 22:
+								HandlePEER_COMPOSE(p2PMsg2Handle._msg);
+								break;
+							case 23:
+								HandlePEER_WEAPON_STATUS(p2PMsg2Handle._msg);
+								break;
+							case 24:
+								SendRandezvousPing();
+								break;
+							case 25:
+								HandlePEER_RANDEZVOUS_PONG(p2PMsg2Handle._msg);
+								break;
+							case 27:
+								HandlePEER_RELIABLE_ACK(p2PMsg2Handle._msg);
+								break;
+							case 28:
+								HandlePEER_FALL_DOWN(p2PMsg2Handle._msg);
+								break;
+							case 29:
+								HandlePEER_CANNON_MOVE(p2PMsg2Handle._msg);
+								break;
+							case 30:
+								HandlePEER_CANNON_FIRE(p2PMsg2Handle._msg);
+								break;
+							case 31:
+								HandlePEER_HIT_BRICK(p2PMsg2Handle._msg);
+								break;
+							case 32:
+								HandlePEER_HIT_BRICKMAN(p2PMsg2Handle._msg);
+								break;
+							case 34:
+								HandlePEER_ENABLE_HANDBOMB(p2PMsg2Handle._msg);
+								break;
+							case 20:
+								HandlePEER_PRIVATE_SHAKE(p2PMsg2Handle._msg);
+								break;
+							case 4:
+								HandlePEER_PUBLIC_SHAKE(p2PMsg2Handle._msg);
+								break;
+							case 36:
+								HandlePEER_RELAY_SHAKE(p2PMsg2Handle._msg);
+								break;
+							case 19:
+								HandlePEER_PRIVATE_HAND(p2PMsg2Handle._msg, p2PMsg2Handle._recvFrom);
+								break;
+							case 3:
+								HandlePEER_PUBLIC_HAND(p2PMsg2Handle._msg, p2PMsg2Handle._recvFrom);
+								break;
+							case 35:
+								HandlePEER_RELAY_HAND(p2PMsg2Handle._msg, p2PMsg2Handle._recvFrom);
+								break;
+							case 37:
+								HandlePEER_MON_GEN(p2PMsg2Handle._msg);
+								break;
+							case 38:
+								HandlePEER_MON_DIE(p2PMsg2Handle._msg);
+								break;
+							case 39:
+								HandlePEER_MON_MOVE(p2PMsg2Handle._msg);
+								break;
+							case 43:
+								HandlePEER_MON_HIT(p2PMsg2Handle._msg);
+								break;
+							case 44:
+								HandlePEER_SPECTATOR(p2PMsg2Handle._msg);
+								break;
+							case 47:
+								HandlePEER_BLAST_TIME(p2PMsg2Handle._msg);
+								break;
+							case 48:
+								HandlePEER_HIT_IMPACT(p2PMsg2Handle._msg);
+								break;
+							case 50:
+								HandlePEER_INSTALLING_BOMB(p2PMsg2Handle._msg);
+								break;
+							case 51:
+								HandlePEER_UNINSTALLING_BOMB(p2PMsg2Handle._msg);
+								break;
+
+
+							case 52:
+								SendP2pStatus();
+								break;
+							case 53:
+								HandlePEER_DIR(p2PMsg2Handle._msg);
+								break;
+							case 54:
+								HandlePEER_CONSUME(p2PMsg2Handle._msg);
+								break;
+							case 55:
+								HandlePEER_UNINVINCIBLE(p2PMsg2Handle._msg);
+								break;
+							case 56:
+								HandlePEER_NUMWAVE(p2PMsg2Handle._msg);
+								break;
+							case 57:
+								HandlePEER_MON_ADDPOINT(p2PMsg2Handle._msg);
+								break;
+							case 58:
+								HandlePEER_DF_HEALER(p2PMsg2Handle._msg);
+								break;
+							case 59:
+								HandlePEER_DF_SELFHEAL(p2PMsg2Handle._msg);
+								break;
+							case 60:
+								HandlePEER_HP(p2PMsg2Handle._msg);
+								break;
+							case 61:
+								HandlePEER_BIG_WPN_FIRE(p2PMsg2Handle._msg);
+								break;
+							case 62:
+								HandlePEER_BIG_WPN_FLY(p2PMsg2Handle._msg);
+								break;
+							case 63:
+								HandlePEER_BIG_WPN_KABOOM(p2PMsg2Handle._msg);
+								break;
+							case 64:
+								HandlePEER_BOOST(p2PMsg2Handle._msg);
+								break;
+							case 65:
+								HandlePEER_SENSEBEAM(p2PMsg2Handle._msg);
+								break;
+							case 66:
+								HandlePEER_CONNECTION_STATUS(p2PMsg2Handle._msg);
+								break;
+							case 68:
+								HandlePEER_RANDEZVOUS_STATUS(p2PMsg2Handle._msg);
+								break;
+							case 69:
+								HandlePEER_BIG_FIRE(p2PMsg2Handle._msg);
+								break;
+							case 70:
+								HandlePEER_PORTAL(p2PMsg2Handle._msg);
+								break;
+							case 71:
+								HandlePEER_BRICK_ANIM(p2PMsg2Handle._msg);
+								break;
+							case 72:
+								HandlePEER_INVISIBLILITY(p2PMsg2Handle._msg);
+								break;
+							case 73:
+								HandlePEER_FIRE_NEW(p2PMsg2Handle._msg);
+								break;
+							case 74:
+								HandlePEER_HIT_BRICK_NEW(p2PMsg2Handle._msg);
+								break;
+							case 75:
+								HandlePEER_MON_HIT_NEW(p2PMsg2Handle._msg);
+								break;
+							case 76:
+								HandlePEER_HIT_BRICKMAN_NEW(p2PMsg2Handle._msg);
+								break;
+							case 77:
+								HandlePEER_HIT_IMPACT_NEW(p2PMsg2Handle._msg);
+								break;
+							case 78:
+								HandlePEER_MOVE_W(p2PMsg2Handle._msg);
+								break;
+							case 79:
+								HandlePEER_FIRE_ACTION_W(p2PMsg2Handle._msg);
+								break;
+							case 80:
+								HandlePEER_FIRE_W(p2PMsg2Handle._msg);
+								break;
+							case 81:
+								HandlePEER_DIR_W(p2PMsg2Handle._msg);
+								break;
+							case 82:
+								HandlePEER_HIT_BRICKMAN_W(p2PMsg2Handle._msg);
+								break;
+							case 83:
+								HandlePEER_CREATE_ACTIVE_ITEM(p2PMsg2Handle._msg);
+								break;
+							case 84:
+								HandlePEER_EAT_ACTIVE_ITEM_REQ(p2PMsg2Handle._msg);
+								break;
+							case 85:
+								HandlePEER_EAT_ACTIVE_ITEM_ACK(p2PMsg2Handle._msg);
+								break;
+							case 86:
+								HandlePEER_GUN_ANIM(p2PMsg2Handle._msg);
+								break;
+							case 87:
+								HandlePEER_STATE_FEVER(p2PMsg2Handle._msg);
+								break;
+							case 88:
+								HandlePEER_USE_ACTIVE_ITEM(p2PMsg2Handle._msg);
+								break;
+							case 89:
+								HandlePEER_BLACKHOLE_EFF(p2PMsg2Handle._msg);
+								break;
+							case 90:
+								HandlePEER_BUNGEE_BREAK_INTO_REQ(p2PMsg2Handle._msg);
+								break;
+							case 91:
+								HandlePEER_BUNGEE_BREAK_INTO_ACK(p2PMsg2Handle._msg);
+								break;
+							case 92:
+								HandlePEER_BUNGEE_BREAK_INTO_ACTIVEITEM_LIST(p2PMsg2Handle._msg);
+								break;
+							case 93:
+								HandlePEER_BRICK_ANIM_CROSSFADE(p2PMsg2Handle._msg);
+								break;
+							case 94:
+								HandlePEER_TRAIN_ROTATE(p2PMsg2Handle._msg);
+								break;
+							default:
+								Debug.LogError("Unknown msg encountered " + p2PMsg2Handle._id);
+								break;
 						}
 					}
 					readQueue.Dequeue();
