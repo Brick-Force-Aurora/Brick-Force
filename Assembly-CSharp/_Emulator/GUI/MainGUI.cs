@@ -36,14 +36,14 @@ namespace _Emulator
             GUILayout.Label("Host IP:");
             ClientExtension.instance.hostIP = GUILayout.TextField(ClientExtension.instance.hostIP);
 
-            if (GUILayout.Button("Host Match"))
+            if (GUILayout.Button("Host"))
             {
                 hostHidden = true;
                 ServerEmulator.instance.SetupServer();
                 ClientExtension.instance.LoadServer();
             }
 
-            if (GUILayout.Button("Join Match"))
+            if (GUILayout.Button("Join"))
             {
                 hostHidden = true;
                 ClientExtension.instance.LoadServer();
@@ -62,10 +62,10 @@ namespace _Emulator
                 ServerEmulator.instance.Reset();
             }
 
-            if (GUILayout.Button("End Match"))
+            /*if (GUILayout.Button("End Match"))
             {
                 ServerEmulator.instance.matchData.EndMatch();
-            }
+            }*/
 
             if (GUILayout.Button("Clear Buffers"))
             {

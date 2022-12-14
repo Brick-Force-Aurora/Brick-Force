@@ -84,6 +84,8 @@ namespace _Emulator
 
                 GUI.contentColor = logTypeColors[log.type];
                 GUILayout.Label(log.message);
+                if (log.stackTrace != string.Empty)
+                    GUILayout.Label(log.stackTrace);
             }
 
             GUILayout.EndScrollView();

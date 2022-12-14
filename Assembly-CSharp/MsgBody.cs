@@ -78,6 +78,15 @@ public class MsgBody
 		return Copy(bytes);
 	}
 
+	public bool Write(byte[] val)
+	{
+		if (!Write(val.Length))
+		{
+			return false;
+		}
+		return Copy(val);
+	}
+
 	public bool Write(int val)
 	{
 		MemoryStream memoryStream = new MemoryStream();
@@ -166,6 +175,20 @@ public class MsgBody
 			return false;
 		}
 		val = Encoding.Unicode.GetString(_buffer, _offset, val2);
+		_offset += val2;
+		return true;
+	}
+
+	public bool Read(out byte[] val)
+	{
+		val = null;
+		if (!Read(out int val2))
+		{
+			return false;
+		}
+
+		val = new byte[val2];
+		Array.Copy(_buffer, _offset, val, 0, val2);
 		_offset += val2;
 		return true;
 	}

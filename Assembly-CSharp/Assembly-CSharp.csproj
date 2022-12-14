@@ -29,6 +29,9 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
     <OutputPath>..\..\Brick-Force\BrickForce_Data\Managed\</OutputPath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <OutputPath>..\..\Brick-Force\BrickForce_Data\Managed\</OutputPath>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="Accessory.cs" />
     <Compile Include="Accuracy.cs" />
@@ -726,6 +729,10 @@
     <Compile Include="_Emulator\Core.cs" />
     <Compile Include="_Emulator\GUI\MainGUI.cs" />
     <Compile Include="_Emulator\GUI\DebugConsole.cs" />
+    <Compile Include="_Emulator\Maps\MapGenerator.cs" />
+    <Compile Include="_Emulator\Network\ChannelManager.cs" />
+    <Compile Include="_Emulator\Network\ChannelReference.cs" />
+    <Compile Include="_Emulator\Network\ChunkedBuffer.cs" />
     <Compile Include="_Emulator\Network\ClientExtension.cs" />
     <Compile Include="_Emulator\Network\ClientReference.cs" />
     <Compile Include="_Emulator\Network\ExtensionOpcodes.cs" />
@@ -736,9 +743,11 @@
     <Compile Include="_Emulator\Network\DummyData.cs" />
     <Compile Include="_Emulator\Network\ServerEmulator.cs" />
     <Compile Include="_Emulator\Network\SlotData.cs" />
+    <Compile Include="_Emulator\Utils\CRC32.cs" />
     <Compile Include="_Emulator\Utils\Utils.cs" />
     <Compile Include="_Emulator\Utils\Hook.cs" />
     <Compile Include="_Emulator\Utils\Import.cs" />
+    <Compile Include="_Emulator\Utils\Zip.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp-firstpass, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
@@ -756,6 +765,9 @@
     <Reference Include="Boo.Lang, Version=2.0.9.5, Culture=neutral, PublicKeyToken=32c39770e9a21a67, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>bin\Debug\Boo.Lang.dll</HintPath>
+    </Reference>
+    <Reference Include="ICSharpCode.SharpZipLib">
+      <HintPath>..\..\Brick-Force\ICSharpCode.SharpZipLib.dll</HintPath>
     </Reference>
     <Reference Include="Mono.Security, Version=2.0.5.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -779,7 +791,7 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>copy /Y "$(TargetPath)" "G:\bf rewrite\Brick-Force 2\BrickForce_Data\Managed\Assembly-CSharp.dll"
-copy /Y "$(TargetPath)" "G:\bf rewrite\Brick-Force 3\BrickForce_Data\Managed\Assembly-CSharp.dll"</PostBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
   </PropertyGroup>
 </Project>

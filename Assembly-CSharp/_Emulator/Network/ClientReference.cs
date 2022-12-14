@@ -1,4 +1,5 @@
-﻿using System.Net.Sockets;
+﻿using System.Collections.Generic;
+using System.Net.Sockets;
 
 namespace _Emulator
 {
@@ -32,6 +33,10 @@ namespace _Emulator
         public SlotData slot;
         public Inventory inventory;
         public DummyData data;
+        public MatchData matchData;
+        public ChannelReference channel;
+        public ChunkedBuffer chunkedBuffer;
+
         private readonly object dataLock = new object();
 
         public ClientReference(Socket _socket, string _name = "", int _seq = -1)
@@ -56,13 +61,17 @@ namespace _Emulator
             socket.Close();
             lock (dataLock)
             {
-                ServerEmulator.instance.matchData.RemoveClient(this);
+                if (matchData != null)
+                    matchData.RemoveClient(this);
+                if (channel != null)
+                    channel.RemoveClient(this);
+                //ServerEmulator.instance.matchData.RemoveClient(this);
                 ServerEmulator.instance.clientList.Remove(this);
             }
             if (send)
             {
                 ServerEmulator.instance.SendLeave(this);
-                ServerEmulator.instance.SendSlotData();
+                ServerEmulator.instance.SendSlotData(matchData);
             }
         }
 

@@ -322,7 +322,8 @@ public class CSVLoader
 			FileStream fileStream = File.Open(pathName, FileMode.Create, FileAccess.Write);
 			StreamWriter streamWriter = new StreamWriter(fileStream, Encoding.ASCII);
 			streamWriter.BaseStream.Seek(0L, SeekOrigin.Begin);
-			streamWriter.WriteLine(header);
+			if (header != "")
+				streamWriter.WriteLine(header);
 			for (int row = 0; row < Rows; row++)
 			{
 				string rowString = "";

@@ -7,7 +7,6 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using UnityEngine;
 using wlic;
-
 public class SockTcp
 {
 	private const int REQ_SUCCESS = 0;
@@ -3623,7 +3622,7 @@ public class SockTcp
 		Say(65, msgBody);
 	}
 
-	public void SendCS_CHANGE_USERMAP_ALIAS_REQ(sbyte slot, string alias)
+	public void SendCS_CHANGE_USERMAP_ALIAS_REQ(int slot, string alias)
 	{
 		MsgBody msgBody = new MsgBody();
 		msgBody.Write(slot);
@@ -3770,7 +3769,7 @@ public class SockTcp
 		}
 	}
 
-	public void SendCS_SAVE_REQ(byte slot, byte[] thumbnail)
+	public void SendCS_SAVE_REQ(int slot, byte[] thumbnail)
 	{
 		MsgBody msgBody = new MsgBody();
 		msgBody.Write(slot);
@@ -3782,7 +3781,8 @@ public class SockTcp
 		Say(39, msgBody);
 	}
 
-	public void SendCS_REGISTER_REQ(byte slot, ushort modeMask, int regHow, int point, int downloadFee, byte[] thumbnail, string msgEval)
+	//Hooked
+	public void SendCS_REGISTER_REQ(int slot, ushort modeMask, int regHow, int point, int downloadFee, byte[] thumbnail, string msgEval)
 	{
 		MsgBody msgBody = new MsgBody();
 		msgBody.Write(slot);
@@ -6197,7 +6197,7 @@ public class SockTcp
 	private void HandleCS_COPYRIGHT_ACK(MsgBody msg)
 	{
 		msg.Read(out int val);
-		msg.Read(out byte val2);
+		msg.Read(out int val2);
 		UserMapInfoManager.Instance.master = val;
 		if (val == MyInfoManager.Instance.Seq)
 		{
@@ -10357,7 +10357,7 @@ public class SockTcp
 		}
 		for (int i = 0; i < val2; i++)
 		{
-			msg.Read(out byte val3);
+			msg.Read(out int val3);
 			msg.Read(out string val4);
 			msg.Read(out int val5);
 			msg.Read(out int val6);

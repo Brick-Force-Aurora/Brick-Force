@@ -21,7 +21,7 @@
         public int handGun = 0;
         public int melee = 0;
         public int special = 0;
-        public sbyte tutorialed = 1;
+        public sbyte tutorialed = 3;
         public int countryFilter = -1;
         public sbyte tos = 1;
         public int extraSlots = 0;

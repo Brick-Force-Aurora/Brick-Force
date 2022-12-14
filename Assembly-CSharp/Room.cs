@@ -128,7 +128,7 @@ public class Room
 
 	private bool locked;
 
-	private int no;
+	public int no;
 
 	private int squad;
 

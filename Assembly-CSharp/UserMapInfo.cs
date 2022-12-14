@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class UserMapInfo
 {
-	private byte slot;
+	public int slot;
 
 	private string alias;
 
@@ -16,10 +16,16 @@ public class UserMapInfo
 
 	private Texture2D thumbnail;
 
+	public RegMap regMap; //added to support editing of existing maps
+
 	public Texture2D Thumbnail
 	{
 		get
 		{
+			if (regMap.Thumbnail != null)
+			{
+				return regMap.Thumbnail;
+			}
 			if (null == thumbnail && alias.Length > 0 && lastModified.Year > 1971)
 			{
 				ThumbnailDownloader.Instance.Enqueue(isUserMap: true, slot);
@@ -32,7 +38,7 @@ public class UserMapInfo
 		}
 	}
 
-	public byte Slot => slot;
+	public int Slot => slot;
 
 	public string Alias
 	{
@@ -84,22 +90,32 @@ public class UserMapInfo
 		}
 	}
 
-	public UserMapInfo(byte _slot, sbyte _premium)
+	public UserMapInfo(int _slot, sbyte _premium)
 	{
 		slot = _slot;
 		alias = string.Empty;
-		thumbnail = null;
 		premium = _premium;
+
+		if (slot > 0)
+			AssignRegMap(RegMapManager.Instance.Get(slot));
 	}
 
-	public UserMapInfo(byte _slot, string _alias, int _brickCount, DateTime _lastModified, sbyte _premium)
+	public UserMapInfo(int _slot, string _alias, int _brickCount, DateTime _lastModified, sbyte _premium)
 	{
 		slot = _slot;
 		alias = _alias;
 		brickCount = _brickCount;
 		lastModified = _lastModified;
-		thumbnail = null;
 		premium = _premium;
+
+		if (slot > 0)
+			AssignRegMap(RegMapManager.Instance.Get(slot));
+	}
+
+	//added to support editing of existing maps
+	public void AssignRegMap(RegMap _regMap)
+	{
+		regMap = _regMap;
 	}
 
 	public void VerifySavedData()
@@ -191,7 +207,7 @@ public class UserMapInfo
 		{
 			FileStream input = File.Open(fileName, FileMode.Open, FileAccess.Read);
 			BinaryReader binaryReader = new BinaryReader(input);
-			slot = binaryReader.ReadByte();
+			slot = binaryReader.ReadInt32();
 			alias = binaryReader.ReadString();
 			brickCount = binaryReader.ReadInt32();
 			int year = binaryReader.ReadInt32();

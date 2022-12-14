@@ -890,6 +890,8 @@ public class TItemManager : MonoBehaviour
 				Debug.LogError("ERROR, Load success " + text2 + " but save secured failed");
 			}
 		}
+
+		cSVLoader.Save("weapon.txt", "");
 		ParseWeapon(cSVLoader);
 		return true;
 	}

@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace _Emulator
 {
@@ -23,16 +26,16 @@ namespace _Emulator
 		public bool debugSend = false;
 		public bool debugPing = false;
 		public bool serverCreated = false;
-		public MatchData matchData;
-		private Channel defaultChannel;
+		//public MatchData matchData;
+		//private Channel defaultChannel;
+		public ChannelManager channelManager = new ChannelManager();
 		private float killLogTimer = 0f;
-		private List<KeyValuePair<int, RegMap>> regMaps = new List<KeyValuePair<int, RegMap>>();
+		public List<KeyValuePair<int, RegMap>> regMaps = new List<KeyValuePair<int, RegMap>>();
 		private bool waitForShutDown = false;
 
 		private void Start()
 		{
-			matchData = new MatchData();
-			defaultChannel = new Channel(_id: 1, _mode: 2, _name: "Default", _ip: "", _port: 5000, _userCount: 1, _maxUserCount: 16, _country: 1, _minLvRank: 0, _maxLvRank: 66, _xpBonus: 0, _fpBonus: 0, _limitStarRate: 0);
+			//matchData = new MatchData();
 		}
 
 		public void SetupServer()
@@ -106,8 +109,8 @@ namespace _Emulator
 						client.Disconnect(true);
 					else
 					{
-						readQueue.Enqueue(new MsgReference(new Msg2Handle(recv.GetId(), msgBody), client));
-						HandleMessages();
+						readQueue.Enqueue(new MsgReference(new Msg2Handle(recv.GetId(), msgBody), client, _channelRef: client.channel, _matchData: client.matchData));
+						//HandleMessages();
 					}
 				}
 
@@ -142,15 +145,24 @@ namespace _Emulator
 			}
 		}
 
+		private void BroadcastChannelMessage(MsgReference msgRef)
+		{
+			Msg4Send data = new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey);
+			for (int i = 0; i < msgRef.channelRef.clientList.Count; i++)
+			{
+				msgRef.channelRef.clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.channelRef.clientList[i].socket);
+			}
+		}
+
 		private void BroadcastRoomMessage(MsgReference msgRef)
 		{
 			Msg4Send data = new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey);
-			for (int i = 0; i < clientList.Count; i++)
+			for (int i = 0; i < msgRef.matchData.clientList.Count; i++)
 			{
-				if (clientList[i].clientStatus < ClientReference.ClientStatus.Room)
+				if (msgRef.matchData.clientList[i].clientStatus < ClientReference.ClientStatus.Room)
 					continue;
 
-				clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), clientList[i].socket);
+				msgRef.matchData.clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.matchData.clientList[i].socket);
 			}
 		}
 
@@ -181,12 +193,12 @@ namespace _Emulator
 		private void BroadcastRoomMessageExclusive(MsgReference msgRef)
 		{
 			Msg4Send data = new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey);
-			for (int i = 0; i < clientList.Count; i++)
+			for (int i = 0; i < msgRef.matchData.clientList.Count; i++)
 			{
-				if (clientList[i].socket == msgRef.client.socket || clientList[i].clientStatus < ClientReference.ClientStatus.Room)
+				if (msgRef.matchData.clientList[i].socket == msgRef.client.socket || msgRef.matchData.clientList[i].clientStatus < ClientReference.ClientStatus.Room)
 					continue;
 
-				clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), clientList[i].socket);
+				msgRef.matchData.clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.matchData.clientList[i].socket);
 			}
 		}
 
@@ -201,7 +213,9 @@ namespace _Emulator
 
 		public void ShutdownInit()
 		{
-			matchData = new MatchData();
+			channelManager.Shutdown();
+			channelManager = new ChannelManager();
+			//matchData = new MatchData();
 			curSeq = 0;
 			serverCreated = false;
 			SendDisconnect(null, SendType.Broadcast);
@@ -234,7 +248,7 @@ namespace _Emulator
 			lock (dataLock)
 			{
 				writeQueue.Enqueue(msg);
-				SendMessages();
+				//SendMessages();
 			}
 		}
 
@@ -259,18 +273,21 @@ namespace _Emulator
 
 				killLogTimer += Time.deltaTime;
 				HandleDeadClients();
-				//HandleMessages();
-				//SendMessages();
+				HandleMessages();
+				SendMessages();
 			}
 		}
 
 		public void Reset()
 		{
 			ClearBuffers();
-			matchData.Reset();
-			matchData = new MatchData();
+			channelManager.Shutdown();
+			channelManager = new ChannelManager();
+			//matchData.Reset();
+			//matchData = new MatchData();
 			foreach(ClientReference client in clientList)
 			{
+				SendChannels(client);
 				SendKick(client);
 				SendRoomList(client);
 			}
@@ -320,6 +337,18 @@ namespace _Emulator
 						HandleCreateRoomRequest(msgRef);
 						break;
 
+					case 13:
+						HandleAddBrickRequest(msgRef);
+						break;
+
+					case 15:
+						HandleDelBrickRequest(msgRef);
+						break;
+
+					case 20:
+						HandleCacheBrickRequest(msgRef);
+						break;
+
 					case 23:
 						HandleLeave(msgRef);
 						break;
@@ -354,6 +383,10 @@ namespace _Emulator
 
 					case 49:
 						HandleStartRequest(msgRef);
+						break;
+
+					case 51:
+						HandleRegisterMapRequest(msgRef);
 						break;
 
 					case 63:
@@ -408,6 +441,10 @@ namespace _Emulator
 						HandleResultDoneRequest(msgRef);
 						break;
 
+					case 143:
+						HandleRoamout(msgRef);
+						break;
+
 					case 145:
 						HandleRoamin(msgRef);
 						break;
@@ -456,6 +493,14 @@ namespace _Emulator
 						HandleRequestDownloadedMaps(msgRef);
 						break;
 
+					case 427:
+						HandleRequestRegisteredMaps(msgRef);
+						break;
+
+					case 429:
+						HandleRequestUserMaps(msgRef);
+						break;
+
 					case 447:
 						HandleOpenDoorRequest(msgRef);
 						break;
@@ -486,6 +531,18 @@ namespace _Emulator
 
 					case ExtensionOpcodes.opDisconnectReq:
 						HandleDisconnect(msgRef);
+						break;
+
+					case ExtensionOpcodes.opBeginChunkedBufferReq:
+						HandleBeginChunkedBuffer(msgRef);
+						break;
+
+					case ExtensionOpcodes.opChunkedBufferReq:
+						HandleChunkedBuffer(msgRef);
+						break;
+
+					case ExtensionOpcodes.opEndChunkedBufferReq:
+						HandleEndChunkedBuffer(msgRef);
 						break;
 
 					default:
@@ -523,6 +580,10 @@ namespace _Emulator
 
 					case SendType.Broadcast:
 						BroadcastMessage(msgRef);
+						break;
+
+					case SendType.BroadcastChannel:
+						BroadcastChannelMessage(msgRef);
 						break;
 
 					case SendType.BroadcastRoom:
@@ -597,11 +658,18 @@ namespace _Emulator
 			msgRef.client.port = 6000 + msgRef.client.seq;
 			curSeq++;
 
+			ChannelReference channel = channelManager.GetDefaultChannel();
+			channel.AddClient(msgRef.client);
+
 			SendPlayerInitInfo(msgRef.client);
-			SendChannels(msgRef.client, new Channel[] { defaultChannel });
-			SendCurChannel(msgRef.client, defaultChannel.Id);
+			SendChannels(msgRef.client);
+			SendCurChannel(msgRef.client, channel.channel.Id);
 			SendInventoryRequest(msgRef.client);
-			SendLogin(msgRef.client, defaultChannel.Id);
+			SendLogin(msgRef.client, channel.channel.Id);
+			SendPlayerInfo(msgRef.client);
+			SendAllDownloadedMaps(msgRef.client);
+			SendEmptyUserMap(msgRef.client);
+			SendAllUserMaps(msgRef.client);
 		}
 
 		private void HandleLoadComplete(MsgReference msgRef)
@@ -616,6 +684,8 @@ namespace _Emulator
 
 		private void HandleTimer(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out int remainTime);
 			msgRef.msg._msg.Read(out int playTime);
 
@@ -636,6 +706,8 @@ namespace _Emulator
 
 		private void HandleMatchCountdown(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out int countdownTime);
 
 			if (debugHandle)
@@ -647,11 +719,30 @@ namespace _Emulator
 				if (matchData.countdownTime <= 0)
 				{
 					matchData.room.Status = Room.ROOM_STATUS.PLAYING;
-					SendRoom(null, SendType.BroadcastRoom);
+					SendRoom(null, matchData, SendType.BroadcastRoom);
 				}
 
-				SendMatchCountdown();
+				SendMatchCountdown(matchData);
 			}
+		}
+
+		private void HandleRoamout(MsgReference msgRef)
+		{
+			msgRef.msg._msg.Read(out int dest);
+
+			if (debugHandle)
+				Debug.Log("HandleRoamout from: " + msgRef.client.GetIdentifier());
+
+			ChannelReference channelRef = channelManager.GetChannelByID(dest);
+			if (channelRef != null)
+			{
+				SendCurChannel(msgRef.client, channelRef.channel.Id);
+				channelRef.AddClient(msgRef.client);
+				SendUserList(msgRef.client);
+				SendRoamin(msgRef.client, channelRef.channel.Id);
+			}
+
+			msgRef.client.clientStatus = ClientReference.ClientStatus.Lobby;
 		}
 
 		private void HandleRoamin(MsgReference msgRef)
@@ -665,10 +756,8 @@ namespace _Emulator
 			if (debugHandle)
 				Debug.Log("HandleRoamin from: " + msgRef.client.GetIdentifier());
 
-			SendPlayerInfo(msgRef.client);
 			SendUserList(msgRef.client);
-			SendDownloadedMaps(msgRef.client);
-			SendRoamin(msgRef.client);
+			SendRoamin(msgRef.client, msgRef.client.channel.channel.Id);
 
 			msgRef.client.clientStatus = ClientReference.ClientStatus.Lobby;
 		}
@@ -683,7 +772,30 @@ namespace _Emulator
 			if (debugHandle)
 				Debug.Log("HandleRequestDownloadedMaps from: " + msgRef.client.GetIdentifier());
 
-			SendDownloadedMaps(msgRef.client);
+			SendDownloadedMaps(msgRef.client, nextPage);
+		}
+
+		private void HandleRequestRegisteredMaps(MsgReference msgRef)
+		{
+			msgRef.msg._msg.Read(out int prevPage);
+			msgRef.msg._msg.Read(out int nextPage);
+			msgRef.msg._msg.Read(out int indexer);
+			msgRef.msg._msg.Read(out ushort modeMask);
+
+			if (debugHandle)
+				Debug.Log("HandleRequestRegisteredMaps from: " + msgRef.client.GetIdentifier());
+
+			SendRegisteredMaps(msgRef.client, nextPage);
+		}
+
+		private void HandleRequestUserMaps(MsgReference msgRef)
+		{
+			msgRef.msg._msg.Read(out int page);
+
+			if (debugHandle)
+				Debug.Log("HandleRequestUserMaps from: " + msgRef.client.GetIdentifier());
+
+			SendUserMaps(msgRef.client, page);
 		}
 
 		private void HandleRequestUserList(MsgReference msgRef)
@@ -703,18 +815,22 @@ namespace _Emulator
 			if (debugHandle)
 				Debug.Log("HandleJoin from: " + msgRef.client.GetIdentifier());
 
+			MatchData matchData = msgRef.client.channel.GetMatchByRoomNumber(roomNumber);
 			if (roomNumber == matchData.room.No)
 			{
 				matchData.AddClient(msgRef.client);
 
 				SendJoin(msgRef.client);
 				SendRendezvousInfo(msgRef.client);
-				SendMaster(msgRef.client);
+				SendMaster(msgRef.client, matchData);
 				SendSlotLocks(msgRef.client);
-				SendRoomConfig(msgRef.client);
-				SendAddRoom(msgRef.client);
+				SendRoomConfig(msgRef.client, matchData);
+				SendAddRoom(msgRef.client, matchData);
 				SendEnter(msgRef.client);
-				SendSlotData();
+				SendSlotData(matchData);
+
+				if (matchData.room.Type == Room.ROOM_TYPE.MAP_EDITOR)
+					SendCopyright(msgRef.client);
 			}
 		}
 
@@ -722,6 +838,8 @@ namespace _Emulator
 		{
 			if (debugHandle)
 				Debug.Log("HandleBreakInto from: " + msgRef.client.GetIdentifier());
+
+			MatchData matchData = msgRef.matchData;
 
 			int reply = 0;
 
@@ -736,7 +854,7 @@ namespace _Emulator
 				msgRef.client.status = BrickManDesc.STATUS.PLAYER_LOADING;
 				msgRef.client.clientStatus = ClientReference.ClientStatus.Match;
 				SendSetStatus(msgRef.client);
-				SendTeamScore();
+				SendTeamScore(matchData);
 				for (int i = 0; i < matchData.clientList.Count; i++)
 				{
 					SendKillCount(matchData.clientList[i]);
@@ -750,7 +868,7 @@ namespace _Emulator
 
 		private void HandleLeave(MsgReference msgRef)
 		{
-			matchData.RemoveClient(msgRef.client);
+			MatchData matchData = msgRef.matchData;
 
 			if (debugHandle)
 				Debug.Log("HandleLeave from: " + msgRef.client.GetIdentifier());
@@ -758,77 +876,93 @@ namespace _Emulator
 			SendLeave(msgRef.client);
 			SendSetStatus(msgRef.client);
 
+			matchData.RemoveClient(msgRef.client);
+
 			if (matchData.room.CurPlayer <= 0)
 			{
-				SendDeleteRoom();
-				matchData = new MatchData();
+				SendDeleteRoom(matchData, matchData.channel);
+				msgRef.client.channel.RemoveMatch(matchData);
+				//matchData = new MatchData();
 				return;
 			}
 
 			if (msgRef.client.seq == matchData.masterSeq)
 			{
 				matchData.masterSeq = matchData.clientList[0].seq;
-				SendMaster(null);
+				SendMaster(null, matchData);
 			}
 		}
 
 		private void HandleCreateRoomRequest(MsgReference msgRef)
 		{
-			if (matchData.roomCreated)
-			{
-				SendCreateRoom(msgRef.client, false);
-				return;
-			}
-
 			msgRef.msg._msg.Read(out int type);
 			msgRef.msg._msg.Read(out string title);
 			msgRef.msg._msg.Read(out bool isLocked);
 			msgRef.msg._msg.Read(out string pswd);
 			msgRef.msg._msg.Read(out int maxPlayer);
-			msgRef.msg._msg.Read(out int goal);
-			msgRef.msg._msg.Read(out int timelimit);
-			msgRef.msg._msg.Read(out int weaponOption);
-			msgRef.msg._msg.Read(out int map);
-			msgRef.msg._msg.Read(out int breakinto);
-			msgRef.msg._msg.Read(out int autobalance);
-			msgRef.msg._msg.Read(out int wanted);
-			msgRef.msg._msg.Read(out int drop);
+			msgRef.msg._msg.Read(out int param1);	//Play: goal			Build: isLoad
+			msgRef.msg._msg.Read(out int param2);	//Play: timeLimit		Build: slot
+			msgRef.msg._msg.Read(out int param3);	//Play: weaponOption	Build: brickCount:landscapeIndex
+			msgRef.msg._msg.Read(out int param4);	//Play: map				Build: map:skyboxIndex
+			msgRef.msg._msg.Read(out int param5);	//Play: breakInto		Build: premium
+			msgRef.msg._msg.Read(out int param6);	//Play: isBalance		Build: N/A
+			msgRef.msg._msg.Read(out int param7);	//Play: isWanted		Build: N/A
+			msgRef.msg._msg.Read(out int param8);	//Play: isDrop			Build: N/A
 			msgRef.msg._msg.Read(out string alias);
 			msgRef.msg._msg.Read(out int master);
+
+			MatchData matchData = msgRef.client.channel.AddNewMatch();
 
 			matchData.room.Type = (Room.ROOM_TYPE)type;
 			matchData.room.Title = title;
 			matchData.room.Locked = isLocked;
 			matchData.room.MaxPlayer = maxPlayer;
-			matchData.room.goal = goal;
-			matchData.room.timelimit = timelimit;
-			matchData.room.weaponOption = weaponOption;
-			matchData.room.map = map;
-			matchData.room.isBreakInto = Convert.ToBoolean(breakinto);
-			matchData.room.isWanted = Convert.ToBoolean(wanted);
-			matchData.room.isDropItem = false;//Convert.ToBoolean(drop);
-			matchData.isBalance = Convert.ToBoolean(autobalance);
 			matchData.room.CurMapAlias = alias;
 			matchData.masterSeq = msgRef.client.seq;
 			matchData.LockSlotsByMaxPlayers(matchData.room.MaxPlayer);
 			matchData.roomCreated = true;
+
+			if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.MAP_EDITOR)
+			{
+				if (param1 == 1)
+					matchData.CacheMap(regMaps.Find(x => x.Value.Map == param2).Value, new UserMapInfo(param2, (sbyte)param5));
+				else
+					matchData.CacheMapGenerate(param3, param4, alias);
+			}
+
+			else
+			{
+				matchData.room.goal = param1;
+				matchData.room.timelimit = param2;
+				matchData.room.weaponOption = param3;
+				matchData.room.map = param4;
+				matchData.room.isBreakInto = Convert.ToBoolean(param5);
+				matchData.room.isWanted = Convert.ToBoolean(param7);
+				matchData.room.isDropItem = false;//Convert.ToBoolean(param8);
+				matchData.isBalance = Convert.ToBoolean(param6);
+			}
 
 			if (debugHandle)
 				Debug.Log("HandleCreateRoom from: " + msgRef.client.GetIdentifier());
 
 			matchData.AddClient(msgRef.client);
 			SendRendezvousInfo(msgRef.client);
-			SendMaster(msgRef.client);
+			SendMaster(msgRef.client, matchData);
 			SendSlotLocks(msgRef.client);
-			SendRoomConfig(msgRef.client);
-			SendAddRoom(msgRef.client);
+			SendRoomConfig(msgRef.client, matchData);
+			SendAddRoom(msgRef.client, matchData);
 			SendCreateRoom(msgRef.client);
 			SendEnter(msgRef.client);
-			SendSlotData();
+			SendSlotData(matchData);
+
+			if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.MAP_EDITOR)
+				SendCopyright(msgRef.client);
 		}
 
 		private void HandleRoomConfig(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out int killCount);
 			msgRef.msg._msg.Read(out int timeLimit);
 			msgRef.msg._msg.Read(out int weaponOption);
@@ -854,18 +988,19 @@ namespace _Emulator
 			if (debugHandle)
 				Debug.Log("HandleRoomConfig from: " + msgRef.client.GetIdentifier());
 
-			SendRoomConfig(null);
+			SendRoomConfig(null, matchData);
 		}
 
 		private void HandleRoomRequest(MsgReference msgRef)
 		{
+
 			msgRef.msg._msg.Read(out int roomNumber);
 
 			if (debugHandle)
 				Debug.Log("HandleRoomRequest from: " + msgRef.client.GetIdentifier());
 
-			if (roomNumber == matchData.room.No)
-				SendRoom(msgRef.client);
+			MatchData matchData = msgRef.client.channel.GetMatchByRoomNumber(roomNumber);
+			SendRoom(msgRef.client, matchData);
 		}
 
 		private void HandleRoomListRequest(MsgReference msgRef)
@@ -878,6 +1013,8 @@ namespace _Emulator
 
 		private void HandleResumeRoomRequest(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out int nextStatus);
 
 			if (msgRef.client.seq == matchData.masterSeq)
@@ -888,11 +1025,13 @@ namespace _Emulator
 			if (debugHandle)
 				Debug.Log("HandleResumeRoomRequest from: " + msgRef.client.GetIdentifier());
 
-			SendRoom(null, SendType.BroadcastRoom);
+			SendRoom(null, matchData, SendType.BroadcastRoom);
 		}
 
 		private void HandleTeamChangeRequest(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out bool clickSlot);
 			msgRef.msg._msg.Read(out int slotNum);
 
@@ -915,6 +1054,8 @@ namespace _Emulator
 
 		private void HandleSlotLockRequest(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out sbyte slotNum);
 			msgRef.msg._msg.Read(out sbyte lck);
 
@@ -929,7 +1070,7 @@ namespace _Emulator
 				matchData.slots[slotNum].ToggleLock(Convert.ToBoolean(lck));
 				matchData.room.MaxPlayer = matchData.slots.FindAll(x => !x.isLocked).Count;
 
-				SendSlotLock(msgRef.client, slotNum, SendType.BroadcastRoom);
+				SendSlotLock(msgRef.client, matchData, slotNum, SendType.BroadcastRoom);
 			}
 
 		}
@@ -948,6 +1089,8 @@ namespace _Emulator
 
 		private void HandleStartRequest(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out int remainingCountdown);
 
 			matchData.lobbyCountdownTime = 0;
@@ -962,7 +1105,7 @@ namespace _Emulator
 			}
 
 			matchData.room.Status = Room.ROOM_STATUS.PENDING;
-			SendRoom(null, SendType.BroadcastRoom);
+			SendRoom(null, matchData, SendType.BroadcastRoom);
 
 			for (int i = 0; i < matchData.clientList.Count; i++)
 			{
@@ -972,11 +1115,13 @@ namespace _Emulator
 				SendRespawnTicket(matchData.clientList[i]);
 			}
 
-			SendStart();
+			SendStart(matchData);
 		}
 
 		private void HandleWeaponHeldRatioRequest(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out int count);
 			for (int i = 0; i < count; i++)
 			{
@@ -987,7 +1132,7 @@ namespace _Emulator
 			if (debugHandle)
 				Debug.Log("HandleWeaponHeldRatioRequest from: " + msgRef.client.GetIdentifier());
 
-			if (msgRef.client.status == BrickManDesc.STATUS.PLAYER_LOADING)
+			if (msgRef.client.status <= BrickManDesc.STATUS.PLAYER_LOADING)
 			{
 				msgRef.client.status = BrickManDesc.STATUS.PLAYER_PLAYING;
 				SendSetStatus(msgRef.client);
@@ -999,7 +1144,7 @@ namespace _Emulator
 				msgRef.client.isBreakingInto = false;
 
 				for (int i = 0; i < matchData.destroyedBricks.Count; i++)
-					SendDestroyedBrick(msgRef.client, matchData.destroyedBricks[i]);
+					SendDestroyedBrick(msgRef.client, matchData.destroyedBricks[i], matchData);
 
 				SendCannons(msgRef.client);
 				SendTrains(msgRef.client);
@@ -1022,6 +1167,8 @@ namespace _Emulator
 		{
 			if (killLogTimer < 0.2f)
 				return;
+
+			MatchData matchData = msgRef.matchData;
 
 			msgRef.msg._msg.Read(out int id);
 
@@ -1099,7 +1246,7 @@ namespace _Emulator
 
 			KillLogEntry killLogEntry = new KillLogEntry(id, killerType, killer, victimType, victim, (Weapon.BY)weaponBy, slot, category, hitpart, damageLog);
 			matchData.killLog.Add(killLogEntry);
-			SendKillLogEntry(killLogEntry);
+			SendKillLogEntry(killLogEntry, matchData);
 
 			if (killer != victim)
 			{
@@ -1110,20 +1257,20 @@ namespace _Emulator
 							matchData.redScore++;
 						else
 							matchData.blueScore++;
-						SendTeamScore();
+						SendTeamScore(matchData);
 						if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
 						{
-							HandleTeamMatchEnd();
+							HandleTeamMatchEnd(matchData);
 						}
 						break;
 
 					case Room.ROOM_TYPE.INDIVIDUAL:
 						matchData.redScore++;
-						SendIndividualScore();
+						SendIndividualScore(matchData);
 
 						if (matchData.redScore >= matchData.room.goal)
 						{
-							HandleIndividualMatchEnd();
+							HandleIndividualMatchEnd(matchData);
 						}
 						break;
 				}
@@ -1135,11 +1282,13 @@ namespace _Emulator
 			if (debugHandle)
 				Debug.Log("HandleTeamScoreRequest from: " + msgRef.client.GetIdentifier());
 
-			SendTeamScore();
+			SendTeamScore(msgRef.matchData);
 		}
 
 		private void HandleDestroyBrickRequest(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out int brick);
 
 			if (debugHandle)
@@ -1148,7 +1297,7 @@ namespace _Emulator
 			if (!(matchData.destroyedBricks.Exists(x => x == brick)))
 			{
 				matchData.destroyedBricks.Add(brick);
-				SendDestroyBrick(brick);
+				SendDestroyBrick(brick, matchData);
 			}
 		}
 
@@ -1187,6 +1336,8 @@ namespace _Emulator
 
 		private void HandleEquipRequest(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out long itemSeq);
 
 			if (debugHandle)
@@ -1206,13 +1357,13 @@ namespace _Emulator
 					{
 						oldItem.Usage = Item.USAGE.UNEQUIP;
 						msgRef.client.inventory.activeSlots[index] = null;
-						SendUnequip(msgRef.client, oldItem.Seq, oldItem.Code);
+						SendUnequip(msgRef.client, oldItem.Seq, oldItem.Code, matchData);
 					}
 				}
 				item.Usage = Item.USAGE.EQUIP;
 				msgRef.client.inventory.GenerateActiveSlots();
 
-				SendEquip(msgRef.client, item.Seq, item.Code);
+				SendEquip(msgRef.client, item.Seq, item.Code, matchData);
 			}
 		}
 
@@ -1349,7 +1500,7 @@ namespace _Emulator
 			if (debugHandle)
 				Debug.Log("HandleRadioMsgRequest from: " + msgRef.client.GetIdentifier());
 
-			SendRadioMsg(seq, category, message);
+			SendRadioMsg(seq, category, message, msgRef.matchData);
 		}
 
 		private void HandleChatRequest(MsgReference msgRef)
@@ -1391,20 +1542,20 @@ namespace _Emulator
 			SendRespawnTicket(msgRef.client);
 		}
 
-		public void HandleIndividualMatchEnd()
+		public void HandleIndividualMatchEnd(MatchData matchData)
 		{
 			matchData.room.Status = Room.ROOM_STATUS.WAITING;
-			SendIndividualMatchEnd();
+			SendIndividualMatchEnd(matchData);
 			matchData.Reset();
-			SendRoom(null, SendType.BroadcastRoom);
+			SendRoom(null, matchData, SendType.BroadcastRoom);
 		}
 
-		public void HandleTeamMatchEnd()
+		public void HandleTeamMatchEnd(MatchData matchData)
 		{
 			matchData.room.Status = Room.ROOM_STATUS.WAITING;
-			SendTeamMatchEnd();
+			SendTeamMatchEnd(matchData);
 			matchData.Reset();
-			SendRoom(null, SendType.BroadcastRoom);
+			SendRoom(null, matchData, SendType.BroadcastRoom);
 		}
 
 		private void HandleWeaponChangeRequest(MsgReference msgRef)
@@ -1428,7 +1579,7 @@ namespace _Emulator
 			if (debugHandle)
 				Debug.Log("HandleOpenDoorRequest from: " + msgRef.client.GetIdentifier());
 
-			SendOpenDoor(seq);
+			SendOpenDoor(seq, msgRef.matchData);
 		}
 
 		private void HandleCloseDoorRequest(MsgReference msgRef)
@@ -1446,6 +1597,8 @@ namespace _Emulator
 
 		private void HandleDelegateMasterRequest(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			if (msgRef.client.seq == matchData.masterSeq)
 			{
 				msgRef.msg._msg.Read(out int newMaster);
@@ -1454,12 +1607,14 @@ namespace _Emulator
 					Debug.Log("HandleDelegateMasterRequest from: " + msgRef.client.GetIdentifier());
 
 				matchData.masterSeq = newMaster;
-				SendMaster(null);
+				SendMaster(null, matchData);
 			}
 		}
 
 		private void HandleGetCannonRequest(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out int brickSeq);
 
 			if (debugHandle)
@@ -1468,13 +1623,15 @@ namespace _Emulator
 			if (!matchData.usedCannons.ContainsKey(brickSeq))
 			{
 				matchData.usedCannons.Add(brickSeq, msgRef.client.seq);
-				SendGetCannon(msgRef.client.seq, brickSeq);
+				SendGetCannon(msgRef.client.seq, brickSeq, matchData);
 				Debug.Log(matchData.usedCannons.Count);
 			}
 		}
 
 		private void HandleEmptyCannonRequest(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out int brickSeq);
 
 			if (debugHandle)
@@ -1483,12 +1640,14 @@ namespace _Emulator
 			if (matchData.usedCannons.ContainsKey(brickSeq))
 			{
 				matchData.usedCannons.Remove(brickSeq);
-				SendEmptyCannon(brickSeq);
+				SendEmptyCannon(brickSeq, matchData);
 			}
 		}
 
 		private void HandleGetTrainRequest(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out int brickSeq);
 			msgRef.msg._msg.Read(out int trainId);
 
@@ -1498,12 +1657,14 @@ namespace _Emulator
 			if (!matchData.usedTrains.ContainsKey(trainId))
 			{
 				matchData.usedTrains.Add(trainId, msgRef.client.seq);
-				SendGetTrain(msgRef.client.seq, trainId);
+				SendGetTrain(msgRef.client.seq, trainId, matchData);
 			}
 		}
 
 		private void HandleEmptyTrainRequest(MsgReference msgRef)
 		{
+			MatchData matchData = msgRef.matchData;
+
 			msgRef.msg._msg.Read(out int trainId);
 
 			if (debugHandle)
@@ -1512,8 +1673,219 @@ namespace _Emulator
 			if (matchData.usedTrains.ContainsKey(trainId))
 			{
 				matchData.usedTrains.Remove(trainId);
-				SendEmptyTrain(trainId);
+				SendEmptyTrain(trainId, matchData);
 			}
+		}
+
+		private void HandleCacheBrickRequest(MsgReference msgRef)
+		{
+			if (debugHandle)
+				Debug.Log("HandleCacheBrickRequest from: " + msgRef.client.GetIdentifier());
+
+			SendCacheBrick(msgRef.client);
+			SendCacheBrickDone(msgRef.client);
+		}
+
+		private void HandleAddBrickRequest(MsgReference msgRef)
+		{
+			MatchData matchData = msgRef.matchData;
+
+			if (debugHandle)
+				Debug.Log("HandleAddBrickRequest from: " + msgRef.client.GetIdentifier());
+
+			msgRef.msg._msg.Read(out byte brick);
+			msgRef.msg._msg.Read(out byte x);
+			msgRef.msg._msg.Read(out byte y);
+			msgRef.msg._msg.Read(out byte z);
+			msgRef.msg._msg.Read(out byte rot);
+
+			int seq = matchData.GetNextBrickSeq();
+			List<int> morphes = new List<int>();
+			BrickInst brickInst = matchData.cachedMap.AddBrickInst(seq, brick, x, y, z, 0, rot);
+			if (brickInst != null)
+			{
+				SendAddBrick(msgRef.client, brickInst);
+			}
+		}
+
+		private void HandleDelBrickRequest(MsgReference msgRef)
+		{
+			MatchData matchData = msgRef.matchData;
+
+			if (debugHandle)
+				Debug.Log("HandleDelBrickRequest from: " + msgRef.client.GetIdentifier());
+
+			msgRef.msg._msg.Read(out int seq);
+
+			List<int> morphes = new List<int>();
+			if (matchData.cachedMap.DelBrickInst(seq, ref morphes))
+				SendDelBrick(msgRef.client, seq);
+		}
+
+		private void HandleRegisterMapRequest(MsgReference msgRef)
+		{
+			MatchData matchData = msgRef.matchData;
+
+			if (debugHandle)
+				Debug.Log("HandleRegisterMap from: " + msgRef.client.GetIdentifier());
+
+			msgRef.msg._msg.Read(out int map);
+			msgRef.msg._msg.Read(out ushort modeMask);
+			msgRef.msg._msg.Read(out int regHow);
+			msgRef.msg._msg.Read(out int point);
+			msgRef.msg._msg.Read(out int downloadFee);
+			msgRef.msg._msg.Read(out string msgEval);
+
+			if (map == matchData.cachedMap.map)
+			{
+				Texture2D thumbnail = new Texture2D(1, 1);
+				if (msgRef.client.chunkedBuffer.id == ExtensionOpcodes.opChunkedBufferThumbnailReq)
+				{
+					if (msgRef.client.chunkedBuffer.finished)
+					{
+						thumbnail.LoadImage(msgRef.client.chunkedBuffer.buffer);
+						thumbnail.Apply();
+						Debug.Log("Load Thumbnail");
+					}
+					else
+						Debug.LogError("HandleRegisterMapRequest: ChunkedBuffer not finished");
+				}
+
+				DateTime time = DateTime.Now;
+				int hashId = MapGenerator.instance.GetHashIdForTime(time);
+				RegMap regMap = new RegMap(hashId, msgRef.client.name + "@Aurora", matchData.cachedUMI.Alias, time, modeMask, true, false, 0, 0, 0, 0, 0, 0, 0, false);
+				regMap.Thumbnail = thumbnail;
+				matchData.cachedMap.map = hashId;
+				matchData.cachedUMI.regMap = regMap;
+				matchData.cachedUMI.slot = hashId;
+
+				matchData.cachedUMI.regMap.Save();
+				matchData.cachedMap.Save(hashId, matchData.cachedMap.skybox);
+
+				SendCustomMessage("Saved " + matchData.cachedUMI.regMap.Alias + " with ID " + hashId);
+			}
+
+			msgRef.client.chunkedBuffer = null;
+		}
+
+		public void SendDelBrick(ClientReference client, int brickSeq)
+		{
+			MatchData matchData = client.matchData;
+
+			MsgBody body = new MsgBody();
+
+			body.Write(client.seq);
+			body.Write(brickSeq);
+
+			Say(new MsgReference(16, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
+
+			if (debugSend)
+				Debug.Log("SendDelBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
+		}
+
+		public void SendAddBrick(ClientReference client, BrickInst brick)
+		{
+			MatchData matchData = client.matchData;
+
+			MsgBody body = new MsgBody();
+
+			body.Write(client.seq);
+			body.Write(brick.Seq);
+			body.Write(brick.Template);
+			body.Write(brick.PosX);
+			body.Write(brick.PosY);
+			body.Write(brick.PosZ);
+			body.Write(brick.Rot);
+
+			Say(new MsgReference(14, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
+
+			if (debugSend)
+				Debug.Log("SendAddBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
+		}
+
+		public void SendCacheBrick(ClientReference client)
+		{
+			MatchData matchData = client.matchData;
+
+			List<KeyValuePair<int, BrickInst>> brickList = new List<KeyValuePair<int, BrickInst>>();
+			brickList = matchData.cachedMap.dic.ToList();
+
+			int chunkSize = 100;
+			int chunkCount = Mathf.CeilToInt((float)brickList.Count / (float)chunkSize);
+			int processedCount = 0;
+
+			for (int chunk = 0; chunk < chunkCount; chunk++)
+			{
+				int remaining = brickList.Count - processedCount;
+				if (remaining < chunkSize)
+					chunkSize = remaining;
+
+				MsgBody body = new MsgBody();
+
+				body.Write(chunkSize);
+
+				for (int i = 0; i < chunkSize; i++, processedCount++)
+				{
+					BrickInst brickInst = brickList[processedCount].Value;
+					body.Write(brickInst.Seq);
+					body.Write(brickInst.Template);
+					body.Write(brickInst.PosX);
+					body.Write(brickInst.PosY);
+					body.Write(brickInst.PosZ);
+					body.Write(brickInst.Code);
+					body.Write(brickInst.Rot);
+					if (brickInst.BrickForceScript != null)
+					{
+						body.Write((byte)brickInst.BrickForceScript.CmdList.Count);
+
+						if (brickInst.BrickForceScript.CmdList.Count > 0)
+						{
+							body.Write(brickInst.BrickForceScript.Alias);
+							body.Write(brickInst.BrickForceScript.EnableOnAwake);
+							body.Write(brickInst.BrickForceScript.VisibleOnAwake);
+							body.Write(brickInst.BrickForceScript.GetCommandString());
+						}
+					}
+
+					else
+						body.Write((byte)0);
+				}
+
+				Say(new MsgReference(21, body, client, SendType.Unicast));
+			}
+
+			if (debugSend)
+				Debug.Log("SendCacheBrick with " + chunkCount + " chunks to: " + client.GetIdentifier());
+		}
+
+		public void SendCacheBrickDone(ClientReference client)
+		{
+			MatchData matchData = client.matchData;
+
+			MsgBody body = new MsgBody();
+
+			body.Write(0); //mapIndex
+			body.Write(matchData.cachedMap.skybox);
+
+			Say(new MsgReference(22, body, client, SendType.Unicast));
+
+			if (debugSend)
+				Debug.Log("SendCacheBrickDone for map " + matchData.cachedMap.map + " to: " + client.GetIdentifier());
+		}
+
+		public void SendCopyright(ClientReference client)
+		{
+			MsgBody body = new MsgBody();
+
+			MatchData matchData = client.matchData;
+
+			body.Write(matchData.masterSeq);
+			body.Write(matchData.cachedUMI.Slot);
+
+			Say(new MsgReference(53, body, client));
+
+			if (debugSend)
+				Debug.Log("SendCopyRight to: " + client.GetIdentifier());
 		}
 
 		public void SendPremiumItems(ClientReference client)
@@ -1537,28 +1909,32 @@ namespace _Emulator
 		}
 		public void SendCannons(ClientReference client)
 		{
-			foreach(KeyValuePair<int, int> entry in matchData.usedCannons)
+			MatchData matchData = client.matchData;
+
+			foreach (KeyValuePair<int, int> entry in matchData.usedCannons)
 			{
-				SendGetCannon(entry.Value, entry.Key, client, SendType.Unicast);
+				SendGetCannon(entry.Value, entry.Key, matchData, client, SendType.Unicast);
 			}
 		}
 
 		public void SendTrains(ClientReference client)
 		{
+			MatchData matchData = client.matchData;
+
 			foreach (KeyValuePair<int, int> entry in matchData.usedTrains)
 			{
-				SendGetTrain(entry.Value, entry.Key, client, SendType.Unicast);
+				SendGetTrain(entry.Value, entry.Key, matchData, client, SendType.Unicast);
 			}
 		}
 
-		public void SendGetCannon(int seq, int brickSeq, ClientReference client = null, SendType sendType = SendType.BroadcastRoom)
+		public void SendGetCannon(int seq, int brickSeq, MatchData matchData, ClientReference client = null, SendType sendType = SendType.BroadcastRoom)
 		{
 			MsgBody body = new MsgBody();
 
 			body.Write(seq);
 			body.Write(brickSeq);
 
-			Say(new MsgReference(159, body, null, sendType));
+			Say(new MsgReference(159, body, null, sendType, matchData.channel, matchData));
 
 			if (debugSend)
 			{
@@ -1570,26 +1946,26 @@ namespace _Emulator
 			}
 		}
 
-		public void SendEmptyCannon(int brickSeq)
+		public void SendEmptyCannon(int brickSeq, MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
 			body.Write(brickSeq);
 
-			Say(new MsgReference(161, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(161, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendEmptyCannon for room no: " + matchData.room.No);
 		}
 
-		public void SendGetTrain(int seq, int trainId, ClientReference client = null, SendType sendType = SendType.BroadcastRoom)
+		public void SendGetTrain(int seq, int trainId, MatchData matchData, ClientReference client = null, SendType sendType = SendType.BroadcastRoom)
 		{
 			MsgBody body = new MsgBody();
 
 			body.Write(seq);
 			body.Write(trainId);
 
-			Say(new MsgReference(552, body, client, sendType));
+			Say(new MsgReference(552, body, client, sendType, matchData.channel, matchData));
 
 			if (debugSend)
 			{
@@ -1601,13 +1977,13 @@ namespace _Emulator
 			}
 		}
 
-		public void SendEmptyTrain(int trainId)
+		public void SendEmptyTrain(int trainId, MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
 			body.Write(trainId);
 
-			Say(new MsgReference(554, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(554, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendEmptyTrain for room no: " + matchData.room.No);
@@ -1620,13 +1996,13 @@ namespace _Emulator
 			SayInstant(new MsgReference(ExtensionOpcodes.opDisconnectAck, body, client, sendType));
 		}
 
-		public void SendOpenDoor(int seq)
+		public void SendOpenDoor(int seq, MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
 			body.Write(seq);
 
-			Say(new MsgReference(450, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(450, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendOpenDoor for room no: " + matchData.room.No);
@@ -1654,7 +2030,7 @@ namespace _Emulator
 			body.Write(prev);
 			body.Write(next);
 
-			Say(new MsgReference(416, body, client, SendType.BroadcastRoomExclusive));
+			Say(new MsgReference(416, body, client, SendType.BroadcastRoomExclusive, client.channel, client.matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendPlayerWeaponChange for player: " + client.GetIdentifier());
@@ -1668,7 +2044,7 @@ namespace _Emulator
 			SendItemPimps(client);
 			SendPremiumItems(client);
 		}
-		public void SendIndividualMatchEnd()
+		public void SendIndividualMatchEnd(MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
@@ -1689,13 +2065,13 @@ namespace _Emulator
 				body.Write(matchData.clientList[i].data.xp);
 				body.Write((long)0); //buff
 			}
-			Say(new MsgReference(180, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(180, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendIndivudalMatchEnd for room no: " + matchData.room.No);
 		}
 
-		public void SendTeamMatchEnd()
+		public void SendTeamMatchEnd(MatchData matchData)
 		{
 			for (int team = 0; team < 2; team++)
 			{
@@ -1740,21 +2116,20 @@ namespace _Emulator
 			body.Write(text);
 			body.Write(Convert.ToBoolean(client.data.gm));
 
-
-			Say(new MsgReference(25, body, null, SendType.Broadcast));
+			Say(new MsgReference(25, body, null, SendType.BroadcastChannel, client.channel, client.matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendChat");
 		}
 
-		public void SendRadioMsg(int seq, int category, int message)
+		public void SendRadioMsg(int seq, int category, int message, MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 			body.Write(seq);
 			body.Write(category);
 			body.Write(message);
 
-			Say(new MsgReference(96, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(96, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendRadioMsg for room no: " + matchData.room.No);
@@ -1884,7 +2259,7 @@ namespace _Emulator
 				Debug.Log("SendWeaponSlotList to: " + client.GetIdentifier());
 		}
 
-		public void SendEquip(ClientReference client, long itemSeq, string code)
+		public void SendEquip(ClientReference client, long itemSeq, string code, MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
@@ -1898,7 +2273,7 @@ namespace _Emulator
 				Debug.Log("Broadcasted SendEquip for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
 		}
 
-		public void SendUnequip(ClientReference client, long itemSeq, string code)
+		public void SendUnequip(ClientReference client, long itemSeq, string code, MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
@@ -1924,25 +2299,25 @@ namespace _Emulator
 				Debug.Log("SendInventoryRequest to: " + client.GetIdentifier());
 		}
 
-		public void SendDestroyBrick(int brick)
+		public void SendDestroyBrick(int brick, MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
 			body.Write(brick);
 
-			Say(new MsgReference(77, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(77, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendDestroyBrick for brick " + brick+ " for room no: " + matchData.room.No);
 		}
 
-		public void SendDestroyedBrick(ClientReference client, int brick, SendType sendType = SendType.Unicast)
+		public void SendDestroyedBrick(ClientReference client, int brick, MatchData matchData, SendType sendType = SendType.Unicast)
 		{
 			MsgBody body = new MsgBody();
 
 			body.Write(brick);
 
-			Say(new MsgReference(78, body, client, sendType));
+			Say(new MsgReference(78, body, client, sendType, matchData.channel, matchData));
 
 			if (debugSend)
 			{
@@ -1955,12 +2330,14 @@ namespace _Emulator
 
 		public void SendKillCount(ClientReference client)
 		{
+			MatchData matchData = client.matchData;
+
 			MsgBody body = new MsgBody();
 
 			body.Write(client.seq);
 			body.Write(client.kills);
 
-			Say(new MsgReference(69, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(69, body, null, SendType.BroadcastRoom, client.channel, client.matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendKillCount for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
@@ -1968,12 +2345,14 @@ namespace _Emulator
 
 		public void SendDeathCount(ClientReference client)
 		{
+			MatchData matchData = client.matchData;
+
 			MsgBody body = new MsgBody();
 
 			body.Write(client.seq);
 			body.Write(client.deaths);
 
-			Say(new MsgReference(68, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(68, body, null, SendType.BroadcastRoom, client.channel, client.matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendDeatchCount for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
@@ -1981,13 +2360,15 @@ namespace _Emulator
 
 		public void SendAssistCount(ClientReference client)
 		{
+			MatchData matchData = client.matchData;
+
 			MsgBody body = new MsgBody();
 
 			body.Write(client.seq);
 			body.Write(client.assists);
 			body.Write(client.score);
 
-			Say(new MsgReference(185, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(185, body, null, SendType.BroadcastRoom, client.channel, client.matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendAssistCount for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
@@ -1995,18 +2376,20 @@ namespace _Emulator
 
 		public void SendRoundScore(ClientReference client)
 		{
+			MatchData matchData = client.matchData;
+
 			MsgBody body = new MsgBody();
 
 			body.Write(client.seq);
 			body.Write(client.score);
 
-			Say(new MsgReference(300, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(300, body, null, SendType.BroadcastRoom, client.channel, client.matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendRoundScore for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
 		}
 
-		public void SendKillLogEntry(KillLogEntry entry)
+		public void SendKillLogEntry(KillLogEntry entry, MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
@@ -2018,37 +2401,37 @@ namespace _Emulator
 			body.Write((int)entry.weaponBy);
 			body.Write(entry.hitpart);
 
-			Say(new MsgReference(45, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(45, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendKillLogEntry for room no: " + matchData.room.No);
 		}
 
-		public void SendIndividualScore()
+		public void SendIndividualScore(MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
 			body.Write(matchData.redScore);
 
-			Say(new MsgReference(179, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(179, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendIndividualScore for room no: " + matchData.room.No);
 		}
 
-		public void SendTeamScore()
+		public void SendTeamScore(MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 			body.Write(matchData.redScore);
 			body.Write(matchData.blueScore);
 
-			Say(new MsgReference(67, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(67, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendTeamScore for room no: " + matchData.room.No);
 		}
 
-		public void SendMaster(ClientReference client)
+		public void SendMaster(ClientReference client, MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
@@ -2056,7 +2439,7 @@ namespace _Emulator
 
 			if (client == null)
 			{
-				Say(new MsgReference(31, body, null, SendType.BroadcastRoom));
+				Say(new MsgReference(31, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 				if (debugSend)
 					Debug.Log("Broadcasted SendMaster for room no: " + matchData.room.No);
@@ -2073,22 +2456,23 @@ namespace _Emulator
 
 		public void SendSlotLocks(ClientReference client)
 		{
+			MatchData matchData = client.matchData;
 			for (sbyte i = 0; i < matchData.slots.Count; i++)
 			{
-				SendSlotLock(client, i);
+				SendSlotLock(client, matchData, i);
 			}
 
 			if (debugSend)
 				Debug.Log("SendSlots to: " + client.GetIdentifier());
 		}
 
-		public void SendSlotLock(ClientReference client, sbyte index, SendType sendType = SendType.Unicast)
+		public void SendSlotLock(ClientReference client, MatchData matchData, sbyte index, SendType sendType = SendType.Unicast)
 		{
 			MsgBody body = new MsgBody();
 
 			body.Write(index);
 			body.Write(Convert.ToSByte(matchData.slots[index].isLocked));
-			Say(new MsgReference(86, body, client, sendType));
+			Say(new MsgReference(86, body, client, sendType, matchData.channel, matchData));
 
 			if (debugSend)
 			{
@@ -2099,7 +2483,7 @@ namespace _Emulator
 			}
 		}
 
-		public void SendRoomConfig(ClientReference client)
+		public void SendRoomConfig(ClientReference client, MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
@@ -2119,7 +2503,7 @@ namespace _Emulator
 
 			if (client == null)
 			{
-				Say(new MsgReference(92, body, null, SendType.BroadcastRoom));
+				Say(new MsgReference(92, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 				if (debugSend)
 					Debug.Log("Broadcasted SendRoomConfig for room no: " + matchData.room.No);
@@ -2134,7 +2518,7 @@ namespace _Emulator
 			}
 		}
 
-		public void SendAddRoom(ClientReference client)
+		public void SendAddRoom(ClientReference client, MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
@@ -2162,7 +2546,7 @@ namespace _Emulator
 
 			if (client == null)
 			{
-				Say(new MsgReference(5, body, null, SendType.BroadcastRoom));
+				Say(new MsgReference(5, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 				if (debugSend)
 					Debug.Log("Broadcasted SendAddRoom for room no: " + matchData.room.No);
@@ -2177,7 +2561,7 @@ namespace _Emulator
 			}
 		}
 
-		public void SendRoom(ClientReference client, SendType sendType = SendType.Unicast)
+		public void SendRoom(ClientReference client, MatchData matchData, SendType sendType = SendType.Unicast)
 		{
 			MsgBody body = new MsgBody();
 
@@ -2203,7 +2587,7 @@ namespace _Emulator
 			body.Write(matchData.room.Squad);
 			body.Write(matchData.room.SquadCounter);
 
-			Say(new MsgReference(470, body, client, sendType));
+			Say(new MsgReference(470, body, client, sendType, matchData.channel, matchData));
 
 			if (debugSend)
 			{
@@ -2216,13 +2600,13 @@ namespace _Emulator
 
 		}
 
-		public void SendDeleteRoom()
+		public void SendDeleteRoom(MatchData matchData, ChannelReference channel)
 		{
 			MsgBody body = new MsgBody();
 
 			body.Write(matchData.room.No);
 
-			Say(new MsgReference(6, body, null, SendType.Broadcast));
+			Say(new MsgReference(6, body, null, SendType.BroadcastChannel, channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendDelRoom for room no: " + matchData.room.No);
@@ -2232,30 +2616,36 @@ namespace _Emulator
 		{
 			MsgBody body = new MsgBody();
 
-			body.Write(Convert.ToInt32(matchData.roomCreated)); //count
-			if (matchData.roomCreated)
+			if (client.channel == null)
+				body.Write(0); //count
+			else
 			{
-				body.Write(matchData.room.No);
-				body.Write((int)matchData.room.Type);
-				body.Write(matchData.room.Title);
-				body.Write(matchData.room.Locked);
-				body.Write((int)matchData.room.Status);
-				body.Write(matchData.room.CurPlayer);
-				body.Write(matchData.room.MaxPlayer);
-				body.Write(matchData.room.map);
-				body.Write(matchData.room.CurMapAlias);
-				body.Write(matchData.room.goal);
-				body.Write(matchData.room.timelimit);
-				body.Write(matchData.room.weaponOption);
-				body.Write(matchData.room.ping);
-				body.Write(matchData.room.score1);
-				body.Write(matchData.room.score2);
-				body.Write(matchData.room.CountryFilter);
-				body.Write(matchData.room.isBreakInto);
-				body.Write(matchData.room.isDropItem);
-				body.Write(matchData.room.isWanted);
-				body.Write(matchData.room.Squad);
-				body.Write(matchData.room.SquadCounter);
+				body.Write(client.channel.matches.Count); //count
+				for (int i = 0; i < client.channel.matches.Count; i++)
+				{
+					MatchData matchData = client.channel.matches[i];
+					body.Write(matchData.room.No);
+					body.Write((int)matchData.room.Type);
+					body.Write(matchData.room.Title);
+					body.Write(matchData.room.Locked);
+					body.Write((int)matchData.room.Status);
+					body.Write(matchData.room.CurPlayer);
+					body.Write(matchData.room.MaxPlayer);
+					body.Write(matchData.room.map);
+					body.Write(matchData.room.CurMapAlias);
+					body.Write(matchData.room.goal);
+					body.Write(matchData.room.timelimit);
+					body.Write(matchData.room.weaponOption);
+					body.Write(matchData.room.ping);
+					body.Write(matchData.room.score1);
+					body.Write(matchData.room.score2);
+					body.Write(matchData.room.CountryFilter);
+					body.Write(matchData.room.isBreakInto);
+					body.Write(matchData.room.isDropItem);
+					body.Write(matchData.room.isWanted);
+					body.Write(matchData.room.Squad);
+					body.Write(matchData.room.SquadCounter);
+				}
 			}
 
 			Say(new MsgReference(468, body, client));
@@ -2266,6 +2656,8 @@ namespace _Emulator
 
 		public void SendCreateRoom(ClientReference client, bool success = true)
 		{
+			MatchData matchData = client.matchData;
+
 			MsgBody body = new MsgBody();
 
 			body.Write((int)matchData.room.Type);
@@ -2280,6 +2672,7 @@ namespace _Emulator
 
 		public void SendJoin(ClientReference client)
 		{
+			MatchData matchData = client.matchData;
 			MsgBody body = new MsgBody();
 
 			body.Write(matchData.room.No);
@@ -2303,6 +2696,8 @@ namespace _Emulator
 
 		public void SendEnter(ClientReference client)
 		{
+			MatchData matchData = client.matchData;
+
 			MsgBody body = new MsgBody();
 
 			body.Write(client.slot.slotIndex);
@@ -2331,7 +2726,7 @@ namespace _Emulator
 			}
 			body.Write(0); //drpItem count
 
-			Say(new MsgReference(10, body, client, SendType.BroadcastRoomExclusive));
+			Say(new MsgReference(10, body, client, SendType.BroadcastRoomExclusive, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendEnter for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
@@ -2339,17 +2734,19 @@ namespace _Emulator
 
 		public void SendLeave(ClientReference client)
 		{
+			MatchData matchData = client.matchData;
+
 			MsgBody body = new MsgBody();
 
 			body.Write(client.seq);
 
-			Say(new MsgReference(11, body, client, SendType.BroadcastRoom));
+			Say(new MsgReference(11, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendLeave for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
 		}
 
-		public void SendSlotData()
+		public void SendSlotData(MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
@@ -2384,8 +2781,8 @@ namespace _Emulator
 				body.Write(0); //drpItem count
 			}
 
-			Say(new MsgReference(ExtensionOpcodes.opSlotDataAck, body, null, SendType.BroadcastRoom));
-			Say(new MsgReference(ExtensionOpcodes.opSlotDataAck, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(ExtensionOpcodes.opSlotDataAck, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
+			Say(new MsgReference(ExtensionOpcodes.opSlotDataAck, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendSlotData for room no: " + matchData.room.No);
@@ -2393,13 +2790,15 @@ namespace _Emulator
 
 		public void SendTeamChange(ClientReference client)
 		{
+			MatchData matchData = client.matchData;
+
 			MsgBody body = new MsgBody();
 
 			body.Write(client.seq);
 			body.Write(0); //unused
 			body.Write(client.slot.slotIndex);
 
-			Say(new MsgReference(81, body, client, SendType.BroadcastRoom));
+			Say(new MsgReference(81, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendTeamChange for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
@@ -2407,24 +2806,26 @@ namespace _Emulator
 
 		public void SendSetStatus(ClientReference client)
 		{
+			MatchData matchData = client.matchData;
+
 			MsgBody body = new MsgBody();
 
 			body.Write(client.seq);
 			body.Write((int)client.status);
 
-			Say(new MsgReference(48, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(48, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendSetStatus for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
 		}
 
-		public void SendStart()
+		public void SendStart(MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
 			body.Write(matchData.lobbyCountdownTime);
 
-			Say(new MsgReference(50, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(50, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendStart for room no: " + matchData.room.No);
@@ -2445,18 +2846,18 @@ namespace _Emulator
 			MsgBody body = new MsgBody();
 
 			body.Write(client.seq);
-			Say(new MsgReference(43, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(43, body, null, SendType.BroadcastRoom, client.channel, client.matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendLoadComplete for: " + client.GetIdentifier());
 		}
 
-		public void SendMatchCountdown()
+		public void SendMatchCountdown(MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
 			body.Write(matchData.countdownTime);
-			Say(new MsgReference(72, body, null, SendType.BroadcastRoom));
+			Say(new MsgReference(72, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("Broadcasted SendMatchCountdown for: " + matchData.countdownTime);
@@ -2464,11 +2865,13 @@ namespace _Emulator
 
 		public void SendTimer(ClientReference client)
 		{
+			MatchData matchData = client.matchData;
+
 			MsgBody body = new MsgBody();
 
 			body.Write(matchData.remainTime);
 			body.Write(matchData.playTime);
-			Say(new MsgReference(66, body, client, SendType.BroadcastRoom));
+			Say(new MsgReference(66, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
 
 			if (debugSend)
 				Debug.Log("SendTimer to: " + client.GetIdentifier());
@@ -2505,11 +2908,29 @@ namespace _Emulator
 				Debug.Log("SendPlayerInitInfo to: " + client.GetIdentifier());
 		}
 
-		public void SendChannels(ClientReference client, Channel[] channels)
+		public void SendChannels(ClientReference client)
 		{
 			MsgBody body = new MsgBody();
 
-			body.Write(channels.Length);
+			body.Write(channelManager.channels.Count);
+			foreach (ChannelReference channelRef in channelManager.channels)
+			{
+				body.Write(channelRef.channel.Id);
+				body.Write(channelRef.channel.Mode);
+				body.Write(channelRef.channel.Name);
+				body.Write(channelRef.channel.Ip);
+				body.Write(channelRef.channel.Port);
+				body.Write(channelRef.channel.UserCount);
+				body.Write(channelRef.channel.MaxUserCount);
+				body.Write(channelRef.channel.Country);
+				body.Write((byte)channelRef.channel.MinLvRank);
+				body.Write((byte)channelRef.channel.MaxLvRank);
+				body.Write((ushort)channelRef.channel.XpBonus);
+				body.Write((ushort)channelRef.channel.FpBonus);
+				body.Write(channelRef.channel.LimitStarRate);
+			}
+
+			/*body.Write(channels.Length);
 			for (int i = 0; i < channels.Length; i++)
 			{
 				body.Write(channels[i].Id);
@@ -2525,7 +2946,7 @@ namespace _Emulator
 				body.Write((ushort)channels[i].XpBonus);
 				body.Write((ushort)channels[i].FpBonus);
 				body.Write(channels[i].LimitStarRate);
-			}
+			}*/
 			Say(new MsgReference(141, body, client));
 
 			if (debugSend)
@@ -2612,13 +3033,13 @@ namespace _Emulator
 		{
 			MsgBody body = new MsgBody();
 
-			body.Write(clientList.Count);
-			for (int i = 0; i < clientList.Count; i++)
+			body.Write(client.channel.clientList.Count);
+			for (int i = 0; i < client.channel.clientList.Count; i++)
 			{
-				body.Write(clientList[i].seq);
-				body.Write(clientList[i].name);
-				body.Write(clientList[i].data.xp);
-				body.Write(clientList[i].data.rank);
+				body.Write(client.channel.clientList[i].seq);
+				body.Write(client.channel.clientList[i].name);
+				body.Write(client.channel.clientList[i].data.xp);
+				body.Write(client.channel.clientList[i].data.rank);
 
 			}
 			Say(new MsgReference(467, body, client, sendType));
@@ -2627,11 +3048,22 @@ namespace _Emulator
 				Debug.Log("SendUserList to: " + client.GetIdentifier());
 		}
 
-		public void SendRoamin(ClientReference client, SendType sendType = SendType.Unicast)
+		public void SendRoamout(ClientReference client, int src, SendType sendType = SendType.Unicast)
 		{
 			MsgBody body = new MsgBody();
 
-			body.Write(1);
+			body.Write(src);
+			Say(new MsgReference(144, body, client, sendType));
+
+			if (debugSend)
+				Debug.Log("SendRoamout to: " + client.GetIdentifier());
+		}
+
+		public void SendRoamin(ClientReference client, int dest, SendType sendType = SendType.Unicast)
+		{
+			MsgBody body = new MsgBody();
+
+			body.Write(dest);
 			Say(new MsgReference(146, body, client, sendType));
 
 			if (debugSend)
@@ -2647,15 +3079,124 @@ namespace _Emulator
 				Debug.Log("SendConnected to: " + client.GetIdentifier());
 		}
 
-		public void SendDownloadedMaps(ClientReference client, int offset = 0)
+		public void SendAllDownloadedMaps(ClientReference client)
+		{
+			int chunkSize = 100;
+			int chunkCount = Mathf.CeilToInt((float)regMaps.Count / (float)chunkSize);
+			int processedCount = 0;
+
+			for (int chunk = 0; chunk < chunkCount; chunk++)
+			{
+				int remaining = regMaps.Count - processedCount;
+				if (remaining < chunkSize)
+					chunkSize = remaining;
+
+				MsgBody body = new MsgBody();
+
+				body.Write(-1); //page
+				body.Write(chunkSize); //count
+				for (int i = 0; i < chunkSize; i++, processedCount++)
+				{
+					KeyValuePair<int, RegMap> entry = regMaps[processedCount];
+					body.Write(entry.Value.Map);
+					body.Write(entry.Value.Developer);
+					body.Write(entry.Value.Alias);
+					body.Write(entry.Value.ModeMask);
+					body.Write((byte)(Room.clanMatch | Room.official));
+					body.Write(entry.Value.tagMask);
+					body.Write(entry.Value.RegisteredDate.Year);
+					body.Write((sbyte)entry.Value.RegisteredDate.Month);
+					body.Write((sbyte)entry.Value.RegisteredDate.Day);
+					body.Write((sbyte)entry.Value.RegisteredDate.Hour);
+					body.Write((sbyte)entry.Value.RegisteredDate.Minute);
+					body.Write((sbyte)entry.Value.RegisteredDate.Second);
+					body.Write(entry.Value.DownloadFee);
+					body.Write(entry.Value.Release);
+					body.Write(entry.Value.LatestRelease);
+					body.Write(entry.Value.Likes);
+					body.Write(entry.Value.DisLikes);
+					body.Write(entry.Value.DownloadCount);
+				}
+
+				Say(new MsgReference(426, body, client));
+			}
+
+			if (debugSend)
+				Debug.Log("SendAllDownloadedMaps to: " + client.GetIdentifier());
+		}
+
+		public void SendAllUserMaps(ClientReference client)
 		{
 			MsgBody body = new MsgBody();
 
-			body.Write(Mathf.FloorToInt(offset / 100f)); //page
-			body.Write(regMaps.Count - offset > 100 ? 100 : regMaps.Count);
-			int i;
-			bool recursiveFlag = false;
-			for (i = offset; i < regMaps.Count; i++)
+			int chunkSize = 200;
+			int chunkCount = Mathf.CeilToInt((float)regMaps.Count / (float)chunkSize);
+			int processedCount = 0;
+
+			for (int chunk = 0; chunk < chunkCount; chunk++)
+			{
+				int remaining = regMaps.Count - processedCount;
+				if (remaining < chunkSize)
+					chunkSize = remaining;
+
+				body.Write(-1); //page
+				body.Write(chunkSize); //count
+				for (int i = 0; i < chunkSize; i++, processedCount++)
+				{
+					KeyValuePair<int, RegMap> entry = regMaps[processedCount];
+					body.Write(entry.Value.Map); //slot
+					body.Write(entry.Value.Alias);
+					body.Write(-1); //brick count
+					body.Write(entry.Value.RegisteredDate.Year);
+					body.Write((sbyte)entry.Value.RegisteredDate.Month);
+					body.Write((sbyte)entry.Value.RegisteredDate.Day);
+					body.Write((sbyte)entry.Value.RegisteredDate.Hour);
+					body.Write((sbyte)entry.Value.RegisteredDate.Minute);
+					body.Write((sbyte)entry.Value.RegisteredDate.Second);
+					body.Write((sbyte)0);
+				}
+				Say(new MsgReference(430, body, client));
+			}
+
+			if (debugSend)
+				Debug.Log("SendAllUserMaps to: " + client.GetIdentifier());
+		}
+
+		public void SendEmptyUserMap(ClientReference client)
+		{
+			MsgBody body = new MsgBody();
+
+			body.Write(-1); //page
+			body.Write(1); //count
+			body.Write(0); //slot
+			body.Write("");
+			body.Write(-1); //brick count
+			body.Write(2000);
+			body.Write((sbyte)0);
+			body.Write((sbyte)0);
+			body.Write((sbyte)0);
+			body.Write((sbyte)0);
+			body.Write((sbyte)0);
+			body.Write((sbyte)0);
+
+			Say(new MsgReference(430, body, client));
+
+			if (debugSend)
+				Debug.Log("SendEmptyUserMap to: " + client.GetIdentifier());
+		}
+
+		public void SendDownloadedMaps(ClientReference client, int page)
+		{
+			MsgBody body = new MsgBody();
+
+			const int mapsPerPage = 12;
+			int offset = page * mapsPerPage;
+			int remaining = regMaps.Count - offset;
+			int count = remaining < mapsPerPage ? remaining : mapsPerPage;
+
+			body.Write(page); //page
+			body.Write(count); //count
+			for (int i = offset; i < offset + count; i++)
 			{
 				KeyValuePair<int, RegMap> entry = regMaps[i];
 				body.Write(entry.Value.Map);
@@ -2676,20 +3217,81 @@ namespace _Emulator
 				body.Write(entry.Value.Likes);
 				body.Write(entry.Value.DisLikes);
 				body.Write(entry.Value.DownloadCount);
-
-				if (i - offset == 100)
-				{
-					recursiveFlag = true;
-					break;
-				}
 			}
 			Say(new MsgReference(426, body, client));
 
-			if (recursiveFlag)
-				SendDownloadedMaps(client, i);
-
 			if (debugSend)
 				Debug.Log("SendDownloadedMaps to: " + client.GetIdentifier());
+		}
+
+		public void SendRegisteredMaps(ClientReference client, int page)
+		{
+			MsgBody body = new MsgBody();
+
+			const int mapsPerPage = 12;
+			int offset = page * mapsPerPage;
+			int remaining = regMaps.Count - offset;
+			int count = remaining < mapsPerPage ? remaining : mapsPerPage;
+
+			body.Write(page); //page
+			body.Write(count); //count
+			for (int i = offset; i < offset + count; i++)
+			{
+				KeyValuePair<int, RegMap> entry = regMaps[i];
+				body.Write(entry.Value.Map);
+				body.Write(entry.Value.Developer);
+				body.Write(entry.Value.Alias);
+				body.Write(entry.Value.ModeMask);
+				body.Write((byte)(Room.clanMatch | Room.official));
+				body.Write(entry.Value.tagMask);
+				body.Write(entry.Value.RegisteredDate.Year);
+				body.Write((sbyte)entry.Value.RegisteredDate.Month);
+				body.Write((sbyte)entry.Value.RegisteredDate.Day);
+				body.Write((sbyte)entry.Value.RegisteredDate.Hour);
+				body.Write((sbyte)entry.Value.RegisteredDate.Minute);
+				body.Write((sbyte)entry.Value.RegisteredDate.Second);
+				body.Write(entry.Value.DownloadFee);
+				body.Write(entry.Value.Release);
+				body.Write(entry.Value.LatestRelease);
+				body.Write(entry.Value.Likes);
+				body.Write(entry.Value.DisLikes);
+				body.Write(entry.Value.DownloadCount);
+			}
+			Say(new MsgReference(428, body, client));
+
+			if (debugSend)
+				Debug.Log("SendRegisteredMaps to: " + client.GetIdentifier());
+		}
+
+		public void SendUserMaps(ClientReference client, int page)
+		{
+			MsgBody body = new MsgBody();
+
+			const int mapsPerPage = 12;
+			int offset = page * mapsPerPage;
+			int remaining = regMaps.Count - offset;
+			int count = remaining < mapsPerPage ? remaining : mapsPerPage;
+
+			body.Write(page); //page
+			body.Write(count); //count
+			for (int i = offset; i < offset + count; i++)
+			{
+				KeyValuePair<int, RegMap> entry = regMaps[i];
+				body.Write(entry.Value.Map); //slot
+				body.Write(entry.Value.Alias);
+				body.Write(10000); //brick count
+				body.Write(entry.Value.RegisteredDate.Year);
+				body.Write((sbyte)entry.Value.RegisteredDate.Month);
+				body.Write((sbyte)entry.Value.RegisteredDate.Day);
+				body.Write((sbyte)entry.Value.RegisteredDate.Hour);
+				body.Write((sbyte)entry.Value.RegisteredDate.Minute);
+				body.Write((sbyte)entry.Value.RegisteredDate.Second);
+				body.Write((sbyte)0);
+			}
+			Say(new MsgReference(430, body, client));
+
+			if (debugSend)
+				Debug.Log("SendUserMaps to: " + client.GetIdentifier());
 		}
 
 		public void SendCustomMessage(string message, ClientReference client = null, SendType sendType = SendType.Broadcast)
@@ -2711,6 +3313,67 @@ namespace _Emulator
 
 			if (debugSend)
 				Debug.Log("SendRespawnTicket to: " + client.GetIdentifier());
+		}
+
+		private void HandleBeginChunkedBuffer(MsgReference msgRef)
+		{
+			msgRef.msg._msg.Read(out ushort opcode);
+			msgRef.msg._msg.Read(out int size);
+			msgRef.msg._msg.Read(out uint crc);
+
+			if (debugHandle)
+				Debug.Log("HandleBeginChunkedBuffer from: " + msgRef.client.GetIdentifier());
+
+			const int maxBufferSize = 1000000000;
+			if (size > maxBufferSize)
+			{
+				Debug.LogWarning("ServerEmulator.HandleBeginChunkedBuffer: Buffer was " + size + " bytes");
+				return;
+			}
+
+			if (msgRef.client.chunkedBuffer == null)
+			{
+				msgRef.client.chunkedBuffer = new ChunkedBuffer((uint)size, crc, opcode);
+			}
+
+			else
+			{
+				Debug.LogWarning("ServerEmulator.HandleBeginChunkedBuffer: ChunkedBuffer with id " + msgRef.client.chunkedBuffer.id + " is already assigned");
+				return;
+			}
+		}
+
+		private void HandleChunkedBuffer(MsgReference msgRef)
+		{
+			msgRef.msg._msg.Read(out ushort opcode);
+			msgRef.msg._msg.Read(out int chunk);
+			msgRef.msg._msg.Read(out byte[] next);
+
+			if (msgRef.client.chunkedBuffer != null && msgRef.client.chunkedBuffer.id == opcode)
+			{
+				msgRef.client.chunkedBuffer.WriteNext(next, chunk);
+			}
+		}
+
+		private void HandleEndChunkedBuffer(MsgReference msgRef)
+		{
+
+			if (debugHandle)
+				Debug.Log("HandleEndChunkedBuffer from: " + msgRef.client.GetIdentifier());
+
+			msgRef.msg._msg.Read(out ushort opcode);
+
+			if (msgRef.client.chunkedBuffer != null)
+			{
+				msgRef.client.chunkedBuffer.finished = true;
+				uint crc = CRC32.computeUnsigned(msgRef.client.chunkedBuffer.buffer);
+				if (crc != (msgRef.client.chunkedBuffer.crc))
+				{
+					Debug.LogError("HandleEndChunkedBuffer: crc mismatch");
+				}
+
+				File.WriteAllBytes("test.png", msgRef.client.chunkedBuffer.buffer);
+			}
 		}
 	}
 }

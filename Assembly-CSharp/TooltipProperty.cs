@@ -1439,6 +1439,7 @@ public class TooltipProperty
 				}
 				GUI.color = color;
 				outputy = titley;
+
 				LabelUtil.TextOut(new Vector2(outputx, outputy), (num8 + num17).ToString("0.##") + "%" + str, "MiniLabel", Color.white, GlobalVars.txtEmptyColor, TextAnchor.MiddleCenter);
 				LabelUtil.TextOut(new Vector2(outputx, outputy + 20f), (num14 + num18).ToString("0.##") + "%" + str2, "MiniLabel", Color.white, GlobalVars.txtEmptyColor, TextAnchor.MiddleCenter);
 				LabelUtil.TextOut(new Vector2(outputx, outputy + 40f), (num10 + num19).ToString("0.##") + "%" + str3, "MiniLabel", Color.white, GlobalVars.txtEmptyColor, TextAnchor.MiddleCenter);

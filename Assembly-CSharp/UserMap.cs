@@ -15,7 +15,7 @@ public class UserMap
 
 	public int crc;
 
-	private Dictionary<int, BrickInst> dic;
+	public Dictionary<int, BrickInst> dic;
 
 	private BrickInst[,,] geometry;
 

@@ -42,7 +42,7 @@ public class SelectUserMapDlg : Dialog
 
 	private Vector2 umiScrollPosition = Vector2.zero;
 
-	private byte umiSlot;
+	private int umiSlot;
 
 	private float lastClickTime;
 

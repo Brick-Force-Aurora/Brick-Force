@@ -7,7 +7,7 @@ public class WeaponModifier : MonoBehaviour
 
 	private Dictionary<int, WpnModEx> dicEx;
 
-	private static WeaponModifier _instance;
+	public static WeaponModifier _instance;
 
 	public static WeaponModifier Instance
 	{
@@ -21,6 +21,7 @@ public class WeaponModifier : MonoBehaviour
 					Debug.LogError("ERROR, Fail to get the WeaponModifier Instance");
 				}
 			}
+			
 			return _instance;
 		}
 	}

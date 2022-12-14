@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace _Emulator
@@ -24,7 +26,13 @@ namespace _Emulator
         public Dictionary<int, int> usedCannons;
         public Dictionary<int, int> usedTrains;
         public List<KillLogEntry> killLog;
+        public ChannelReference channel;
         public Room room;
+
+        //Build only
+        public UserMap cachedMap;
+        public UserMapInfo cachedUMI;
+        public bool mapCached;
 
         public MatchData()
         {
@@ -57,6 +65,8 @@ namespace _Emulator
 
 
             room = new Room(false, 0, "", Room.ROOM_TYPE.TEAM_MATCH, Room.ROOM_STATUS.WAITING, 0, 0, 0, "", 0, 0, 0, 0, 0, 0, 0, false, false, false, 0, 0);
+            cachedMap = new UserMap();
+            mapCached = false;
         }
 
         public void Reset()
@@ -77,6 +87,59 @@ namespace _Emulator
                 clientList[i].assists = 0;
                 clientList[i].score = 0;
             }
+        }
+
+        public void Shutdown()
+        {
+            foreach (ClientReference client in clientList)
+            {
+                client.matchData = null;
+                client.DetachSlot();
+                client.clientStatus = ClientReference.ClientStatus.Lobby;
+                client.status = BrickManDesc.STATUS.PLAYER_WAITING;
+                client.deaths = 0;
+                client.kills = 0;
+                client.assists = 0;
+                client.score = 0;
+                room.CurPlayer = clientList.Count;
+            }
+
+            Reset();
+        }
+
+        public void CacheMap(RegMap regMap, UserMapInfo umi)
+        {
+            if (regMap != null)
+            {
+                mapCached = true;
+                cachedMap.Clear();
+                cachedMap.Load(regMap.Map);
+                cachedUMI = umi;
+                cachedUMI.AssignRegMap(regMap);
+                cachedUMI.Alias = cachedUMI.regMap.Alias;
+            }
+
+            else
+                Debug.LogError("Couldn't cache map");
+        }
+
+        public void CacheMapGenerate(int landscapeIndex, int skyboxIndex, string alias)
+        {
+            mapCached = true;
+            cachedMap.Clear();
+            cachedMap = MapGenerator.instance.Generate(landscapeIndex, skyboxIndex);
+            DateTime time = DateTime.Now;
+            int hashId = MapGenerator.instance.GetHashIdForTime(time);
+            cachedMap.map = hashId;
+            cachedUMI = new UserMapInfo(hashId, alias, cachedMap.dic.Keys.Count, time, 0);
+        }
+
+        public int GetNextBrickSeq()
+        {
+            int seq = UnityEngine.Random.Range(0, int.MaxValue);
+            while (cachedMap.dic.ContainsKey(seq))
+                seq = UnityEngine.Random.Range(0, int.MaxValue);
+            return seq;
         }
 
         public sbyte GetWinningTeam()
@@ -122,21 +185,22 @@ namespace _Emulator
             switch (room.Type)
             {
                 case Room.ROOM_TYPE.TEAM_MATCH:
-                    ServerEmulator.instance.HandleTeamMatchEnd();
+                    ServerEmulator.instance.HandleTeamMatchEnd(this);
                     break;
 
                 case Room.ROOM_TYPE.INDIVIDUAL:
-                    ServerEmulator.instance.HandleIndividualMatchEnd();
+                    ServerEmulator.instance.HandleIndividualMatchEnd(this);
                     break;
 
                 default:
-                    ServerEmulator.instance.HandleIndividualMatchEnd();
+                    ServerEmulator.instance.HandleIndividualMatchEnd(this);
                     break;
             }
         }
 
         public void AddClient(ClientReference client)
         {
+            client.matchData = this;
             client.AssignSlot(GetNextFreeSlot());
             client.clientStatus = ClientReference.ClientStatus.Room;
             clientList.Add(client);
@@ -145,6 +209,7 @@ namespace _Emulator
 
         public void RemoveClient(ClientReference client)
         {
+            client.matchData = null;
             client.DetachSlot();
             client.clientStatus = ClientReference.ClientStatus.Lobby;
             client.status = BrickManDesc.STATUS.PLAYER_WAITING;

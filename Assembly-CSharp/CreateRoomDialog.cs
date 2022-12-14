@@ -282,7 +282,7 @@ public class CreateRoomDialog : Dialog
 
 	private Color txtMainClr = Color.white;
 
-	private byte umiSlot;
+	private int umiSlot;
 
 	private bool[] IsSupportClanMode;
 
@@ -569,7 +569,7 @@ public class CreateRoomDialog : Dialog
 		return true;
 	}
 
-	public bool InitDialog4MapEditorNew(byte slot)
+	public bool InitDialog4MapEditorNew(int slot)
 	{
 		curModeMask = 32767;
 		InitDialog();
@@ -586,7 +586,7 @@ public class CreateRoomDialog : Dialog
 		return true;
 	}
 
-	public bool InitDialog4MapEditorLoad(byte slot)
+	public bool InitDialog4MapEditorLoad(int slot)
 	{
 		curModeMask = 32767;
 		InitDialog();
