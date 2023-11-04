@@ -244,7 +244,53 @@ public class CSVLoader
 		_noCols = num2;
 	}
 
-	public bool SecuredLoad(string pathName)
+    public void SecuredLoadAndSave(String pathName, String targetPath)
+    {
+        SecuredLoad(pathName);
+        File.WriteAllText(targetPath, "");
+        FileStream fileStream = File.Open(targetPath, FileMode.Create, FileAccess.Write);
+        StreamWriter streamWriter = new StreamWriter(fileStream, Encoding.ASCII);
+        streamWriter.BaseStream.Seek(0L, SeekOrigin.Begin);
+        streamWriter.WriteLine(_rows.Count);
+        for (int i = 0; i < _rows.Count; i++)
+        {
+            string line = "";
+            string[] array = _rows[i];
+            for (int j = 0; j < array.Length; j++)
+            {
+                if(j == array.Length - 1)
+                {
+                    line += array[j];
+                } else {
+                    line += array[j] + ",";
+                }
+                
+            }
+            streamWriter.WriteLine(line);
+        }
+        streamWriter.Close();
+        fileStream.Close();
+    }
+
+    public void LoadAndSecuredSave(String pathName, String targetPath)
+    {
+        FileStream fileStream = File.OpenRead(pathName);
+        StreamReader streamReader = new StreamReader(fileStream, Encoding.ASCII);
+        _rows = new List<string[]>();
+        streamReader.BaseStream.Seek(0L, SeekOrigin.Begin);
+        int num = Int32.Parse(streamReader.ReadLine());
+        for (int i = 0; i < _rows.Count; i++)
+        {
+            string text = streamReader.ReadLine();
+            string[] array = text.Split(',');
+            _rows.Add(array);
+        }
+        streamReader.Close();
+        fileStream.Close();
+        SecuredSave(targetPath);
+    }
+
+    public bool SecuredLoad(string pathName)
 	{
 		pathName += ".cooked";
 		try

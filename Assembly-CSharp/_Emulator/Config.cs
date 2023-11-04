@@ -39,7 +39,7 @@ namespace _Emulator
             csv.SetValue("block_connections", blockConnections);
             csv.SetValue("auto_clear_dead_clients", autoClearDeadClients);
             csv.SetValue("max_connections", maxConnections);
-            csv.Save(path, "Option\tValue");
+            csv.Save(path, "Config\tValue");
         }
 
         public void LoadConfigFromDisk(string path = "Config\\Config.csv")
