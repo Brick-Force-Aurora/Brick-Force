@@ -40,6 +40,8 @@
 ![](https://i.imgur.com/6ncbt4O.png)
 
 ## Inventory Editor
+This is still available, but the Ingame Shop now works, items can only be bought permanently and all have the same price. Maybe sometime this could be updated.
+To get Access to the full ingame shop, download the shop.txt.cooked and shopCategory.txt.cooked from the release and put them in BrickForce_Data/Resources/Template
 ![](https://i.imgur.com/teJ36Lz.png)
 
 - Click on items in the left list to add them to the inventory.
@@ -73,9 +75,15 @@
 - Future support for Build Mode is planned.
 - Only one room per host to simplify server.
 - Item stats are mostly backup values loaded from disk and are different from Infernum servers.
-- Most rare weapons and max up variants have empty stats and are therefore useless in game.
+- ~Most rare weapons and max up variants have empty stats and are therefore useless in game.~
 - Game languages need to be english, otherwise you will get stuck in the loading screen.
 - Can be changed under registry path HKEY_CURRENT_USER\SOFTWARE\EXE Games\BrickForce (set BfVoice & BfLanguage to 1 for english).
+
+## How to develop
+- Install Visual Studio 2017
+- Open the solution file Brick-Force.sln
+- Change Build Output Path to Brick-Force_Data/Managed in project properties to match original game folder
+- If necessary reimport ICSharpCode.SharpZipLib.dll as reference
 
 ## Notes
 - This is a non-commercial fan project and not associated with any of the companies originally involved in the development and publishing of the game.

@@ -369,6 +369,10 @@ namespace _Emulator
 						HandleEquipRequest(msgRef);
 						break;
 
+                    case 37:
+                        HandleUnequipRequest(msgRef);
+                        break;
+
 					case 42:
 						HandleLoadComplete(msgRef);
 						break;
@@ -433,6 +437,10 @@ namespace _Emulator
 						HandleRadioMsgRequest(msgRef);
 						break;
 
+                    case 121:
+                        HandleBuyRequest(msgRef);
+                        break;
+
 					case 135:
 						HandleP2PComplete(msgRef);
 						break;
@@ -456,6 +464,10 @@ namespace _Emulator
 					case 160:
 						HandleEmptyCannonRequest(msgRef);
 						break;
+
+                    case 307:
+                        HandleInitItemTermRequest(msgRef);
+                        break;
 
 					case 333:
 						HandleSetShooterToolRequest(msgRef);
@@ -1163,6 +1175,113 @@ namespace _Emulator
 			}
 		}
 
+        private void HandleInitItemTermRequest(MsgReference msgRef)
+        {
+
+            MsgBody msgBody = msgRef.msg._msg;
+            msgBody.Read(out long item);
+            msgBody.Read(out int code);
+
+            //TODO: activate Item
+
+            MsgBody body = new MsgBody();
+            body.Write(0); // 0 = sucess !0 == fail
+            body.Write(item);
+
+            Say(new MsgReference(308, body, msgRef.client, SendType.Unicast));
+        }
+
+        private void HandleBuyRequest(MsgReference msgRef)
+        {
+            //BuyHow See Good.BUY_HOW
+            //Option = duration (days)
+            //needEquip = Direct Equip
+            //val = False afaik
+            MsgBody msgBody = msgRef.msg._msg;
+            msgBody.Read(out string code);
+            msgBody.Read(out int buyHow);
+            msgBody.Read(out int option);
+            msgBody.Read(out byte val);
+            //TODO needEquip
+            msgBody.Read(out bool needEqup);
+            //seq is error code or unique id
+            //Read(out long val); seq
+            //msgRef.Read(out string val2); code
+            //msgRef.Read(out int val3); remain
+            int remain = option * 86400;
+            //negative = permanent
+            if (option > 30) remain = -1;
+            sbyte premium = 0; // isPremium 0 || 1
+            int durability = int.MaxValue; //Durability int.MaxValue = Permanent
+            MsgBody body = new MsgBody();
+
+            TItem template = TItemManager.Instance.dic.FirstOrDefault(x => x.Value.code == code).Value;
+
+            int seqSeed = msgRef.client.seq + 1;
+            byte[] baseSeq = new byte[8];
+            byte[] seed = System.Text.Encoding.UTF8.GetBytes(template.name);
+            byte[] codeSeed = System.Text.Encoding.UTF8.GetBytes(template.code);
+            for (int i = 0; i < seed.Length && i < 5; i++)
+                baseSeq[i] = (byte)(seed[i] ^ seed[seed.Length - 1 - i]);
+
+            for (int i = 0; i < 3; i++)
+                baseSeq[i] ^= codeSeed[i];
+
+            long itemSeq = BitConverter.ToInt64(baseSeq, 0) * seqSeed;
+
+            Good good = ShopManager.Instance.dic.FirstOrDefault(x => x.Value.code == code).Value;
+            int price = good.GetPriceByOpt(option, (Good.BUY_HOW)buyHow);
+            switch ((Good.BUY_HOW)buyHow)
+            {
+                case Good.BUY_HOW.BRICK_POINT:
+                    break;
+                case Good.BUY_HOW.CASH_POINT:
+                    if (msgRef.client.data.tokens >= price)
+                    {
+                        int tokens = msgRef.client.data.tokens = msgRef.client.data.tokens - price;
+                        MsgBody bodyUpdate = new MsgBody();
+                        bodyUpdate.Write(msgRef.client.data.forcePoints);
+                        bodyUpdate.Write(msgRef.client.data.brickPoints);
+                        bodyUpdate.Write(tokens);
+                        bodyUpdate.Write(msgRef.client.data.coins);
+                        bodyUpdate.Write(msgRef.client.data.starDust);
+                        Say(new MsgReference(102, bodyUpdate, msgRef.client, SendType.Unicast));
+                    }
+                    else
+                    {
+                        itemSeq = -3;
+                    }
+                    break;
+                case Good.BUY_HOW.GENERAL_POINT:
+                    if (msgRef.client.data.forcePoints >= price)
+                    {
+                        int point = msgRef.client.data.forcePoints = msgRef.client.data.forcePoints - price;
+                        MsgBody bodyUpdate = new MsgBody();
+                        bodyUpdate.Write(point);
+                        bodyUpdate.Write(msgRef.client.data.brickPoints);
+                        bodyUpdate.Write(msgRef.client.data.tokens);
+                        bodyUpdate.Write(msgRef.client.data.coins);
+                        bodyUpdate.Write(msgRef.client.data.starDust);
+                        Say(new MsgReference(102, bodyUpdate, msgRef.client, SendType.Unicast));
+                    }
+                    else
+                    {
+                        itemSeq = -3;
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+            msgRef.client.inventory.AddItem(template);
+            body.Write(itemSeq);
+            body.Write(code);
+            body.Write(remain);
+            body.Write(premium);
+            body.Write(durability);
+            Say(new MsgReference(122, body, msgRef.client, SendType.Unicast));
+        }
+
 		private void HandleKillLogRequest(MsgReference msgRef)
 		{
 			if (killLogTimer < 0.2f)
@@ -1342,7 +1461,7 @@ namespace _Emulator
 
 			if (debugHandle)
 				Debug.Log("HandleEquipRequest from: " + msgRef.client.GetIdentifier());
-
+            
 			Item item = msgRef.client.inventory.equipment.Find(x => x.Seq == itemSeq);
 			if (item != null)
 			{
@@ -1367,7 +1486,48 @@ namespace _Emulator
 			}
 		}
 
-		private void HandleClearShooterTools(MsgReference msgRef)
+        private void HandleUnequipRequest(MsgReference msgRef)
+        {
+            MatchData matchData = msgRef.matchData;
+
+            // Read the item sequence number from the message.
+            msgRef.msg._msg.Read(out long itemSeq);
+
+            if (debugHandle)
+                Debug.Log("HandleUnequipRequest from: " + msgRef.client.GetIdentifier());
+
+            // Find the item in the inventory using the sequence number.
+            Item item = msgRef.client.inventory.equipment.Find(x => x.Seq == itemSeq);
+            if (item != null)
+            {
+                // Check if the item is currently equipped.
+                if (item.Usage != Item.USAGE.EQUIP)
+                    return;
+
+                // Find the index of the slot that the item is equipped to.
+                int index = Inventory.SlotToIndex(item.Template.slot);
+                if (index != -1 && index < msgRef.client.inventory.activeSlots.Length)
+                {
+                    // Ensure that the item is the one currently equipped in the slot.
+                    Item currentItem = msgRef.client.inventory.activeSlots[index];
+                    if (currentItem != null && currentItem.Seq == itemSeq)
+                    {
+                        // Set the item's usage to unequip and update the inventory slot.
+                        currentItem.Usage = Item.USAGE.UNEQUIP;
+                        msgRef.client.inventory.activeSlots[index] = null;
+
+                        // Send a message to the client indicating the item has been unequipped.
+                        SendUnequip(msgRef.client, currentItem.Seq, currentItem.Code, matchData);
+                    }
+                }
+
+                // Regenerate the active slots to reflect the change in the inventory.
+                msgRef.client.inventory.GenerateActiveSlots();
+            }
+        }
+
+
+        private void HandleClearShooterTools(MsgReference msgRef)
 		{
 			if (debugHandle)
 				Debug.Log("HandleClearShooterTools from: " + msgRef.client.GetIdentifier());

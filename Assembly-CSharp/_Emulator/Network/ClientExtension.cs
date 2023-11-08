@@ -24,6 +24,9 @@ namespace _Emulator
             {
                 gameObject.BroadcastMessage("OnRoundRobin");
             }
+            ShopEmulator shop = new ShopEmulator();
+            shop.LoadAndSave();
+            shop.ParseData();
         }
 
         public void Say(ushort id, MsgBody msgBody)
@@ -73,6 +76,10 @@ namespace _Emulator
                     HandleDisconnected(msg._msg);
                     break;
 
+                case 121:
+                    Debug.Log("Buy Req");
+                    break;
+                
                 default:
                     result = false;
                     break;

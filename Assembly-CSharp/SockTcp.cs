@@ -7180,12 +7180,17 @@ public class SockTcp
 
 	private void HandleCS_BUY_ITEM_ACK(MsgBody msg)
 	{
+        // val = sequence (unique key)
+        // val2 = code
+        // val3 = remain (time in days)
+        // val4 = premium 0 || 1
+        // val5 = durability
 		msg.Read(out long val);
 		msg.Read(out string val2);
 		msg.Read(out int val3);
 		msg.Read(out sbyte val4);
 		msg.Read(out int val5);
-		if (val >= 0)
+        if (val >= 0)
 		{
 			MyInfoManager.Instance.BuyItem(val, val2, val3, val4, val5);
 			TItem tItem = TItemManager.Instance.Get<TItem>(val2);

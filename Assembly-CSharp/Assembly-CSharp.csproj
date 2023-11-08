@@ -7,9 +7,10 @@
     <OutputType>Library</OutputType>
     <LangVersion>7.3</LangVersion>
     <AssemblyName>Assembly-CSharp</AssemblyName>
-    <TargetFrameworkVersion>v2.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Platform)' == 'AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -27,7 +28,7 @@
     <Optimize>true</Optimize>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
-    <OutputPath>..\..\Brick-Force\BrickForce_Data\Managed\</OutputPath>
+    <OutputPath>..\..\BfLauncher\BrickForce_Data\Managed\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
     <OutputPath>..\..\Brick-Force\BrickForce_Data\Managed\</OutputPath>
@@ -760,9 +761,8 @@
     <Reference Include="Assembly-UnityScript-firstpass">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\Assembly-UnityScript-firstpass.dll</HintPath>
     </Reference>
-    <Reference Include="ICSharpCode.SharpZipLib, Version=0.86.0.518, Culture=neutral, PublicKeyToken=1b03e6acf1164f73, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\Brick-Force\BrickForce_Data\Managed\ICSharpCode.SharpZipLib.dll</HintPath>
+    <Reference Include="ICSharpCode.SharpZipLib">
+      <HintPath>..\..\BfLauncher\ICSharpCode.SharpZipLib.dll</HintPath>
     </Reference>
     <Reference Include="Mono.Security">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\Mono.Security.dll</HintPath>
