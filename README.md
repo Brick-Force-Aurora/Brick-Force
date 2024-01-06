@@ -82,8 +82,10 @@ To get Access to the full ingame shop, download the shop.txt.cooked and shopCate
 ## How to develop
 - Install Visual Studio 2017
 - Open the solution file Brick-Force.sln
+- Install the Launcher and the Game into the same folder where the Brick-Force Repository Folder is to resolve all Dependencies
 - Change Build Output Path to Brick-Force_Data/Managed in project properties to match original game folder
 - If necessary reimport ICSharpCode.SharpZipLib.dll as reference
+- To Debug select the Brick-Force.exe as the external Program
 
 ## Notes
 - This is a non-commercial fan project and not associated with any of the companies originally involved in the development and publishing of the game.
