@@ -29,10 +29,19 @@ namespace _Emulator
         public ChannelReference channel;
         public Room room;
 
+        //CTF
+        public int redCaptures;
+        public int blueCaptures;
+
         //Build only
         public UserMap cachedMap;
         public UserMapInfo cachedUMI;
         public bool mapCached;
+
+        //BND
+        //public int currentRound;
+        //public int totalRounds;
+        public int repeat;
 
         public MatchData()
         {
@@ -59,11 +68,13 @@ namespace _Emulator
             List<List<SlotData>> split = Utils.SplitList<SlotData>(slots, 8);
             redSlots = split[0];
             blueSlots = split[1];
+            repeat = 10;
 
             for (int i = 0; i < redSlots.Count; i++)
                 redSlots[i].isRed = true;
 
-
+            redCaptures = 0;
+            blueCaptures = 0;
             room = new Room(false, 0, "", Room.ROOM_TYPE.TEAM_MATCH, Room.ROOM_STATUS.WAITING, 0, 0, 0, "", 0, 0, 0, 0, 0, 0, 0, false, false, false, 0, 0);
             cachedMap = new UserMap();
             mapCached = false;
@@ -78,6 +89,9 @@ namespace _Emulator
             usedCannons.Clear();
             usedTrains.Clear();
             killLog.Clear();
+            redCaptures = 0;
+            blueCaptures = 0;
+            repeat = 10;
             room.Status = Room.ROOM_STATUS.WAITING;
             for (int i = 0; i < clientList.Count; i++)
             {
@@ -87,6 +101,18 @@ namespace _Emulator
                 clientList[i].assists = 0;
                 clientList[i].score = 0;
             }
+        }
+
+        // Method to reset data for a new round
+        public void ResetForNewRound()
+        {
+            // Reset round-specific data
+            remainTime = countdownTime; // assuming countdownTime is set to the desired round duration
+            playTime = 0;
+            destroyedBricks.Clear();
+            usedCannons.Clear();
+            usedTrains.Clear();
+            killLog.Clear();
         }
 
         public void Shutdown()
@@ -190,6 +216,17 @@ namespace _Emulator
 
                 case Room.ROOM_TYPE.INDIVIDUAL:
                     ServerEmulator.instance.HandleIndividualMatchEnd(this);
+                    break;
+
+                case Room.ROOM_TYPE.CAPTURE_THE_FLAG:
+                    ServerEmulator.instance.HandleCTFMatchEnd(this);
+                    break;
+
+                case Room.ROOM_TYPE.BND:
+                    if (repeat <= 0)
+                    {
+                        ServerEmulator.instance.HandleBNDMatchEnd(this);
+                    }
                     break;
 
                 default:

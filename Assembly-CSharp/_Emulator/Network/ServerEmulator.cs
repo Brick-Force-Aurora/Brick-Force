@@ -345,6 +345,10 @@ namespace _Emulator
 						HandleDelBrickRequest(msgRef);
 						break;
 
+                    case 19:
+                        Debug.LogWarning("PaletteManagerRequest");
+                        break;
+
 					case 20:
 						HandleCacheBrickRequest(msgRef);
 						break;
@@ -465,8 +469,46 @@ namespace _Emulator
 						HandleEmptyCannonRequest(msgRef);
 						break;
 
+                    case 262:
+                        HandleGetBack2SpawnerRequest(msgRef);
+                        break;
+
+                    case 264:
+                        HandleMatchRestartCountRequest(msgRef);
+                        break;
+
+                    case 266:
+                        HandleMatchRestartRequest(msgRef);
+                        break;
+
+                    case 285:
+                        HandlePickFlagRequest(msgRef);
+                        break;
+
+                    case 287:
+                        HandleCaptureFlagRequest(msgRef);
+                        break;
+
+                    case 289: 
+                        HandleDropFlagRequest(msgRef);
+                        break;
+
+                    case 295:
+                        HandleCTFScoreRequest(msgRef);
+                        break;
+
                     case 307:
                         HandleInitItemTermRequest(msgRef);
+                        break;
+
+                    case 324:
+                        HandleBNDScoreRequest(msgRef);
+                        break;
+
+                    case 329:
+                        msgRef.msg._msg.Read(out long item);
+                        msgRef.msg._msg.Read(out string code);
+                        Debug.LogWarning("UseConsumable Item: " + item + " code: " + code);
                         break;
 
 					case 333:
@@ -481,6 +523,18 @@ namespace _Emulator
 						HandleRegMapInfoRequest(msgRef);
 						break;
 
+                    case 345:
+                        Debug.LogWarning("StackPointRequest");
+                        break;
+
+                    case 349:
+                        HandleBNDShiftPhaseRequest(msgRef);
+                        break;
+
+                    case 366:
+                        HandleFlagReturnRequest(msgRef);
+                        break;
+
 					case 368:
 						HandleWeaponHeldRatioRequest(msgRef);
 						break;
@@ -489,7 +543,11 @@ namespace _Emulator
 						HandleDelegateMasterRequest(msgRef);
 						break;
 
-					case 414:
+                    case 399:
+                        Debug.LogWarning("InflictedDamageRequest");
+                        break;
+
+                    case 414:
 						HandleWeaponChangeRequest(msgRef);
 						break;
 
@@ -513,6 +571,10 @@ namespace _Emulator
 						HandleRequestUserMaps(msgRef);
 						break;
 
+                    case 431:
+                        Debug.LogWarning("AllMapRequest:");
+                        break;
+
 					case 447:
 						HandleOpenDoorRequest(msgRef);
 						break;
@@ -520,6 +582,11 @@ namespace _Emulator
 					case 448:
 						HandleCloseDoorRequest(msgRef);
 						break;
+
+                    case 460:
+                        msgRef.msg._msg.Read(out int opt);
+                        Debug.LogWarning("SaveCommonOpt: " + opt);
+                        break;
 
 					case 469:
 						HandleRoomRequest(msgRef);
@@ -709,9 +776,19 @@ namespace _Emulator
 
 			if (debugPing)
 				Debug.Log("HandleTimer from: " + msgRef.client.GetIdentifier());
-
-			if (matchData.remainTime <= 0)
-				matchData.EndMatch();
+            if (matchData.room.type == Room.ROOM_TYPE.BND)
+            {
+                Debug.LogWarning(matchData.repeat);
+                if (matchData.repeat <= 0)
+                {
+                    matchData.EndMatch();
+                }
+            }
+            else
+            {
+                if (matchData.remainTime <= 0)
+                    matchData.EndMatch();
+            }
 
 			SendTimer(msgRef.client);
 		}
@@ -1392,7 +1469,19 @@ namespace _Emulator
 							HandleIndividualMatchEnd(matchData);
 						}
 						break;
-				}
+
+                    case Room.ROOM_TYPE.CAPTURE_THE_FLAG:
+                        if (victimClient.slot.slotIndex > 7)
+                            matchData.redScore++;
+                        else
+                            matchData.blueScore++;
+                        SendTeamScore(matchData);
+                        if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
+                        {
+                            HandleCTFMatchEnd(matchData);
+                        }
+                        break;
+                }
 			}
 		}
 
@@ -1718,7 +1807,23 @@ namespace _Emulator
 			SendRoom(null, matchData, SendType.BroadcastRoom);
 		}
 
-		private void HandleWeaponChangeRequest(MsgReference msgRef)
+        public void HandleCTFMatchEnd(MatchData matchData)
+        {
+            matchData.room.Status = Room.ROOM_STATUS.WAITING;
+            SendCTFMatchEnd(matchData);
+            matchData.Reset();
+            SendRoom(null, matchData, SendType.BroadcastRoom);
+        }
+
+        public void HandleBNDMatchEnd(MatchData matchData)
+        {
+            matchData.room.Status = Room.ROOM_STATUS.WAITING;
+            SendBNDMatchEnd(matchData);
+            matchData.Reset();
+            SendRoom(null, matchData, SendType.BroadcastRoom);
+        }
+
+        private void HandleWeaponChangeRequest(MsgReference msgRef)
 		{
 			msgRef.msg._msg.Read(out int slot);
 			msgRef.msg._msg.Read(out long seq);
@@ -1928,7 +2033,36 @@ namespace _Emulator
 			msgRef.client.chunkedBuffer = null;
 		}
 
-		public void SendDelBrick(ClientReference client, int brickSeq)
+        public void HandleBNDScoreRequest(MsgReference msgRef)
+        {
+            Debug.LogWarning("ScoreRequest");
+        }
+
+        public void HandleBNDShiftPhaseRequest(MsgReference msgRef)
+        {
+            Debug.LogWarning("recieved Shift Phase Req");
+            msgRef.msg._msg.Read(out int repeat);
+            MatchData matchData = msgRef.client.matchData;
+            matchData.repeat = repeat;
+            msgRef.msg._msg.Read(out bool isBuildPhase);
+            SendShiftPhase(msgRef.client, 1, isBuildPhase);
+        }
+
+        public void SendShiftPhase(ClientReference client, int repeat, bool isBuildPhase)
+        {
+            MatchData matchData = client.matchData;
+            matchData.ResetForNewRound();
+
+            MsgBody body = new MsgBody();
+
+            body.Write(repeat);
+            body.Write(isBuildPhase);
+
+            Say(new MsgReference(344, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
+        }
+
+
+        public void SendDelBrick(ClientReference client, int brickSeq)
 		{
 			MatchData matchData = client.matchData;
 
@@ -2266,7 +2400,81 @@ namespace _Emulator
 				Debug.Log("Broadcasted SendTeamMatchEnd for room no: " + matchData.room.No);
 		}
 
-		public void SendChat(ClientReference client, ChatText.CHAT_TYPE type, string text)
+        public void SendCTFMatchEnd(MatchData matchData)
+        {
+            for (int team = 0; team < 2; team++)
+            {
+                MsgBody body = new MsgBody();
+
+                body.Write(team == 0 ? matchData.GetWinningTeam() : (sbyte)-matchData.GetWinningTeam());
+                body.Write(matchData.redCaptures); //RedScore
+                body.Write(matchData.blueCaptures); //BlueScore
+                body.Write(matchData.blueScore); //RedTotalKill
+                body.Write(matchData.redScore); //BluTotalKill
+                body.Write(matchData.redScore); //RedTotalDeath
+                body.Write(matchData.blueScore); //BlueTotalDeath
+                body.Write(matchData.clientList.Count);
+                for (int i = 0; i < matchData.clientList.Count; i++)
+                {
+                    body.Write(matchData.clientList[i].slot.isRed);
+                    body.Write(matchData.clientList[i].seq);
+                    body.Write(matchData.clientList[i].name);
+                    body.Write(matchData.clientList[i].kills);
+                    body.Write(matchData.clientList[i].deaths);
+                    body.Write(matchData.clientList[i].assists);
+                    body.Write(matchData.clientList[i].score);
+                    body.Write(0); //points
+                    body.Write(0); //xp
+                    body.Write(0); //mission
+                    body.Write(matchData.clientList[i].data.xp);
+                    body.Write(matchData.clientList[i].data.xp);
+                    body.Write((long)0); //buff
+                }
+                Say(new MsgReference(292, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam));
+            }
+
+            if (debugSend)
+                Debug.Log("Broadcasted SendCTFMatchEnd for room no: " + matchData.room.No);
+        }
+
+        public void SendBNDMatchEnd(MatchData matchData)
+        {
+            for (int team = 0; team < 2; team++)
+            {
+                MsgBody body = new MsgBody();
+
+                body.Write(team == 0 ? matchData.GetWinningTeam() : (sbyte)-matchData.GetWinningTeam());
+                body.Write(matchData.redCaptures); //RedScore
+                body.Write(matchData.blueCaptures); //BlueScore
+                body.Write(matchData.blueScore); //RedTotalKill
+                body.Write(matchData.redScore); //BluTotalKill
+                body.Write(matchData.redScore); //RedTotalDeath
+                body.Write(matchData.blueScore); //BlueTotalDeath
+                body.Write(matchData.clientList.Count);
+                for (int i = 0; i < matchData.clientList.Count; i++)
+                {
+                    body.Write(matchData.clientList[i].slot.isRed);
+                    body.Write(matchData.clientList[i].seq);
+                    body.Write(matchData.clientList[i].name);
+                    body.Write(matchData.clientList[i].kills);
+                    body.Write(matchData.clientList[i].deaths);
+                    body.Write(matchData.clientList[i].assists);
+                    body.Write(matchData.clientList[i].score);
+                    body.Write(0); //points
+                    body.Write(0); //xp
+                    body.Write(0); //mission
+                    body.Write(matchData.clientList[i].data.xp);
+                    body.Write(matchData.clientList[i].data.xp);
+                    body.Write((long)0); //buff
+                }
+                Say(new MsgReference(338, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam));
+            }
+
+            if (debugSend)
+                Debug.Log("Broadcasted SendBNDMatchEnd for room no: " + matchData.room.No);
+        }
+
+        public void SendChat(ClientReference client, ChatText.CHAT_TYPE type, string text)
 		{
 			MsgBody body = new MsgBody();
 
@@ -3535,5 +3743,106 @@ namespace _Emulator
 				File.WriteAllBytes("test.png", msgRef.client.chunkedBuffer.buffer);
 			}
 		}
-	}
+
+        private void HandlePickFlagRequest(MsgReference msgRef)
+        {
+            MatchData data = msgRef.matchData;
+            msgRef.msg._msg.Read(out int flag);
+            if (debugHandle)
+                Debug.Log("HandlePickFlag from: " + msgRef.client.GetIdentifier() + " FlagId: " + flag);
+            MsgBody msg = new MsgBody();
+            // i think the response needs to be the plaxer seq which picked up the flag
+
+            msg.Write(msgRef.client.seq);
+            Say(new MsgReference(286, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+
+        private void HandleDropFlagRequest(MsgReference msgRef)
+        {
+            MatchData data = msgRef.matchData;
+            msgRef.msg._msg.Read(out int x);
+            msgRef.msg._msg.Read(out int y);
+            msgRef.msg._msg.Read(out int z);
+            if (debugHandle)
+                Debug.Log("HandleFlagDrop from: " + msgRef.client.GetIdentifier() + " Flag: x: " + x + " y: " + y + " z: " + z);
+            MsgBody msg = new MsgBody();
+            msg.Write(0); //unused
+            msg.Write(0); // unused
+            msg.Write(x);
+            msg.Write(y);
+            msg.Write(z);
+
+            Say(new MsgReference(290, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+
+        private void HandleCaptureFlagRequest(MsgReference msgRef)
+        {
+            MatchData data = msgRef.matchData;
+            msgRef.msg._msg.Read(out int flag);
+            msgRef.msg._msg.Read(out bool opponent);
+            if (msgRef.client.slot.slotIndex > 7)
+            {
+                data.redCaptures++;
+            } else
+            {
+                data.blueCaptures++;
+            }
+            if (debugHandle)
+                Debug.Log("HandleCaptureFlag from: " + msgRef.client.GetIdentifier() + " FlagId: " + flag + " IsOpponent: " + opponent);
+            MsgBody msg = new MsgBody();
+            msg.Write(msgRef.client.seq); // Player sequence
+            //Score is not counted
+            //Round only starts for one player (oponent?)
+
+            Say(new MsgReference(288, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+
+        private void HandleCTFScoreRequest(MsgReference msgRef)
+        {
+            MatchData data = msgRef.matchData;
+            MsgBody msg = new MsgBody();
+            msg.Write(data.redScore); // red score
+            msg.Write(data.blueScore); // blue score
+            if (debugHandle)
+                Debug.Log("HandleCTFScoreReq from: " + msgRef.client.GetIdentifier() + " RedScore: " + data.redScore + " BluScore: " + data.blueScore);
+
+            Say(new MsgReference(296, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+
+        private void HandleFlagReturnRequest(MsgReference msgRef)
+        {
+            MatchData data = msgRef.matchData;
+            msgRef.msg._msg.Read(out float x);
+            msgRef.msg._msg.Read(out float y);
+            msgRef.msg._msg.Read(out float z);
+            if (debugHandle)
+                Debug.Log("HandleFlagReturn from: " + msgRef.client.GetIdentifier() + " Flag: x: " + x + " y: " + y + " z: " + z);
+            MsgBody msg = new MsgBody();
+
+            Say(new MsgReference(367, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+
+        private void HandleGetBack2SpawnerRequest(MsgReference msgRef)
+        {
+            MatchData data = msgRef.matchData;
+            MsgBody msg = new MsgBody();
+            Say(new MsgReference(263, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+
+        private void HandleMatchRestartCountRequest(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out int count);
+            MatchData data = msgRef.matchData;
+            MsgBody msg = new MsgBody();
+            msg.Write(count);
+            Say(new MsgReference(265, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+
+        private void HandleMatchRestartRequest(MsgReference msgRef)
+        {
+            MatchData data = msgRef.matchData;
+            MsgBody msg = new MsgBody();
+            Say(new MsgReference(267, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+    }
 }

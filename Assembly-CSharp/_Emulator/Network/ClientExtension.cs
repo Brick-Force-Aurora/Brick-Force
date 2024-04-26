@@ -75,10 +75,6 @@ namespace _Emulator
                 case ExtensionOpcodes.opDisconnectAck:
                     HandleDisconnected(msg._msg);
                     break;
-
-                case 121:
-                    Debug.Log("Buy Req");
-                    break;
                 
                 default:
                     result = false;

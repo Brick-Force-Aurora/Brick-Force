@@ -3,3 +3,4 @@ C:\Users\Jan\Documents\GitHub\BfLauncher\BrickForce_Data\Managed\Assembly-CSharp
 C:\Users\Jan\Documents\GitHub\Brick-Force\Assembly-CSharp\obj\Debug\Assembly-CSharp.csproj.CopyComplete
 C:\Users\Jan\Documents\GitHub\Brick-Force\Assembly-CSharp\obj\Debug\Assembly-CSharp.dll
 C:\Users\Jan\Documents\GitHub\Brick-Force\Assembly-CSharp\obj\Debug\Assembly-CSharp.pdb
+C:\Users\Jan\Documents\GitHub\Brick-Force\Assembly-CSharp\obj\Debug\Assembly-CSharp.csprojAssemblyReference.cache

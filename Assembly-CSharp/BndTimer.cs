@@ -46,8 +46,10 @@ public class BndTimer : MonoBehaviour
 	{
 		build /= 60;
 		battle /= 60;
-		return (build << 16) | (battle << 8) | rpt;
-	}
+        // return (build << 16) | (battle << 8) | rpt;
+        //DEBUG ONLY
+        return (1 << 16) | (1 << 8) | rpt;
+    }
 
 	public static int BuildPhaseTime(int timerOpt)
 	{
@@ -142,6 +144,7 @@ public class BndTimer : MonoBehaviour
 				play++;
 				if (play % 60 == 0)
 				{
+                    
 					CSNetManager.Instance.Sock.SendCS_STACK_POINT_REQ();
 				}
 				if (remain < 0)

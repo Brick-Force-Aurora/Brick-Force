@@ -427,6 +427,7 @@ public class CaptureTheFlagMatch : MonoBehaviour
 		else
 		{
 			GameObject gameObject = BrickManManager.Instance.Get(seq);
+            Debug.Log(gameObject);
 			if (gameObject != null)
 			{
 				Transform[] componentsInChildren = gameObject.GetComponentsInChildren<Transform>();

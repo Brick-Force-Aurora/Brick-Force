@@ -3114,8 +3114,11 @@ public class SockTcp
 
 	public void SendCS_BND_SHIFT_PHASE_REQ(int repeat, bool isBuildPhase)
 	{
+        Debug.LogWarning("Send BND Shift Phase Req");
 		MsgBody msgBody = new MsgBody();
+        Debug.LogWarning(repeat);
 		msgBody.Write(repeat);
+        Debug.LogWarning(isBuildPhase);
 		msgBody.Write(isBuildPhase);
 		Say(349, msgBody);
 	}
@@ -9060,12 +9063,14 @@ public class SockTcp
 		GameObject gameObject = GameObject.Find("Main");
 		if (null != gameObject)
 		{
+            Debug.Log(val);
 			gameObject.BroadcastMessage("OnRoundEnd", val);
 			if (RoomManager.Instance.Master != MyInfoManager.Instance.Seq)
 			{
 				BndTimer component = gameObject.GetComponent<BndTimer>();
 				if (null != component)
 				{
+                    Debug.Log("Shift Phase");
 					component.ShiftPhase(val2);
 				}
 			}
@@ -9434,6 +9439,7 @@ public class SockTcp
 		BrickManManager.Instance.haveFlagSeq = val;
 		BrickManManager.Instance.bSendTcpCheckOnce = false;
 		GameObject gameObject = GameObject.Find("Main");
+
 		if (null != gameObject)
 		{
 			gameObject.BroadcastMessage("OnPicked", val);
@@ -11563,6 +11569,7 @@ public class SockTcp
 
 	private void HandleCS_BND_STATUS_ACK(MsgBody msg)
 	{
+        Debug.LogWarning("BND Status ACK");
 		msg.Read(out bool val);
 		MyInfoManager.Instance.BndModeDesc = new BuildNDestroyModeDesc();
 		MyInfoManager.Instance.BndModeDesc.buildPhase = val;
