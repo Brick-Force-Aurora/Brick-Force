@@ -30,8 +30,8 @@ namespace _Emulator
         public Room room;
 
         //CTF
-        public int redCaptures;
-        public int blueCaptures;
+        public int ctfRedKillCount;
+        public int ctfBlueKillCount;
 
         //Build only
         public UserMap cachedMap;
@@ -39,9 +39,12 @@ namespace _Emulator
         public bool mapCached;
 
         //BND
-        //public int currentRound;
-        //public int totalRounds;
-        public int repeat;
+        public bool isBuildPhase;    // Current phase: true = Build, false = Destroy
+        public bool useBuildGun;
+        public int repeat;      // Total number of Build-and-Destroy rounds
+        public int currentRound;     // Current round number
+        public int buildPhaseTime;   // Time (in seconds) for Build phase
+        public int battlePhaseTime;  // Time (in seconds) for Destroy phase
 
         public MatchData()
         {
@@ -68,13 +71,17 @@ namespace _Emulator
             List<List<SlotData>> split = Utils.SplitList<SlotData>(slots, 8);
             redSlots = split[0];
             blueSlots = split[1];
-            repeat = 10;
+            isBuildPhase = true;
+            repeat = 0;
+            currentRound = 1;
+            buildPhaseTime = 0;
+            battlePhaseTime = 0;
 
             for (int i = 0; i < redSlots.Count; i++)
                 redSlots[i].isRed = true;
 
-            redCaptures = 0;
-            blueCaptures = 0;
+            ctfRedKillCount = 0;
+            ctfBlueKillCount = 0;
             room = new Room(false, 0, "", Room.ROOM_TYPE.TEAM_MATCH, Room.ROOM_STATUS.WAITING, 0, 0, 0, "", 0, 0, 0, 0, 0, 0, 0, false, false, false, 0, 0);
             cachedMap = new UserMap();
             mapCached = false;
@@ -89,9 +96,13 @@ namespace _Emulator
             usedCannons.Clear();
             usedTrains.Clear();
             killLog.Clear();
-            redCaptures = 0;
-            blueCaptures = 0;
-            repeat = 10;
+            ctfRedKillCount = 0;
+            ctfBlueKillCount = 0;
+            isBuildPhase = true;
+            repeat = 0;
+            currentRound = 1;
+            buildPhaseTime = 0;
+            battlePhaseTime = 0;
             room.Status = Room.ROOM_STATUS.WAITING;
             for (int i = 0; i < clientList.Count; i++)
             {
@@ -223,10 +234,12 @@ namespace _Emulator
                     break;
 
                 case Room.ROOM_TYPE.BND:
-                    if (repeat <= 0)
+                    /*Debug.LogWarning("MatchDataEndMatch repeat:" + repeat + " remainTime: " + remainTime + " isBuildPhase: " + isBuildPhase);
+                    if (repeat <= 0 && remainTime <0 && !isBuildPhase)
                     {
                         ServerEmulator.instance.HandleBNDMatchEnd(this);
-                    }
+                    }*/
+                    ServerEmulator.instance.HandleBNDMatchEnd(this);
                     break;
 
                 default:

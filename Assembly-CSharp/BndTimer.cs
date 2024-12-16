@@ -44,9 +44,10 @@ public class BndTimer : MonoBehaviour
 
 	public static int PackTimerOption(int build, int battle, int rpt)
 	{
-		build /= 60;
+        build /= 60;
 		battle /= 60;
         return (build << 16) | (battle << 8) | rpt;
+        //TESTING: return (1 << 16) | (1 << 8) | 2;
     }
 
 	public static int BuildPhaseTime(int timerOpt)
@@ -73,10 +74,13 @@ public class BndTimer : MonoBehaviour
 
 	public void ShiftPhase(bool buildPhase)
 	{
-		if (buildPhase)
+        Debug.LogWarning("BndTimer: ShiftPhase to isBuildPhase: " + buildPhase);
+        if (buildPhase)
 		{
-			repeat--;
-		}
+            Debug.LogWarning("BndTimer: reduce repeat: " + repeat);
+            repeat--;
+            Debug.LogWarning("BndTimer: new repeat: " + repeat);
+        }
 		isBuildPhase = buildPhase;
 		remain = ((!isBuildPhase) ? BattlePhaseTime(RoomManager.Instance.TimeLimit) : BuildPhaseTime(RoomManager.Instance.TimeLimit));
 	}
@@ -88,6 +92,7 @@ public class BndTimer : MonoBehaviour
 		isBuildPhase = true;
 		remain = BuildPhaseTime(RoomManager.Instance.TimeLimit);
 		repeat = Repeat(RoomManager.Instance.TimeLimit);
+        Debug.LogWarning("repeatAtStart of BNDTimer: " + repeat);
 		GameObject gameObject = GameObject.Find("Me");
 		if (null == gameObject)
 		{
@@ -145,11 +150,14 @@ public class BndTimer : MonoBehaviour
                     
 					CSNetManager.Instance.Sock.SendCS_STACK_POINT_REQ();
 				}
+                //Debug.Log("[VERBOSE] BndTimerUpdate: remain: " + remain);
 				if (remain < 0)
 				{
 					remain = 0;
-					ShiftPhase(!isBuildPhase);
-					CSNetManager.Instance.Sock.SendCS_BND_SHIFT_PHASE_REQ(repeat, isBuildPhase);
+                    Debug.LogWarning("BndTimer: ShiftPhase from isBuildPhase: " + isBuildPhase);
+                    ShiftPhase(!isBuildPhase);
+                    Debug.LogWarning("BndTimer: SendShiftPhaseReq repeat: " + repeat + " isBuildPhase: " + isBuildPhase);
+                    CSNetManager.Instance.Sock.SendCS_BND_SHIFT_PHASE_REQ(repeat, isBuildPhase);
 				}
 				else
 				{

@@ -319,7 +319,8 @@ namespace _Emulator
 
 			try
 			{
-				switch (msgRef.msg._id)
+                //Debug.Log($"[Verbose] Processing message ID: {msgRef.msg._id} from client: {msgRef.client.GetIdentifier()}");
+                switch (msgRef.msg._id)
 				{
 					case 1:
 						HandleLoginRequest(msgRef);
@@ -503,6 +504,14 @@ namespace _Emulator
 
                     case 324:
                         HandleBNDScoreRequest(msgRef);
+                        break;
+
+                    case 325:
+                        HandleLineBrickRequest(msgRef);
+                        break;
+
+                    case 327:
+                        HandleReplaceBrickRequest(msgRef);
                         break;
 
                     case 329:
@@ -778,7 +787,6 @@ namespace _Emulator
 				Debug.Log("HandleTimer from: " + msgRef.client.GetIdentifier());
             if (matchData.room.type == Room.ROOM_TYPE.BND)
             {
-                Debug.LogWarning(matchData.repeat);
                 if (matchData.repeat <= 0)
                 {
                     matchData.EndMatch();
@@ -790,7 +798,7 @@ namespace _Emulator
                     matchData.EndMatch();
             }
 
-			SendTimer(msgRef.client);
+            SendTimer(msgRef.client);
 		}
 
 		private void HandleMatchCountdown(MsgReference msgRef)
@@ -1031,7 +1039,23 @@ namespace _Emulator
 				matchData.isBalance = Convert.ToBoolean(param6);
 			}
 
-			if (debugHandle)
+            if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.BND)
+            {
+                // Unpack the timer configuration for Build and Destroy phases
+                int buildTime, destroyTime, repeat;
+                UnpackTimerOption(param2, out buildTime, out destroyTime, out repeat);
+
+                matchData.buildPhaseTime = buildTime;
+                matchData.battlePhaseTime = destroyTime;
+                matchData.repeat = repeat;
+
+                // Initialize BND-specific fields
+                /*matchData.currentPhase = MatchData.BnDPhase.Build;
+                matchData.currentRound = 1;
+                matchData.remainTime = buildTime; // Start with Build phase time*/
+            }
+
+            if (debugHandle)
 				Debug.Log("HandleCreateRoom from: " + msgRef.client.GetIdentifier());
 
 			matchData.AddClient(msgRef.client);
@@ -1470,11 +1494,31 @@ namespace _Emulator
 						}
 						break;
 
+                    case Room.ROOM_TYPE.BND:
+                        Debug.LogWarning(matchData.isBuildPhase);
+                        //the emulator match data is currently in the wrong phase?
+                        if (!matchData.isBuildPhase)
+                        {
+                            // Score during the Destroy phase
+                            if (victimClient.slot.slotIndex > 7)
+                                matchData.redScore++;
+                            else
+                                matchData.blueScore++;
+
+                            SendBnDScore(matchData);
+
+                            if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
+                            {
+                                HandleBNDMatchEnd(matchData);
+                            }
+                        }
+                        break;
+
                     case Room.ROOM_TYPE.CAPTURE_THE_FLAG:
                         if (victimClient.slot.slotIndex > 7)
-                            matchData.redScore++;
+                            matchData.ctfRedKillCount++;
                         else
-                            matchData.blueScore++;
+                            matchData.ctfBlueKillCount++;
                         SendTeamScore(matchData);
                         if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
                         {
@@ -2035,7 +2079,14 @@ namespace _Emulator
 
         public void HandleBNDScoreRequest(MsgReference msgRef)
         {
-            Debug.LogWarning("ScoreRequest");
+            MatchData data = msgRef.matchData;
+            MsgBody msg = new MsgBody();
+            msg.Write(data.redScore); // red score
+            msg.Write(data.blueScore); // blue score
+            if (debugHandle)
+                Debug.Log("HandleBNDScoreReq from: " + msgRef.client.GetIdentifier() + " RedScore: " + data.redScore + " BluScore: " + data.blueScore);
+
+            Say(new MsgReference(339, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
 
         public void HandleBNDShiftPhaseRequest(MsgReference msgRef)
@@ -2043,9 +2094,17 @@ namespace _Emulator
             Debug.LogWarning("recieved Shift Phase Req");
             msgRef.msg._msg.Read(out int repeat);
             MatchData matchData = msgRef.client.matchData;
+            Debug.LogWarning("matchData old repeat: " + matchData.repeat + " msg repeat: " + repeat);
             matchData.repeat = repeat;
+            if (repeat <= 0)
+            {
+                matchData.EndMatch();
+            }
+
             msgRef.msg._msg.Read(out bool isBuildPhase);
-            SendShiftPhase(msgRef.client, 1, isBuildPhase);
+            Debug.LogWarning("matchData old isBuildPhase: " + matchData.isBuildPhase + " msg isBuild: " + isBuildPhase);
+            matchData.isBuildPhase = isBuildPhase;
+            SendShiftPhase(msgRef.client, repeat, isBuildPhase);
         }
 
         public void SendShiftPhase(ClientReference client, int repeat, bool isBuildPhase)
@@ -2407,12 +2466,12 @@ namespace _Emulator
                 MsgBody body = new MsgBody();
 
                 body.Write(team == 0 ? matchData.GetWinningTeam() : (sbyte)-matchData.GetWinningTeam());
-                body.Write(matchData.redCaptures); //RedScore
-                body.Write(matchData.blueCaptures); //BlueScore
-                body.Write(matchData.blueScore); //RedTotalKill
-                body.Write(matchData.redScore); //BluTotalKill
-                body.Write(matchData.redScore); //RedTotalDeath
-                body.Write(matchData.blueScore); //BlueTotalDeath
+                body.Write(matchData.redScore); //RedScore
+                body.Write(matchData.blueScore); //BlueScore
+                body.Write(matchData.ctfRedKillCount); //RedTotalKill
+                body.Write(matchData.ctfBlueKillCount); //BluTotalKill
+                body.Write(matchData.ctfBlueKillCount); //RedTotalDeath
+                body.Write(matchData.ctfRedKillCount); //BlueTotalDeath
                 body.Write(matchData.clientList.Count);
                 for (int i = 0; i < matchData.clientList.Count; i++)
                 {
@@ -2444,12 +2503,10 @@ namespace _Emulator
                 MsgBody body = new MsgBody();
 
                 body.Write(team == 0 ? matchData.GetWinningTeam() : (sbyte)-matchData.GetWinningTeam());
-                body.Write(matchData.redCaptures); //RedScore
-                body.Write(matchData.blueCaptures); //BlueScore
+                body.Write(matchData.redScore); //RedScore
+                body.Write(matchData.blueScore); //BlueScore
                 body.Write(matchData.blueScore); //RedTotalKill
                 body.Write(matchData.redScore); //BluTotalKill
-                body.Write(matchData.redScore); //RedTotalDeath
-                body.Write(matchData.blueScore); //BlueTotalDeath
                 body.Write(matchData.clientList.Count);
                 for (int i = 0; i < matchData.clientList.Count; i++)
                 {
@@ -2799,7 +2856,19 @@ namespace _Emulator
 				Debug.Log("Broadcasted SendTeamScore for room no: " + matchData.room.No);
 		}
 
-		public void SendMaster(ClientReference client, MatchData matchData)
+        public void SendBnDScore(MatchData matchData)
+        {
+            MsgBody body = new MsgBody();
+            body.Write(matchData.redScore);
+            body.Write(matchData.blueScore);
+
+            Say(new MsgReference(339, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
+
+            if (debugSend)
+                Debug.Log("Broadcasted SendTeamScore for room no: " + matchData.room.No);
+        }
+
+        public void SendMaster(ClientReference client, MatchData matchData)
 		{
 			MsgBody body = new MsgBody();
 
@@ -3782,16 +3851,17 @@ namespace _Emulator
             msgRef.msg._msg.Read(out bool opponent);
             if (msgRef.client.slot.slotIndex > 7)
             {
-                data.redCaptures++;
+                data.blueScore++;
             } else
             {
-                data.blueCaptures++;
+                data.redScore++;
             }
+            SendTeamScore(data);
+            data.ResetForNewRound();
             if (debugHandle)
                 Debug.Log("HandleCaptureFlag from: " + msgRef.client.GetIdentifier() + " FlagId: " + flag + " IsOpponent: " + opponent);
             MsgBody msg = new MsgBody();
             msg.Write(msgRef.client.seq); // Player sequence
-            //Score is not counted
             //Round only starts for one player (oponent?)
 
             Say(new MsgReference(288, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
@@ -3843,6 +3913,77 @@ namespace _Emulator
             MatchData data = msgRef.matchData;
             MsgBody msg = new MsgBody();
             Say(new MsgReference(267, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+
+        private void HandleLineBrickRequest(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out long item);
+            msgRef.msg._msg.Read(out string code);
+            msgRef.msg._msg.Read(out byte brick);
+            msgRef.msg._msg.Read(out byte x);
+            msgRef.msg._msg.Read(out byte y);
+            msgRef.msg._msg.Read(out byte z);
+            msgRef.msg._msg.Read(out byte rot);
+
+            //Line Brick Success 326
+            /*MyInfoManager.Instance.IsModified = true;
+            Brick brick = BrickManager.Instance.GetBrick(val3);
+            if (brick != null)
+            {
+                BrickManager.Instance.AddBrickCreator(val2, val3, new Vector3((float)(int)val4, (float)(int)val5, (float)(int)val6), val7);
+            }
+            if (val == MyInfoManager.Instance.Seq)
+            {
+                ((LineToolDialog)DialogManager.Instance.GetDialog(DialogManager.DIALOG_INDEX.LINE_TOOL))?.MoveNext(success: true);
+            }*/
+            //Line Brick Fail 330
+            /*msg.Read(out int val);
+            ShowBuildErrorMessage(val);
+            ((LineToolDialog)DialogManager.Instance.GetDialog(DialogManager.DIALOG_INDEX.LINE_TOOL))?.MoveNext(success: false);*/
+        }
+
+        private void HandleReplaceBrickRequest(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out long item);
+            msgRef.msg._msg.Read(out string code);
+            msgRef.msg._msg.Read(out int existing);
+            msgRef.msg._msg.Read(out byte brick);
+            msgRef.msg._msg.Read(out byte x);
+            msgRef.msg._msg.Read(out byte y);
+            msgRef.msg._msg.Read(out byte z);
+            msgRef.msg._msg.Read(out byte rot);
+            //Replace Brick Success 328
+            /*MyInfoManager.Instance.IsModified = true;
+            BrickManager.Instance.DelBrick(val2, shrink: true);
+            Brick brick = BrickManager.Instance.GetBrick(val4);
+            if (brick != null)
+            {
+                BrickManager.Instance.AddBrickCreator(val3, val4, new Vector3((float)(int)val5, (float)(int)val6, (float)(int)val7), val8);
+            }
+            if (val == MyInfoManager.Instance.Seq)
+            {
+                ((ReplaceToolDialog)DialogManager.Instance.GetDialog(DialogManager.DIALOG_INDEX.REPLACE_TOOL))?.MoveNext(success: true);
+            }*/
+            //Replace Brick Fail 331
+            /*msg.Read(out int val);
+            ShowBuildErrorMessage(val);
+            ((ReplaceToolDialog)DialogManager.Instance.GetDialog(DialogManager.DIALOG_INDEX.REPLACE_TOOL))?.MoveNext(success: false);*/
+        }
+
+        public static void UnpackTimerOption(int packed, out int build, out int battle, out int rpt)
+        {
+            // Extract `rpt` (last 8 bits)
+            rpt = packed & 0xFF;
+
+            // Extract `battle` (middle 8 bits)
+            battle = (packed >> 8) & 0xFF;
+
+            // Extract `build` (first 8 bits)
+            build = (packed >> 16) & 0xFF;
+
+            // Convert back to seconds
+            build *= 60;
+            battle *= 60;
         }
     }
 }

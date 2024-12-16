@@ -3114,7 +3114,7 @@ public class SockTcp
 
 	public void SendCS_BND_SHIFT_PHASE_REQ(int repeat, bool isBuildPhase)
 	{
-        Debug.LogWarning("Send BND Shift Phase Req");
+        Debug.LogWarning("Send BND # Req");
 		MsgBody msgBody = new MsgBody();
         Debug.LogWarning(repeat);
 		msgBody.Write(repeat);
@@ -9058,26 +9058,26 @@ public class SockTcp
 
 	private void HandleCS_BND_SHIFT_PHASE_ACK(MsgBody msg)
 	{
-		msg.Read(out int val);
-		msg.Read(out bool val2);
+		msg.Read(out int repeat);
+		msg.Read(out bool isBuildPhase);
 		GameObject gameObject = GameObject.Find("Main");
 		if (null != gameObject)
 		{
-            Debug.Log(val);
-			gameObject.BroadcastMessage("OnRoundEnd", val);
+            Debug.LogWarning(repeat);
+			gameObject.BroadcastMessage("OnRoundEnd", repeat);
 			if (RoomManager.Instance.Master != MyInfoManager.Instance.Seq)
 			{
 				BndTimer component = gameObject.GetComponent<BndTimer>();
 				if (null != component)
 				{
-                    Debug.Log("Shift Phase");
-					component.ShiftPhase(val2);
+                    Debug.LogWarning("Shift Phase not host");
+					component.ShiftPhase(isBuildPhase);
 				}
 			}
 		}
 		if (MyInfoManager.Instance.BndModeDesc != null)
 		{
-			MyInfoManager.Instance.BndModeDesc.buildPhase = val2;
+			MyInfoManager.Instance.BndModeDesc.buildPhase = isBuildPhase;
 		}
 	}
 
