@@ -92,3 +92,7 @@ To get Access to the full ingame shop, download the shop.txt.cooked and shopCate
 - Code in _Emulator folder is newly added to the game.
 - Other code is mostly reverse engineered (decompiled) from the original game and refined so it compiles as a VS project.
 - Therefore commercial use of this project is not recommended.
+
+## Troubleshooting
+
+- **Stuck in "Downloading Once..":** Most likely something is faulty in your config. To fix this issue go to the Registry Editor and go to the path: `Computer\HKEY_CURRENT_USER\SOFTWARE\EXE Games\BrickForce` and delete the `EXE Games` Folder. Now restart the game and it should work
