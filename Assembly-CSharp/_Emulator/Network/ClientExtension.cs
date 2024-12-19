@@ -25,7 +25,7 @@ namespace _Emulator
                 gameObject.BroadcastMessage("OnRoundRobin");
             }
             ShopEmulator shop = new ShopEmulator();
-            shop.LoadAndSave();
+            //shop.LoadAndSave();
             shop.ParseData();
         }
 
@@ -170,16 +170,16 @@ namespace _Emulator
         {
             MsgBody body = new MsgBody();
 
-            body.Write(inventory.csv._rows.Count);
-            for (int row = 0; row < inventory.csv._rows.Count; row++)
+            body.Write(inventory.equipment.Count);
+
+            // Write each item's slot (category) and code
+            foreach (var item in inventory.equipment)
             {
-                body.Write(inventory.csv._rows[row].Length);
-                for (int col = 0; col < inventory.csv._rows[row].Length; col++)
-                {
-                    body.Write(inventory.csv._rows[row][col]);
-                }
+                body.Write(item.Template.slot.ToString()); // Write the slot (e.g., Main, Secondary)
+                body.Write(item.Code);                     // Write the item code
             }
 
+            // Send the data
             Say(ExtensionOpcodes.opInventoryAck, body);
         }
 

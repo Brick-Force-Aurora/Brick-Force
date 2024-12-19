@@ -601,7 +601,11 @@ namespace _Emulator
 						HandleRoomRequest(msgRef);
 						break;
 
-					case 478:
+                    case 471:
+                        HandleChargeForcePoint(msgRef);
+                        break;
+
+                    case 478:
 						HandleRequestUserList(msgRef);
 						break;
 
@@ -1309,14 +1313,23 @@ namespace _Emulator
             //Read(out long val); seq
             //msgRef.Read(out string val2); code
             //msgRef.Read(out int val3); remain
-            int remain = option * 86400;
+            int remain; // = option * 86400; //this is wrong for items that dont have a time limit but are single use
             //negative = permanent
-            if (option > 30) remain = -1;
             sbyte premium = 0; // isPremium 0 || 1
             int durability = int.MaxValue; //Durability int.MaxValue = Permanent
             MsgBody body = new MsgBody();
 
             TItem template = TItemManager.Instance.dic.FirstOrDefault(x => x.Value.code == code).Value;
+            if (template.IsAmount)
+            {
+                remain = option;
+            } else if (option <= 30)
+            {
+                remain = option * 86400;
+            } else
+            {
+                remain = -1;
+            }
 
             int seqSeed = msgRef.client.seq + 1;
             byte[] baseSeq = new byte[8];
@@ -1373,8 +1386,17 @@ namespace _Emulator
                 default:
                     break;
             }
-
-            msgRef.client.inventory.AddItem(template);
+            if (MyInfoManager.Instance.inventory.ContainsKey(itemSeq))
+            {
+                remain += MyInfoManager.Instance.inventory[itemSeq].Amount;
+            } else
+            {
+                msgRef.client.inventory.AddItem(template, false, remain);
+            }
+            if (debugHandle)
+            {
+                Debug.LogWarning("Code: " + code + " Name: " + template.Name);
+            }
             body.Write(itemSeq);
             body.Write(code);
             body.Write(remain);
@@ -1563,28 +1585,42 @@ namespace _Emulator
 
 		private void HandleInventoryCSV(MsgReference msgRef)
 		{
-			List<string[]> rows = new List<string[]>();
+            // List to hold new equipment
+            List<Item> newEquipment = new List<Item>();
 
-			msgRef.msg._msg.Read(out int rowCount);
-			for (int row = 0; row < rowCount; row++)
-			{
-				msgRef.msg._msg.Read(out int colCount);
-				string[] rowData = new string[colCount];
-				for (int col = 0; col < colCount; col++)
-				{
-					msgRef.msg._msg.Read(out string entry);
-					rowData[col] = entry;
-				}
-				rows.Add(rowData);
-			}
+            // Read the total count of items
+            msgRef.msg._msg.Read(out int itemCount);
 
-			msgRef.client.inventory = new Inventory(msgRef.client.seq, new CSVLoader(rows));
+            // Read each item's slot and code
+            for (int i = 0; i < itemCount; i++)
+            {
+                msgRef.msg._msg.Read(out string slotName);
+                msgRef.msg._msg.Read(out string code);
 
-			if (debugHandle)
-				Debug.Log("HandleInventoryCSV from: " + msgRef.client.GetIdentifier());
+                // Fetch the item template
+                TItem template = TItemManager.Instance.Get<TItem>(code);
+                if (template != null)
+                {
+                    // Create and add the item to the list
+                    Item.USAGE usage = Item.USAGE.EQUIP;
+                    Item item = new Item(msgRef.client.seq, template, code, usage, -1, 0, 1000);
+                    newEquipment.Add(item);
+                }
+                else
+                {
+                    Debug.LogWarning($"Template not found for code: {code}");
+                }
+            }
 
-			SendInventory(msgRef.client);
-		}
+            // Update the client's inventory
+            msgRef.client.inventory = new Inventory(msgRef.client.seq, newEquipment);
+
+            if (debugHandle)
+                Debug.Log($"HandleInventoryCSV from: {msgRef.client.GetIdentifier()}");
+
+            // Notify the client about the updated inventory
+            SendInventory(msgRef.client);
+        }
 
 		private void HandleEquipRequest(MsgReference msgRef)
 		{
@@ -1796,7 +1832,53 @@ namespace _Emulator
 			SendRadioMsg(seq, category, message, msgRef.matchData);
 		}
 
-		private void HandleChatRequest(MsgReference msgRef)
+        private void HandleChargeForcePoint(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out long seq);
+            msgRef.msg._msg.Read(out string code);
+
+            Item item = MyInfoManager.Instance.inventory[seq];
+
+            Debug.LogWarning("Found Item: " + item.Code + item.IsAmount + " amount: " + item.Amount);
+            item.Amount = item.Amount - 1;
+            Debug.LogWarning("New Amount " + item.Amount);
+            Debug.LogWarning("EnopughToConsume " + item.EnoughToConsume);
+            if (!item.EnoughToConsume)
+            {
+                Debug.LogWarning("Remove Item");
+                MyInfoManager.Instance.inventory.Remove(item.Seq);
+            }
+            TSpecial special = (TSpecial)item.Template;
+            int forcePoints = msgRef.client.data.forcePoints = msgRef.client.data.forcePoints + int.Parse(special.param);
+            SendForcePointAssetUpdate(msgRef.client, forcePoints);
+            SendChargeForcePoint(msgRef.client, seq, code, int.Parse(special.param));
+        }
+
+        public void SendForcePointAssetUpdate(ClientReference client, int forcePoints)
+        {
+            MsgBody bodyUpdate = new MsgBody();
+            bodyUpdate.Write(forcePoints);
+            bodyUpdate.Write(client.data.brickPoints);
+            bodyUpdate.Write(client.data.tokens);
+            bodyUpdate.Write(client.data.coins);
+            bodyUpdate.Write(client.data.starDust);
+            Say(new MsgReference(102, bodyUpdate, client, SendType.Unicast));
+        }
+
+        public void SendChargeForcePoint(ClientReference client, long seq, string code, int amount)
+        {
+            MsgBody body = new MsgBody();
+
+            body.Write(1); //flag for success?
+            body.Write(seq); //unused
+            body.Write(code);
+
+            body.Write(amount); //charge amount
+
+            Say(new MsgReference(472, body, client, SendType.Unicast));
+        }
+
+        private void HandleChatRequest(MsgReference msgRef)
 		{
 			msgRef.msg._msg.Read(out string text);
 
@@ -2411,8 +2493,8 @@ namespace _Emulator
 				body.Write(matchData.clientList[i].deaths);
 				body.Write(matchData.clientList[i].assists);
 				body.Write(matchData.clientList[i].score);
-				body.Write(0); //points
-				body.Write(0); //xp
+				body.Write(Convert.ToString(matchData.clientList[i].score*0.4)); //points
+				body.Write(Convert.ToString(matchData.clientList[i].score * 0.5)); //xp
 				body.Write(0); //mission
 				body.Write(matchData.clientList[i].data.xp);
 				body.Write(matchData.clientList[i].data.xp);
@@ -2445,9 +2527,9 @@ namespace _Emulator
 					body.Write(matchData.clientList[i].deaths);
 					body.Write(matchData.clientList[i].assists);
 					body.Write(matchData.clientList[i].score);
-					body.Write(0); //points
-					body.Write(0); //xp
-					body.Write(0); //mission
+                    body.Write(Convert.ToString(matchData.clientList[i].score * 0.4)); //points
+                    body.Write(Convert.ToString(matchData.clientList[i].score * 0.5)); //xp
+                    body.Write(0); //mission
 					body.Write(matchData.clientList[i].data.xp);
 					body.Write(matchData.clientList[i].data.xp);
 					body.Write((long)0); //buff
@@ -2482,8 +2564,8 @@ namespace _Emulator
                     body.Write(matchData.clientList[i].deaths);
                     body.Write(matchData.clientList[i].assists);
                     body.Write(matchData.clientList[i].score);
-                    body.Write(0); //points
-                    body.Write(0); //xp
+                    body.Write(Convert.ToString(matchData.clientList[i].score * 0.4)); //points
+                    body.Write(Convert.ToString(matchData.clientList[i].score * 0.5)); //xp
                     body.Write(0); //mission
                     body.Write(matchData.clientList[i].data.xp);
                     body.Write(matchData.clientList[i].data.xp);
@@ -2517,8 +2599,8 @@ namespace _Emulator
                     body.Write(matchData.clientList[i].deaths);
                     body.Write(matchData.clientList[i].assists);
                     body.Write(matchData.clientList[i].score);
-                    body.Write(0); //points
-                    body.Write(0); //xp
+                    body.Write(Convert.ToString(matchData.clientList[i].score * 0.4)); //points
+                    body.Write(Convert.ToString(matchData.clientList[i].score * 0.5)); //xp
                     body.Write(0); //mission
                     body.Write(matchData.clientList[i].data.xp);
                     body.Write(matchData.clientList[i].data.xp);

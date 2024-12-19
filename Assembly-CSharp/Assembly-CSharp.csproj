@@ -773,12 +773,19 @@
     <Reference Include="System.Core">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\System.Core.dll</HintPath>
     </Reference>
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Xml" />
     <Reference Include="UnityEngine">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\UnityEngine.dll</HintPath>
     </Reference>
     <Reference Include="UnityScript.Lang">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\UnityScript.Lang.dll</HintPath>
     </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="_Emulator\DATA\shop.txt" />
+    <EmbeddedResource Include="_Emulator\DATA\shopCategory.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

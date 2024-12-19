@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using UnityEngine;
 
@@ -30,9 +31,16 @@ namespace _Emulator
         public void ParseData()
         {
             dic = new Dictionary<string, Good>();
-            FileStream fileStream = File.OpenRead("Config\\shopCategory.txt");
-            StreamReader streamReader = new StreamReader(fileStream, Encoding.ASCII);
+            //FileStream fileStream = File.OpenRead("Config\\shopCategory.txt");
+            //StreamReader streamReader = new StreamReader(fileStream, Encoding.ASCII);
+            string resourceName = "_Emulator.DATA.shopCategory.txt";
+
+            // Get the current assembly
+            var assembly = Assembly.GetExecutingAssembly();
+            Stream stream = assembly.GetManifestResourceStream(resourceName);
+            StreamReader streamReader = new StreamReader(stream);
             streamReader.ReadLine();
+
             while (!streamReader.EndOfStream)
             {
                 string line = streamReader.ReadLine();
@@ -65,8 +73,9 @@ namespace _Emulator
                         isOfferOnce == 1, isGiftable == 1, isPromo == 1, rebuyInvisible == 1, (sbyte)Int32.Parse(splitLine[10]), (sbyte)Int32.Parse(splitLine[11])));
                 }
             }
-            fileStream = File.OpenRead("Config\\shop.txt");
-            streamReader = new StreamReader(fileStream, Encoding.ASCII);
+            resourceName = "_Emulator.DATA.shop.txt";
+            stream = assembly.GetManifestResourceStream(resourceName);
+            streamReader = new StreamReader(stream);
             streamReader.ReadLine();
             while (!streamReader.EndOfStream)
             {
