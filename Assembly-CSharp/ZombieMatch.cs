@@ -443,6 +443,7 @@ public class ZombieMatch : MonoBehaviour
 		deltaTime4ZombieStatus += Time.deltaTime;
 		if (deltaTime4ZombieStatus > 1f && MyInfoManager.Instance.Seq == RoomManager.Instance.Master)
 		{
+            deltaTime4ZombieStatus = 0f;
 			CSNetManager.Instance.Sock.SendCS_ZOMBIE_STATUS_REQ((int)step, (int)deltaTime4ZombieMatch, countDown4SetPositionPhase);
 		}
 	}
@@ -566,7 +567,7 @@ public class ZombieMatch : MonoBehaviour
 	private void OnZombieStatus(ZombieStatus zs)
 	{
 		countDown4SetPositionPhase = zs._cntDn;
-		deltaTime4ZombieMatch = (float)zs._time;
+        deltaTime4ZombieMatch = (float)zs._time;
 		step = (STEP)zs._status;
 	}
 }

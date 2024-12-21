@@ -26,6 +26,7 @@ namespace _Emulator
         public int deaths = 0;
         public int assists = 0;
         public int score = 0;
+        public bool isZombie = false;
         public bool isBreakingInto;
         public float toleranceTime;
         public ClientStatus clientStatus;

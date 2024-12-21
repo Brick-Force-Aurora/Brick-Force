@@ -43,6 +43,10 @@ namespace _Emulator
             activeSlots = new Item[16];
             seq = _seq;
 
+            GenerateActiveSlots();
+            GenerateActiveTools();
+            GenerateActiveChange();
+
             /*if (csv != null)
                 LoadInventoryFromMemory();
             else
@@ -283,53 +287,68 @@ namespace _Emulator
             // Check if the file exists
             if (!File.Exists(filePath))
             {
-                // Create and write the startingGear data
-                using (StreamWriter writer = new StreamWriter(filePath))
+                foreach (var category in DummyData.startingGear)
                 {
-                    foreach (var category in DummyData.startingGear)
+                    string categoryName = category[0];
+                    for (int i = 1; i < category.Length; i++)
                     {
-                        string categoryName = category[0];
-                        for (int i = 1; i < category.Length; i++)
+                        TItem template = TItemManager.Instance.Get<TItem>(category[i]);
+                        if (template == null)
+                            continue;
+
+                        Item item = AddItem(template);
+
+                        if (item != null)
                         {
-                            writer.WriteLine($"{categoryName};{category[i]}");
+                            if (categoryName != "NONE")
+                            {
+                                item.Usage = Item.USAGE.EQUIP;
+                            }
+                            else if (item.Code == "s92" || item.Code == "s08" || item.Code == "s09" || item.Code == "s07")
+                            {
+                                //Check the Brick Guns, because they dont have a slot
+                                item.Usage = Item.USAGE.EQUIP;
+                            }
                         }
                     }
                 }
-                Debug.Log($"Inventory file created at {filePath}.");
-            }
-
-            // Read data from the CSV file
-            foreach (string line in File.ReadAllLines(filePath))
+                //Debug.Log($"Inventory file created at {filePath}.");
+            } else
             {
-                string[] parts = line.Split(';');
-                if (parts.Length < 2)
-                    continue;
-
-                string categoryName = parts[0];
-                string code = parts[1];
-
-                if (!string.IsNullOrEmpty(code))
+                // Read data from the CSV file
+                foreach (string line in File.ReadAllLines(filePath))
                 {
-                    TItem template = TItemManager.Instance.Get<TItem>(code);
-                    if (template == null)
+                    string[] parts = line.Split(';');
+                    if (parts.Length < 2)
                         continue;
 
-                    Item item = AddItem(template);
+                    string categoryName = parts[0];
+                    string code = parts[1];
 
-                    if (item != null)
+                    if (!string.IsNullOrEmpty(code))
                     {
-                        if (categoryName != "NONE")
+                        TItem template = TItemManager.Instance.Get<TItem>(code);
+                        if (template == null)
+                            continue;
+
+                        Item item = AddItem(template);
+
+                        if (item != null)
                         {
-                            item.Usage = Item.USAGE.EQUIP;
-                        }
-                        else if (item.Code == "s92" || item.Code == "s08" || item.Code == "s09" || item.Code == "s07")
-                        {
-                            //Check the Brick Guns, because they dont have a slot
-                            item.Usage = Item.USAGE.EQUIP;
+                            if (categoryName != "NONE")
+                            {
+                                item.Usage = Item.USAGE.EQUIP;
+                            }
+                            else if (item.Code == "s92" || item.Code == "s08" || item.Code == "s09" || item.Code == "s07")
+                            {
+                                //Check the Brick Guns, because they dont have a slot
+                                item.Usage = Item.USAGE.EQUIP;
+                            }
                         }
                     }
                 }
             }
+
 
             GenerateActiveSlots();
             GenerateActiveTools();

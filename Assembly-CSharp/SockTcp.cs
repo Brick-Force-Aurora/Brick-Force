@@ -12102,7 +12102,10 @@ public class SockTcp
 			msg.Read(out int val13);
 			msg.Read(out long val14);
 			list.Add(new ResultUnitZombie(val2, val3, val4, val5, val6, val7, val8, val9, val10, val11, val12, val13, val14));
-		}
+            // Debug log for this client's data
+            Debug.Log($"Info Recieced Player {i + 1}: isRed={val2}, Seq={val3}, Name={val4}, Kills={val5}, Deaths={val6}, Assists={val7}, " +
+                      $"Score={val8}, Points={val9}, XP={val10}, Mission={val11}, PrevXP={val12}, NextXP={val13}, Buff={val14}");
+        }
 		list.Sort((ResultUnitZombie prev, ResultUnitZombie next) => prev.Compare(next));
 		RoomManager.Instance.RU = list.ToArray();
 		RoomManager.Instance.endCode = 0;

@@ -609,6 +609,26 @@ namespace _Emulator
 						HandleRequestUserList(msgRef);
 						break;
 
+                    case 538:
+                        HandleZombieInfectionRequest(msgRef);
+                        break;
+
+                    case 540:
+                        HandleZombieInfectRequest(msgRef);
+                        break;
+
+                    case 545:
+                        HandleZombieScoreRequest(msgRef);
+                        break;
+
+                    case 547:
+                        HandleZombieStatusRequest(msgRef);
+                        break;
+
+                    case 549:
+                        HandleZombieObserverRequest(msgRef);
+                        break;
+
 					case 551:
 						HandleGetTrainRequest(msgRef);
 						break;
@@ -647,6 +667,7 @@ namespace _Emulator
 			catch (Exception ex)
 			{
 				Debug.LogError("HandleMessages: " + ex.Message);
+                Debug.LogError("HandleMessages StackTrace: " + ex.StackTrace);
 			}
 
 			finally
@@ -699,7 +720,8 @@ namespace _Emulator
 			catch (Exception ex)
 			{
 				Debug.LogError("SendMessages: " + ex.Message);
-			}
+                Debug.LogError("SendMessages Stack Trace: " + ex.StackTrace);
+            }
 
 			finally
 			{
@@ -788,18 +810,25 @@ namespace _Emulator
 			}
 
 			if (debugPing)
-				Debug.Log("HandleTimer from: " + msgRef.client.GetIdentifier());
-            if (matchData.room.type == Room.ROOM_TYPE.BND)
+				Debug.Log($"HandleTimer - RemainTime: {remainTime}, PlayTime: {playTime} from " + msgRef.client.GetIdentifier());
+            if (matchData.room.type == Room.ROOM_TYPE.ZOMBIE)
             {
-                if (matchData.repeat <= 0)
+                // Handle round transitions
+                if (matchData.remainTime <= 0)
                 {
-                    matchData.EndMatch();
+                    if (matchData.zombieRoundsLeft > 0 && !matchData.roundInit)
+                    {
+                        SendRoundEnd(msgRef, matchData);
+                    }
                 }
             }
-            else
+            else if (matchData.room.type == Room.ROOM_TYPE.BND && matchData.repeat <= 0)
             {
-                if (matchData.remainTime <= 0)
-                    matchData.EndMatch();
+                matchData.EndMatch();
+            }
+            else if (matchData.remainTime <= 0)
+            {
+                matchData.EndMatch();
             }
 
             SendTimer(msgRef.client);
@@ -927,6 +956,10 @@ namespace _Emulator
 				SendSlotLocks(msgRef.client);
 				SendRoomConfig(msgRef.client, matchData);
 				SendAddRoom(msgRef.client, matchData);
+                if (debugHandle)
+                {
+                    Debug.Log("SendEnter, Client:" + msgRef.client.GetIdentifier());
+                }
 				SendEnter(msgRef.client);
 				SendSlotData(matchData);
 
@@ -1030,8 +1063,7 @@ namespace _Emulator
 				else
 					matchData.CacheMapGenerate(param3, param4, alias);
 			}
-
-			else
+            else
 			{
 				matchData.room.goal = param1;
 				matchData.room.timelimit = param2;
@@ -1057,6 +1089,16 @@ namespace _Emulator
                 /*matchData.currentPhase = MatchData.BnDPhase.Build;
                 matchData.currentRound = 1;
                 matchData.remainTime = buildTime; // Start with Build phase time*/
+            } 
+            else if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.ZOMBIE)
+            {
+                matchData.zombieRounds = param1;
+                matchData.zombieRoundsLeft = param1;
+                matchData.zombieTimePerRound = param2;
+                if (debugSend)
+                {
+                    Debug.Log("ZOMBIE: numrounds: " + param1 + " time: " + param2);
+                }
             }
 
             if (debugHandle)
@@ -1461,7 +1503,7 @@ namespace _Emulator
 			ClientReference killerClient = matchData.clientList.Find(x => x.seq == killer);
 			if (killer != victim)
 			{
-				killerClient.kills++;
+				killerClient.kills++; 
 				SendKillCount(killerClient);
 			}
 
@@ -1532,6 +1574,18 @@ namespace _Emulator
                             if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
                             {
                                 HandleBNDMatchEnd(matchData);
+                            }
+                        }
+                        break;
+
+                    case Room.ROOM_TYPE.ZOMBIE:
+                        Debug.LogWarning("ZombieKillLoghitpart: " + hitpart + " isZombie: " + victimClient.isZombie);
+                        if (hitpart == 4 && victimClient.isZombie)
+                        {
+                            matchData.zombiePlayers.Remove(victimClient.seq);
+                            matchData.killedPlayers.Add(victimClient.seq);
+                            if (matchData.zombiePlayers.Count == 0) {
+                                SendRoundEnd(msgRef, matchData);
                             }
                         }
                         break;
@@ -1949,6 +2003,14 @@ namespace _Emulator
             SendRoom(null, matchData, SendType.BroadcastRoom);
         }
 
+        public void HandleZombieMatchEnd(MatchData matchData)
+        {
+            matchData.room.Status = Room.ROOM_STATUS.WAITING;
+            SendZombieMatchEnd(matchData);
+            matchData.Reset();
+            SendRoom(null, matchData, SendType.BroadcastRoom);
+        }
+
         private void HandleWeaponChangeRequest(MsgReference msgRef)
 		{
 			msgRef.msg._msg.Read(out int slot);
@@ -2175,7 +2237,7 @@ namespace _Emulator
         {
             Debug.LogWarning("recieved Shift Phase Req");
             msgRef.msg._msg.Read(out int repeat);
-            MatchData matchData = msgRef.client.matchData;
+            MatchData matchData = msgRef.matchData;
             Debug.LogWarning("matchData old repeat: " + matchData.repeat + " msg repeat: " + repeat);
             matchData.repeat = repeat;
             if (repeat <= 0)
@@ -2611,6 +2673,56 @@ namespace _Emulator
 
             if (debugSend)
                 Debug.Log("Broadcasted SendBNDMatchEnd for room no: " + matchData.room.No);
+        }
+
+        public void SendZombieMatchEnd(MatchData matchData)
+        {
+            MsgBody body = new MsgBody();
+
+            body.Write(matchData.clientList.Count);
+            Debug.Log($"Sending Zombie Match End - Total Players: {matchData.clientList.Count}");
+
+            for (int i = 0; i < matchData.clientList.Count; i++)
+            {
+                var client = matchData.clientList[i];
+
+                bool isRed = client.slot.isRed;
+                int seq = client.seq;
+                string name = client.name;
+                int kills = client.kills;
+                int deaths = client.deaths;
+                int assists = client.assists;
+                int score = client.score;
+                int points = (int)(score * 0.4);
+                int xp = (int)(score * 0.5);
+                int mission = 0; // Placeholder for mission completion
+                int prevXp = client.data.xp; // Current XP (assuming for now)
+                int nextXp = client.data.xp; // Placeholder for next XP
+                long buff = 0; // Placeholder for buff
+
+                body.Write(isRed);
+                body.Write(seq);
+                body.Write(name);
+                body.Write(kills);
+                body.Write(deaths);
+                body.Write(assists);
+                body.Write(score);
+                body.Write(points.ToString());
+                body.Write(xp.ToString());
+                body.Write(mission);
+                body.Write(prevXp);
+                body.Write(nextXp);
+                body.Write(buff);
+
+                // Debug log for this client's data
+                Debug.Log($"Player {i + 1}: isRed={isRed}, Seq={seq}, Name={name}, Kills={kills}, Deaths={deaths}, Assists={assists}, " +
+                          $"Score={score}, Points={points}, XP={xp}, Mission={mission}, PrevXP={prevXp}, NextXP={nextXp}, Buff={buff}");
+            }
+
+            SayInstant(new MsgReference(537, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
+
+            if (debugSend)
+                Debug.Log($"Broadcasted SendZombieMatchEnd for room no: {matchData.room.No}");
         }
 
         public void SendChat(ClientReference client, ChatText.CHAT_TYPE type, string text)
@@ -3215,7 +3327,8 @@ namespace _Emulator
 
 		public void SendEnter(ClientReference client)
 		{
-			MatchData matchData = client.matchData;
+
+            MatchData matchData = client.matchData;
 
 			MsgBody body = new MsgBody();
 
@@ -4050,6 +4163,292 @@ namespace _Emulator
             /*msg.Read(out int val);
             ShowBuildErrorMessage(val);
             ((ReplaceToolDialog)DialogManager.Instance.GetDialog(DialogManager.DIALOG_INDEX.REPLACE_TOOL))?.MoveNext(success: false);*/
+        }
+
+        private void HandleZombieInfectionRequest(MsgReference msgRef)
+        {
+            MatchData data = msgRef.matchData;
+            //Debug.LogWarning("InfectionRequest current status: " + data.zombieStatus);
+
+            if(data.roundInit)
+            {
+                int numPlayers = data.clientList.Count;
+                int numZombies;
+
+                if (numPlayers <= 4)
+                {
+                    numZombies = 1;
+                }
+                else if (numPlayers <= 10)
+                {
+                    numZombies = 2;
+                }
+                else if (numPlayers <= 15)
+                {
+                    numZombies = 3;
+                }
+                else
+                {
+                    numZombies = 4;
+                }
+
+                // Clone the client list to select randomly
+                List<ClientReference> shuffledClients = new List<ClientReference>(data.clientList);
+
+                // Shuffle the list to ensure randomness
+                for (int i = 0; i < shuffledClients.Count; i++)
+                {
+                    int randomIndex = UnityEngine.Random.Range(i, shuffledClients.Count);
+
+                    // Manually swap elements
+                    var temp = shuffledClients[i];
+                    shuffledClients[i] = shuffledClients[randomIndex];
+                    shuffledClients[randomIndex] = temp;
+                }
+
+                // Select the first `numZombies` clients as zombies
+                data.zombiePlayers.Clear();
+                for (int i = 0; i < numZombies; i++)
+                {
+                    data.clientList.Find(x => x.seq == shuffledClients[i].seq).isZombie = true;
+                    data.zombiePlayers.Add(shuffledClients[i].seq);
+                }
+
+                // Add the remaining clients to the human players list
+                data.humanPlayers.Clear();
+                for (int i = numZombies; i < shuffledClients.Count; i++)
+                {
+                    data.humanPlayers.Add(shuffledClients[i].seq);
+                }
+
+                // Mark the round as initialized
+                data.roundInit = false;
+
+                if (debugSend)
+                {
+                    Debug.Log($"Initialized round: {numZombies} zombies and {data.humanPlayers.Count} humans.");
+                }  
+            }
+
+            // Create a new message body for the response
+            MsgBody msg = new MsgBody();
+
+            // Add human IDs
+            msg.Write(data.humanPlayers.Count); // Write the count of humans
+            foreach (int humanId in data.humanPlayers)
+            {
+                msg.Write(humanId); // Write each human player ID
+            }
+
+            // Add zombie IDs
+            msg.Write(data.zombiePlayers.Count); // Write the count of zombies
+            foreach (int zombieId in data.zombiePlayers)
+            {
+                msg.Write(zombieId); // Write each zombie player ID
+            }
+
+            // Add IDs of players who died (killed)
+            msg.Write(data.killedPlayers.Count); // Write the count of killed players
+            foreach (int killedId in data.killedPlayers)
+            {
+                msg.Write(killedId); // Write each killed player ID
+            }
+            
+            // Add IDs of players who became infected (turned into zombies)
+            msg.Write(data.infectedPlayers.Count); // Write the count of infected players
+            foreach (int infectedId in data.infectedPlayers)
+            {
+                msg.Write(infectedId); // Write each infected player ID
+            }
+
+            // Broadcast the response to all players in the room
+            Say(new MsgReference(539, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+
+            if (debugSend)
+            {
+                Debug.Log("Zombie infection state updated and broadcasted.");
+            }
+        }
+
+        private void HandleZombieInfectRequest(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out int brickMan);
+            msgRef.msg._msg.Read(out int zombie);
+
+            MatchData data = msgRef.matchData;
+            // Update human and zombie player lists
+            if (data.humanPlayers.Contains(brickMan))
+            {
+                data.humanPlayers.Remove(brickMan);
+                data.zombiePlayers.Add(brickMan);
+                ClientReference client = data.clientList[zombie];
+                client.kills += 1;
+            }
+
+            if (data.humanPlayers.Count == 0)
+            {
+                SendRoundEnd(msgRef, data);
+            }
+
+            MsgBody msg = new MsgBody();
+            msg.Write(brickMan); // Infected player
+            msg.Write(zombie);   // Infecting player
+            Say(new MsgReference(541, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+
+            if (debugSend)
+            {
+                Debug.Log($"Zombie Infection: {zombie} infected {brickMan}. Remaining humans: {data.humanPlayers.Count}, Remaining Zombies: {data.zombiePlayers.Count}");
+            }
+        }
+
+        private void HandleZombieScoreRequest(MsgReference msgRef)
+        {
+            // Ensure debug logging is only performed if debugSend is enabled
+            if (debugSend)
+            {
+                Debug.Log($"Zombie Score Request: Total Rounds: {msgRef.matchData.zombieRounds}, " +
+                          $"Current Round: {msgRef.matchData.zombieCurrentRound}");
+            }
+
+            // Prepare the message body with total rounds and current round
+            MsgBody msg = new MsgBody();
+            msg.Write(msgRef.matchData.zombieRounds); // Total rounds
+            msg.Write(msgRef.matchData.zombieCurrentRound); // Current round
+
+            // Send the message as a broadcast
+            Say(new MsgReference(536, msg, null, SendType.BroadcastRoom, msgRef.matchData.channel, msgRef.matchData));
+        }
+
+        private void SendRoundEnd(MsgReference msgRef, MatchData data)
+        {
+            Debug.LogWarning($"Send RoundEnd client {msgRef.client.GetIdentifier()} data: {data.ToString()}");
+
+            if (data.zombieCurrentRound >= data.zombieRounds)
+            {
+                data.EndMatch();
+                return;
+            }
+
+            MsgBody msg = new MsgBody();
+            msg.Write(msgRef.client.seq);
+            if (data.humanPlayers.Count == 0) 
+            {
+                //Zombies win
+                msg.Write((sbyte)-1);
+                msg.Write((sbyte)1);
+            } else
+            {
+                //Humans win
+                msg.Write((sbyte)1);
+                msg.Write((sbyte)-1);
+            }
+            msg.Write((sbyte)data.zombieCurrentRound);
+            data.ResetForNewRound();
+            data.zombieCurrentRound += 1;
+            data.zombieRoundsLeft -= 1;
+
+            HandleZombieScoreRequest(msgRef);
+
+            Say(new MsgReference(205, msg, null, SendType.BroadcastRoom, data.channel, data));
+        }
+
+        private void HandleZombieStatusRequest(MsgReference msgRef)
+        {
+            if (msgRef.client.seq != msgRef.matchData.masterSeq)
+            {
+                return;
+            }
+            msgRef.msg._msg.Read(out int status);
+            msgRef.msg._msg.Read(out int time);
+            msgRef.msg._msg.Read(out int countDown);
+
+            MatchData data = msgRef.matchData;
+            MsgBody msg = new MsgBody();
+            data.zombieStatus = (ZombieMatch.STEP)status;
+
+            if (debugPing)
+            {
+                Debug.Log($"ZombieStatus: {status} Time: {time} Countdown: {countDown}");
+            }
+
+            switch ((ZombieMatch.STEP) status)
+            {
+                case ZombieMatch.STEP.WAITING:
+                    Debug.Log("Waiting");
+                    data.zombieCountdown = 0;
+                    //status = 1;
+                    break;
+                case ZombieMatch.STEP.SET_POSITION:
+                    // Countdown for setting positions
+                    Debug.Log("SetPosition");
+                    if (countDown > 0)
+                    {
+                        data.zombieCountdown = countDown - 1;
+                    }
+                    else
+                    {
+                        data.zombieCountdown = 10;
+                        //status = 2;
+                    }
+                    break;
+                case ZombieMatch.STEP.ZOMBIE:
+                    Debug.Log("Zombie");
+                    break;
+                case ZombieMatch.STEP.ZOMBIE_PLAY:
+                    Debug.Log("Zombie Play");
+                    /*if (data.humanPlayers.Count == 0 || data.zombiePlayers.Count == 0)
+                    {
+                        if (!data.roundInit)
+                        {
+                            SendRoundEnd(msgRef.client, data);
+                        }
+                    }
+                    if (data.remainTime <= 0 && data.zombieRoundsLeft < 0)
+                    {
+                        data.EndMatch();
+                        return;
+                    }*/
+                    //time = 0;\
+                    if (data.zombieCountdown != 10)
+                    {
+                        data.zombieCountdown = 10;
+                    }
+                    break;
+                default:
+                    Debug.LogWarning("Unknown ZombieMatch.STEP received.");
+                    break;
+            }
+
+            msg.Write(status);
+            msg.Write(data.playTime);
+            msg.Write(data.zombieCountdown);
+
+            Say(new MsgReference(548, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+
+
+        private void HandleZombieObserverRequest(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out int seq); //MyInfoManager.Instance.Seq
+            /*MatchData data = msgRef.client.matchData;
+            data.zombiePlayers.Remove(seq);
+            data.killedPlayers.Add(seq);
+            if (debugSend)
+            {
+                Debug.LogWarning("ZombieObserver: Zombies:" + data.zombiePlayers.Count + " Humans: " + data.humanPlayers.Count);
+            }
+            if (data.zombiePlayers.Count == 0)
+            {
+                if (data.zombieRoundsLeft > 0)
+                {
+                    SendRoundEnd(msgRef.client, data);
+                }
+                else
+                {
+                    data.EndMatch();
+                }
+            }*/
+            // No Response
         }
 
         public static void UnpackTimerOption(int packed, out int build, out int battle, out int rpt)

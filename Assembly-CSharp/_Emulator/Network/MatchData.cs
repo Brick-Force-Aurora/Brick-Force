@@ -46,6 +46,20 @@ namespace _Emulator
         public int buildPhaseTime;   // Time (in seconds) for Build phase
         public int battlePhaseTime;  // Time (in seconds) for Destroy phase
 
+        //Zombie
+        public List<int> humanPlayers;
+        public List<int> zombiePlayers;
+        public List<int> killedPlayers;
+        public List<int> infectedPlayers;
+        public bool roundInit;
+        public int zombieCountdown;
+        public int zombieRounds;
+        public int zombieCurrentRound;
+        public int zombieRoundsLeft;
+        public int zombieTimePerRound;
+        public double zombieDeltaTimer;
+        public ZombieMatch.STEP zombieStatus;
+
         public MatchData()
         {
             countdownTime = 0;
@@ -85,7 +99,18 @@ namespace _Emulator
             room = new Room(false, 0, "", Room.ROOM_TYPE.TEAM_MATCH, Room.ROOM_STATUS.WAITING, 0, 0, 0, "", 0, 0, 0, 0, 0, 0, 0, false, false, false, 0, 0);
             cachedMap = new UserMap();
             mapCached = false;
-        }
+            roundInit = true;
+            humanPlayers = new List<int>();
+            zombiePlayers = new List<int>();
+            killedPlayers = new List<int>();
+            infectedPlayers = new List<int>();
+            zombieCountdown = 0;
+            zombieRounds = 0;
+            zombieTimePerRound = 0;
+            zombieRoundsLeft = 0;
+            zombieDeltaTimer = 0;
+            zombieCurrentRound = 1;
+    }
 
         public void Reset()
         {
@@ -110,8 +135,20 @@ namespace _Emulator
                 clientList[i].deaths = 0;
                 clientList[i].kills = 0;
                 clientList[i].assists = 0;
+                clientList[i].isZombie = false;
                 clientList[i].score = 0;
             }
+            roundInit = true;
+            humanPlayers = new List<int>();
+            zombiePlayers = new List<int>();
+            killedPlayers = new List<int>();
+            infectedPlayers = new List<int>();
+            zombieCountdown = 0;
+            zombieRounds = 0;
+            zombieTimePerRound = 0;
+            zombieRoundsLeft = 0;
+            zombieDeltaTimer = 0;
+            zombieCurrentRound = 1;
         }
 
         // Method to reset data for a new round
@@ -124,6 +161,18 @@ namespace _Emulator
             usedCannons.Clear();
             usedTrains.Clear();
             killLog.Clear();
+            roundInit = true;
+            humanPlayers = new List<int>();
+            zombiePlayers = new List<int>();
+            killedPlayers = new List<int>();
+            infectedPlayers = new List<int>();
+            zombieCountdown = 0;
+            zombieDeltaTimer = 0;
+            zombieStatus = ZombieMatch.STEP.WAITING;
+            foreach(ClientReference client in clientList)
+            {
+                client.isZombie = false;
+            }
         }
 
         public void Shutdown()
@@ -240,6 +289,11 @@ namespace _Emulator
                         ServerEmulator.instance.HandleBNDMatchEnd(this);
                     }*/
                     ServerEmulator.instance.HandleBNDMatchEnd(this);
+                    break;
+
+                case Room.ROOM_TYPE.ZOMBIE:
+                    Debug.LogWarning("ZombieMatchend");
+                    ServerEmulator.instance.HandleZombieMatchEnd(this);
                     break;
 
                 default:
