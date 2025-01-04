@@ -177,6 +177,7 @@ namespace _Emulator
             {
                 body.Write(item.Template.slot.ToString()); // Write the slot (e.g., Main, Secondary)
                 body.Write(item.Code);                     // Write the item code
+                body.Write(item.Usage.ToString());         // Write the item Usage
             }
 
             // Send the data

@@ -23,29 +23,10 @@ namespace _Emulator
             equipment = new List<Item>();
             weaponChg = new Item[5];
             shooterTools = new Item[5];
-            activeSlots = new Item[16];
+            activeSlots = new Item[19];
             seq = _seq;
 
             LoadInventoryFromMemory();
-
-            /*if (csv != null)
-                LoadInventoryFromMemory();
-            else
-                LoadInventoryFromDisk();*/
-            //Sort();
-        }
-
-        public Inventory(int _seq, List<Item> _equipment)
-        {
-            equipment = _equipment;
-            weaponChg = new Item[5];
-            shooterTools = new Item[5];
-            activeSlots = new Item[16];
-            seq = _seq;
-
-            GenerateActiveSlots();
-            GenerateActiveTools();
-            GenerateActiveChange();
 
             /*if (csv != null)
                 LoadInventoryFromMemory();
@@ -77,7 +58,7 @@ namespace _Emulator
             }
         }
 
-        public Item AddItem(TItem template, bool sort = false, int amount = -1)
+        public Item AddItem(TItem template, bool sort = false, int amount = -1, Item.USAGE usage = Item.USAGE.UNEQUIP)
         {
             if (equipment.Count >= maxItems)
                 return null;
@@ -96,14 +77,11 @@ namespace _Emulator
                 baseSeq[i] ^= codeSeed[i];
 
             long itemSeq = BitConverter.ToInt64(baseSeq, 0) * seqSeed;
-            Item.USAGE usage = Item.USAGE.UNEQUIP;
             Item item = new Item(itemSeq, template, template.code, usage, amount, 0, 1000);
             equipment.Add(item);
 
             if (sort)
                 Sort();
-
-            UpdateCSV();
 
             return item;
         }
@@ -144,6 +122,7 @@ namespace _Emulator
             GenerateActiveSlots();
             GenerateActiveTools();
             GenerateActiveChange();
+            UpdateCSV();
         }
 
         public void RemoveItem(long seq)
@@ -153,6 +132,7 @@ namespace _Emulator
             GenerateActiveSlots();
             GenerateActiveTools();
             GenerateActiveChange();
+            UpdateCSV();
         }
 
         public void Sort()
@@ -162,7 +142,7 @@ namespace _Emulator
 
         public void GenerateActiveSlots()
         {
-            activeSlots = new Item[16];
+            activeSlots = new Item[19];
             List<Item> activeItems = equipment.FindAll(x => x.Usage == Item.USAGE.EQUIP && x.Template.type < TItem.TYPE.SPECIAL);
             equipmentString = new string[activeItems.Count];
             for (int i = 0; i < activeItems.Count; i++)
@@ -206,8 +186,7 @@ namespace _Emulator
                 {
                     foreach (var item in equipment)
                     {
-                        // Write the slot and code in the desired format
-                        writer.WriteLine($"{item.Template.slot};{item.Code}");
+                        writer.WriteLine($"{item.Template.slot};{item.Code};{item.Usage}");                  
                     }
                 }
 
@@ -319,11 +298,12 @@ namespace _Emulator
                 foreach (string line in File.ReadAllLines(filePath))
                 {
                     string[] parts = line.Split(';');
-                    if (parts.Length < 2)
+                    if (parts.Length < 3)
                         continue;
 
                     string categoryName = parts[0];
                     string code = parts[1];
+                    Item.USAGE usage = (Item.USAGE) Enum.Parse(typeof(Item.USAGE), parts[2], true);
 
                     if (!string.IsNullOrEmpty(code))
                     {
@@ -335,15 +315,7 @@ namespace _Emulator
 
                         if (item != null)
                         {
-                            if (categoryName != "NONE")
-                            {
-                                item.Usage = Item.USAGE.EQUIP;
-                            }
-                            else if (item.Code == "s92" || item.Code == "s08" || item.Code == "s09" || item.Code == "s07")
-                            {
-                                //Check the Brick Guns, because they dont have a slot
-                                item.Usage = Item.USAGE.EQUIP;
-                            }
+                            item.Usage = usage;
                         }
                     }
                 }
@@ -360,41 +332,43 @@ namespace _Emulator
             switch (slot)
             {
                 case TItem.SLOT.UPPER:
-                    return 5;
+                    return 0;
                 case TItem.SLOT.LOWER:
-                    return 6;
+                    return 1;
                 case TItem.SLOT.MELEE:
                     return 2;
                 case TItem.SLOT.MAIN:
-                    return 0;
-                case TItem.SLOT.AUX:
-                    return 1;
-                case TItem.SLOT.BOMB:
-                    return 3;
-                case TItem.SLOT.HEAD:
                     return 4;
+                case TItem.SLOT.AUX:
+                    return 3;
+                case TItem.SLOT.BOMB:
+                    return 5;
+                case TItem.SLOT.HEAD:
+                    return 6;
                 case TItem.SLOT.FACE:
-                    return 11;
-                case TItem.SLOT.BACK:
-                    return 10;
-                case TItem.SLOT.LEG:
-                    return 12;
-                case TItem.SLOT.SASH1:
-                    return 14;
-                case TItem.SLOT.SASH2:
-                    return 14;
-                case TItem.SLOT.SASH3:
-                    return 14;
-                case TItem.SLOT.KIT:
-                    return 13;
-                case TItem.SLOT.LAUNCHER:
                     return 7;
-                case TItem.SLOT.MAGAZINE_L:
+                case TItem.SLOT.BACK:
                     return 8;
-                case TItem.SLOT.MAGAZINE_R:
+                case TItem.SLOT.LEG:
                     return 9;
-                case TItem.SLOT.CHARACTER:
+                case TItem.SLOT.SASH1:
+                    return 10;
+                case TItem.SLOT.SASH2:
+                    return 11;
+                case TItem.SLOT.SASH3:
+                    return 12;
+                case TItem.SLOT.KIT:
+                    return 16;
+                case TItem.SLOT.LAUNCHER:
+                    return 13;
+                case TItem.SLOT.MAGAZINE_L:
+                    return 14;
+                case TItem.SLOT.MAGAZINE_R:
                     return 15;
+                case TItem.SLOT.CHARACTER:
+                    return 17;
+                case TItem.SLOT.NUM:
+                    return 18;
             }
 
             return -1;

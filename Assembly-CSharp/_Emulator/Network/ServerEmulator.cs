@@ -667,6 +667,7 @@ namespace _Emulator
             catch (Exception ex)
             {
                 Debug.LogError("HandleMessages: " + ex.Message);
+                Debug.LogError("HandleMessages StackTrace: " + ex.StackTrace);
             }
 
             finally
@@ -1592,21 +1593,21 @@ namespace _Emulator
 
             // Read the total count of items
             msgRef.msg._msg.Read(out int itemCount);
+            msgRef.client.inventory = new Inventory(msgRef.client.seq);
+            msgRef.client.inventory.equipment.Clear();
 
             // Read each item's slot and code
             for (int i = 0; i < itemCount; i++)
             {
                 msgRef.msg._msg.Read(out string slotName);
                 msgRef.msg._msg.Read(out string code);
+                msgRef.msg._msg.Read(out string usage);
 
                 // Fetch the item template
                 TItem template = TItemManager.Instance.Get<TItem>(code);
                 if (template != null)
                 {
-                    // Create and add the item to the list
-                    Item.USAGE usage = Item.USAGE.EQUIP;
-                    Item item = new Item(msgRef.client.seq, template, code, usage, -1, 0, 1000);
-                    newEquipment.Add(item);
+                    msgRef.client.inventory.AddItem(template, false, -1, (Item.USAGE) Enum.Parse(typeof(Item.USAGE), usage, true));
                 }
                 else
                 {
@@ -1614,11 +1615,12 @@ namespace _Emulator
                 }
             }
 
-            // Update the client's inventory
-            msgRef.client.inventory = new Inventory(msgRef.client.seq, newEquipment);
-
             if (debugHandle)
                 Debug.Log($"HandleInventoryCSV from: {msgRef.client.GetIdentifier()}");
+
+            msgRef.client.inventory.GenerateActiveSlots();
+            msgRef.client.inventory.GenerateActiveTools();
+            msgRef.client.inventory.GenerateActiveChange();
 
             // Notify the client about the updated inventory
             SendInventory(msgRef.client);
@@ -1647,13 +1649,20 @@ namespace _Emulator
                     {
                         oldItem.Usage = Item.USAGE.UNEQUIP;
                         msgRef.client.inventory.activeSlots[index] = null;
-                        SendUnequip(msgRef.client, oldItem.Seq, oldItem.Code, matchData);
+                        SendUnequip(msgRef.client, oldItem.Seq, oldItem.Code);
                     }
                 }
+
+                if (item.Code == "s92" || item.Code == "s09" || item.Code == "s08" || item.Code == "s07")
+                {
+                    //TODO UNequip Brick Gun
+                }
+
                 item.Usage = Item.USAGE.EQUIP;
                 msgRef.client.inventory.GenerateActiveSlots();
+                msgRef.client.inventory.UpdateCSV();
 
-                SendEquip(msgRef.client, item.Seq, item.Code, matchData);
+                SendEquip(msgRef.client, item.Seq, item.Code);
             }
         }
 
@@ -1688,12 +1697,13 @@ namespace _Emulator
                         msgRef.client.inventory.activeSlots[index] = null;
 
                         // Send a message to the client indicating the item has been unequipped.
-                        SendUnequip(msgRef.client, currentItem.Seq, currentItem.Code, matchData);
+                        SendUnequip(msgRef.client, currentItem.Seq, currentItem.Code);
                     }
                 }
 
                 // Regenerate the active slots to reflect the change in the inventory.
                 msgRef.client.inventory.GenerateActiveSlots();
+                msgRef.client.inventory.UpdateCSV();
             }
         }
 
@@ -2637,8 +2647,8 @@ namespace _Emulator
                 body.Write(matchData.clientList[i].slot.isRed);
                 body.Write(matchData.clientList[i].seq);
                 body.Write(matchData.clientList[i].name);
-                body.Write(matchData.clientList[i].kills);
-                body.Write(matchData.clientList[i].deaths);
+                body.Write(0); // survival ensured
+                body.Write(0); // zombie victory
                 body.Write(matchData.clientList[i].assists);
                 body.Write(matchData.clientList[i].score);
                 body.Write(points); //points
@@ -2808,7 +2818,7 @@ namespace _Emulator
                 Debug.Log("SendWeaponSlotList to: " + client.GetIdentifier());
         }
 
-        public void SendEquip(ClientReference client, long itemSeq, string code, MatchData matchData)
+        public void SendEquip(ClientReference client, long itemSeq, string code)
         {
             MsgBody body = new MsgBody();
 
@@ -2819,10 +2829,10 @@ namespace _Emulator
             Say(new MsgReference(36, body, client, SendType.Broadcast));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendEquip for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
+                Debug.Log("Broadcasted SendEquip for client " + client.GetIdentifier() + " for room no: ");
         }
 
-        public void SendUnequip(ClientReference client, long itemSeq, string code, MatchData matchData)
+        public void SendUnequip(ClientReference client, long itemSeq, string code)
         {
             MsgBody body = new MsgBody();
 
@@ -2833,7 +2843,7 @@ namespace _Emulator
             Say(new MsgReference(38, body, client, SendType.Broadcast));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendUnequip for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
+                Debug.Log("Broadcasted SendUnequip for client " + client.GetIdentifier() + " for room no: ");
         }
 
         public void SendInventoryRequest(ClientReference client)
@@ -4192,7 +4202,7 @@ namespace _Emulator
             }
 
             // Broadcast the response to all players in the room
-            Say(new MsgReference(539, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+            Say(new MsgReference(539, msg, null, SendType.BroadcastRoom, data.channel, data));
 
             if (debugSend)
             {
@@ -4223,7 +4233,7 @@ namespace _Emulator
             MsgBody msg = new MsgBody();
             msg.Write(brickMan); // Infected player
             msg.Write(zombie);   // Infecting player
-            Say(new MsgReference(541, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+            Say(new MsgReference(541, msg, null, SendType.BroadcastRoom, data.channel, data));
 
             if (debugSend)
             {
@@ -4236,13 +4246,13 @@ namespace _Emulator
             // Ensure debug logging is only performed if debugSend is enabled
             if (debugSend)
             {
-                Debug.Log($"Zombie Score Request: Total Rounds: {msgRef.matchData.zombieRounds}, " +
+                Debug.Log($"Zombie Score Request: Total Rounds: {msgRef.matchData.room.goal}, " +
                           $"Current Round: {msgRef.matchData.zombieCurrentRound}");
             }
 
             // Prepare the message body with total rounds and current round
             MsgBody msg = new MsgBody();
-            msg.Write(msgRef.matchData.zombieRounds); // Total rounds
+            msg.Write(msgRef.matchData.room.goal); // Total rounds
             msg.Write(msgRef.matchData.zombieCurrentRound); // Current round
 
             // Send the message as a broadcast
@@ -4253,7 +4263,7 @@ namespace _Emulator
         {
             Debug.LogWarning($"Send RoundEnd client {msgRef.client.GetIdentifier()} data: {data.ToString()}");
 
-            if (data.zombieCurrentRound >= data.zombieRounds)
+            if (data.zombieCurrentRound >= data.room.goal)
             {
                 data.EndMatch();
                 return;
