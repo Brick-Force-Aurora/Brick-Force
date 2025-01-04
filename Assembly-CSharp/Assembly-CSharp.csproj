@@ -730,6 +730,9 @@
     <Compile Include="_Emulator\Core.cs" />
     <Compile Include="_Emulator\GUI\MainGUI.cs" />
     <Compile Include="_Emulator\GUI\DebugConsole.cs" />
+    <Compile Include="_Emulator\JSON\JsonObject.cs" />
+    <Compile Include="_Emulator\JSON\JsonReader.cs" />
+    <Compile Include="_Emulator\JSON\JsonWriter.cs" />
     <Compile Include="_Emulator\Maps\MapGenerator.cs" />
     <Compile Include="_Emulator\Network\ChannelManager.cs" />
     <Compile Include="_Emulator\Network\ChannelReference.cs" />
@@ -787,6 +790,7 @@
     <EmbeddedResource Include="_Emulator\DATA\shop.txt" />
     <EmbeddedResource Include="_Emulator\DATA\shopCategory.txt" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>

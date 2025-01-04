@@ -112,9 +112,12 @@ public class BackConfirmDialog : Dialog
 			if (GlobalVars.Instance.MyButton(new Rect(GlobalVars.Instance.ScreenRect.width / 2f - 110f, size.y - sizeOk.y - 25f, sizeOk.x, sizeOk.y), StringMgr.Instance.Get("SAVE"), "BtnAction") || GlobalVars.Instance.IsReturnPressed())
 			{
 				result = true;
-				GetCopyRight();
-				ThumbnailToPNG();
-				CSNetManager.Instance.Sock.SendCS_SAVE_REQ(umi.Slot, ThumbnailToPNG());
+
+                GetCopyRight();
+                ThumbnailToPNG();
+                //umi is missing or wrong on create should generate this and add to new slot
+                CSNetManager.Instance.Sock.SendCS_SAVE_REQ(-1, ThumbnailToPNG());
+                //CSNetManager.Instance.Sock.SendCS_SAVE_REQ(umi.Slot, ThumbnailToPNG());
 				BackToScene();
 			}
 			if (GlobalVars.Instance.MyButton(new Rect(GlobalVars.Instance.ScreenRect.width / 2f + 10f, size.y - sizeOk.y - 25f, sizeOk.x, sizeOk.y), StringMgr.Instance.Get("CANCEL"), "BtnAction") || GlobalVars.Instance.IsReturnPressed())

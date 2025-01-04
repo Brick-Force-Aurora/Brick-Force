@@ -378,6 +378,10 @@ namespace _Emulator
                         HandleUnequipRequest(msgRef);
                         break;
 
+                    case 39:
+                        HandleSaveMap(msgRef);
+                        break;
+
                     case 42:
                         HandleLoadComplete(msgRef);
                         break;
@@ -3703,6 +3707,7 @@ namespace _Emulator
             int chunkSize = 200;
             int chunkCount = Mathf.CeilToInt((float)regMaps.Count / (float)chunkSize);
             int processedCount = 0;
+            Debug.LogWarning("RegMaspCount: " + regMaps.Count);
 
             for (int chunk = 0; chunk < chunkCount; chunk++)
             {
@@ -3715,7 +3720,7 @@ namespace _Emulator
                 for (int i = 0; i < chunkSize; i++, processedCount++)
                 {
                     KeyValuePair<int, RegMap> entry = regMaps[processedCount];
-                    body.Write(entry.Value.Map); //slot
+                    body.Write(entry.Key); //slot
                     body.Write(entry.Value.Alias);
                     body.Write(-1); //brick count
                     body.Write(entry.Value.RegisteredDate.Year);
@@ -3848,7 +3853,7 @@ namespace _Emulator
             for (int i = offset; i < offset + count; i++)
             {
                 KeyValuePair<int, RegMap> entry = regMaps[i];
-                body.Write(entry.Value.Map); //slot
+                body.Write(entry.Key); //slot
                 body.Write(entry.Value.Alias);
                 body.Write(10000); //brick count
                 body.Write(entry.Value.RegisteredDate.Year);
@@ -4365,6 +4370,35 @@ namespace _Emulator
             msg.Write(data.zombieCountdown);
 
             Say(new MsgReference(548, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+
+        private void HandleSaveMap(MsgReference msgRef)
+        {
+            /*MsgBody msgBody = new MsgBody();
+            msgBody.Write(slot);
+            msgBody.Write(thumbnail.Length);
+            for (int i = 0; i < thumbnail.Length; i++)
+            {
+                msgBody.Write(thumbnail[i]);
+            }*/
+            // 40
+            /*
+            msg.Read(out byte val);
+		msg.Read(out int val2);
+		UserMapInfo userMapInfo = UserMapInfoManager.Instance.Get(val);
+		if (userMapInfo != null)
+		{
+			if (val2 == 0)
+			{
+				userMapInfo.Alias = UserMapInfoManager.Instance.CurMapName;
+				MessageBoxMgr.Instance.AddMessage(string.Format(StringMgr.Instance.Get("SAVE_SUCCESS"), userMapInfo.Alias));
+				MyInfoManager.Instance.IsModified = false;
+			}
+			else
+			{
+				MessageBoxMgr.Instance.AddMessage(string.Format(StringMgr.Instance.Get("SAVE_FAIL"), userMapInfo.Alias));
+			}
+		}*/
         }
 
 

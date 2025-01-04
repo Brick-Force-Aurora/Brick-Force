@@ -1,4 +1,7 @@
-﻿using System;
+﻿using _Emulator.JSON;
+using System;
+using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 namespace _Emulator
@@ -6,7 +9,7 @@ namespace _Emulator
     class Config
     {
         public static Config instance;
-        public CSVLoader csv;
+        public JsonObject configData;
 
         public Color crosshairColor = Color.green;
         public float crosshairHue = 90f;
@@ -24,44 +27,62 @@ namespace _Emulator
         {
             LoadConfigFromDisk();
         }
-        public void SaveConfigToDisk(string path = "Config\\Config.csv")
+        public void SaveConfigToDisk(string path = "Config\\Config.json")
         {
-            csv.SetValue("host_ip", ClientExtension.instance.hostIP);
-            csv.SetValue("debug_handle", ServerEmulator.instance.debugHandle);
-            csv.SetValue("debug_send", ServerEmulator.instance.debugSend);
-            csv.SetValue("debug_ping", ServerEmulator.instance.debugPing);
-            csv.SetValue("crosshair_r", crosshairColor.r);
-            csv.SetValue("crosshair_g", crosshairColor.g);
-            csv.SetValue("crosshair_b", crosshairColor.b);
-            csv.SetValue("usk_textures", uskTextures);
-            csv.SetValue("axis_ratio", axisRatio);
-            csv.SetValue("one_client_per_ip", oneClientPerIP);
-            csv.SetValue("block_connections", blockConnections);
-            csv.SetValue("auto_clear_dead_clients", autoClearDeadClients);
-            csv.SetValue("max_connections", maxConnections);
-            csv.Save(path, "Config\tValue");
+            using (var writer = new StreamWriter(path))
+            {
+                var jsonWriter = new JsonWriter(writer);
+                configData = new JsonObject
+                {
+                    { "host_ip", ClientExtension.instance.hostIP },
+                    { "debug_handle", ServerEmulator.instance.debugHandle },
+                    { "debug_send", ServerEmulator.instance.debugSend },
+                    { "debug_ping", ServerEmulator.instance.debugPing },
+                    { "crosshair_r", crosshairColor.r },
+                    { "crosshair_g", crosshairColor.g },
+                    { "crosshair_b", crosshairColor.b },
+                    { "usk_textures", uskTextures },
+                    { "axis_ratio", axisRatio },
+                    { "one_client_per_ip", oneClientPerIP },
+                    { "block_connections", blockConnections },
+                    { "auto_clear_dead_clients", autoClearDeadClients },
+                    { "max_connections", maxConnections }
+                };
+                jsonWriter.WriteObject(configData);
+            }
         }
 
-        public void LoadConfigFromDisk(string path = "Config\\Config.csv")
+        public void LoadConfigFromDisk(string path = "Config\\Config.json")
         {
-            csv = new CSVLoader();
-            csv.Load(path);
-            ClientExtension.instance.hostIP = csv.GetValue<string>("host_ip");
-            ServerEmulator.instance.debugHandle = csv.GetValue<bool>("debug_handle");
-            ServerEmulator.instance.debugSend = csv.GetValue<bool>("debug_send");
-            ServerEmulator.instance.debugPing = csv.GetValue<bool>("debug_ping");
-            crosshairColor.r = csv.GetValue<float>("crosshair_r");
-            crosshairColor.g = csv.GetValue<float>("crosshair_g");
-            crosshairColor.b = csv.GetValue<float>("crosshair_b");
+            if (!File.Exists(path))
+            {
+                Debug.LogWarning("Config file not found. Using default values.");
+                SaveConfigToDisk();
+                return;
+            }
+
+            using (var reader = new StreamReader(path))
+            {
+                var jsonReader = new JsonReader(reader);
+                configData = jsonReader.ReadObject();
+            }
+
+            ClientExtension.instance.hostIP = configData.Get<string>("host_ip");
+            ServerEmulator.instance.debugHandle = configData.Get<bool>("debug_handle");
+            ServerEmulator.instance.debugSend = configData.Get<bool>("debug_send");
+            ServerEmulator.instance.debugPing = configData.Get<bool>("debug_ping");
+            crosshairColor.r = configData.Get<float>("crosshair_r");
+            crosshairColor.g = configData.Get<float>("crosshair_g");
+            crosshairColor.b = configData.Get<float>("crosshair_b");
             Utils.RGBToHSV(crosshairColor, out float H, out float S, out float V);
             crosshairHue = H * 360f;
-            uskTextures = csv.GetValue<bool>("usk_textures");
+            uskTextures = configData.Get<bool>("usk_textures");
             oldUskTextures = !uskTextures;
-            axisRatio = csv.GetValue<float>("axis_ratio");
-            oneClientPerIP = csv.GetValue<bool>("one_client_per_ip");
-            blockConnections = csv.GetValue<bool>("block_connections");
-            autoClearDeadClients = csv.GetValue<bool>("auto_clear_dead_clients");
-            maxConnections = csv.GetValue<int>("max_connections");
+            axisRatio = configData.Get<float>("axis_ratio");
+            oneClientPerIP = configData.Get<bool>("one_client_per_ip");
+            blockConnections = configData.Get<bool>("block_connections");
+            autoClearDeadClients = configData.Get<bool>("auto_clear_dead_clients");
+            maxConnections = configData.Get<int>("max_connections");
             ApplyUskTextures();
         }
 
