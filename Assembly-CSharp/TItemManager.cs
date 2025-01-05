@@ -891,7 +891,7 @@ public class TItemManager : MonoBehaviour
 			}
 		}
 
-		cSVLoader.Save("weapon.txt");
+		//cSVLoader.Save("weapon.txt");
 		ParseWeapon(cSVLoader);
 		return true;
 	}
