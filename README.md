@@ -1,11 +1,12 @@
 ![](https://i.imgur.com/fThs88a.png)
 
-[<p align="center">Join The Discord</p>](https://discord.gg/qktjAYsKwH)
-[<p align="center">Latest Release</p>](https://github.com/Brick-Force-Aurora/Brick-Force/releases/latest)
-
-[<p align="center">Gameplay Video</p>](https://www.youtube.com/watch?v=mslPRyCIKgo)
-
-[<p align="center">Tutorial by Amorph (German)</p>](https://www.youtube.com/watch?v=OuJ-qxDsTrA)
+<div align="center">
+  <a href="https://discord.gg/qktjAYsKwH">Join The Discord</a>  
+  <a href="https://github.com/Brick-Force-Aurora/Brick-Force/releases/latest">Latest Release</a>  
+  <a href="https://brick-force-aurora.github.io/Website/">Website</a>  
+  <a href="https://www.youtube.com/watch?v=mslPRyCIKgo">Gameplay Video</a>  
+  <a href="https://www.youtube.com/watch?v=OuJ-qxDsTrA">Tutorial by Amorph (German)</a>
+</div>
 
 <p align="center">Full rewrite of the original server emulator project with more features and better stability, now available for everyone!</p>
 
@@ -39,17 +40,6 @@
 
 ![](https://i.imgur.com/6ncbt4O.png)
 
-## Inventory Editor
-This is still available, but the Ingame Shop now works, items can only be bought permanently and all have the same price. Maybe sometime this could be updated.
-To get Access to the full ingame shop, download the shop.txt.cooked and shopCategory.txt.cooked from the release and put them in BrickForce_Data/Resources/Template
-![](https://i.imgur.com/teJ36Lz.png)
-
-- Click on items in the left list to add them to the inventory.
-- Click on items in the inventory to remove them.
-- Hold CTRL while clicking in the inventory to equip items.
-- Click Update Inventory to apply changes to your ingame inventory.
-- Click Save Inventory to update and save the current inventory to Inventory.csv.
-
 ## Host Menu
 ![](https://i.imgur.com/zg6pEny.png)
 
@@ -80,7 +70,7 @@ To get Access to the full ingame shop, download the shop.txt.cooked and shopCate
 - Can be changed under registry path HKEY_CURRENT_USER\SOFTWARE\EXE Games\BrickForce (set BfVoice & BfLanguage to 1 for english).
 
 ## How to develop
-- Install Visual Studio 2017
+- Install Visual Studio
 - Open the solution file Brick-Force.sln
 - Install the Launcher and the Game into the same folder where the Brick-Force Repository Folder is to resolve all Dependencies
 - Change Build Output Path to Brick-Force_Data/Managed in project properties to match original game folder
