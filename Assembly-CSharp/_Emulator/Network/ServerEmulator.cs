@@ -4372,8 +4372,61 @@ namespace _Emulator
             Say(new MsgReference(548, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
 
+        private void HandleZombieObserverRequest(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out int seq); //MyInfoManager.Instance.Seq
+            /*MatchData data = msgRef.client.matchData;
+            data.zombiePlayers.Remove(seq);
+            data.killedPlayers.Add(seq);
+            if (debugSend)
+            {
+                Debug.LogWarning("ZombieObserver: Zombies:" + data.zombiePlayers.Count + " Humans: " + data.humanPlayers.Count);
+            }
+            if (data.zombiePlayers.Count == 0)
+            {
+                if (data.zombieRoundsLeft > 0)
+                {
+                    SendRoundEnd(msgRef.client, data);
+                }
+                else
+                {
+                    data.EndMatch();
+                }
+            }*/
+            // No Response
+        }
+
         private void HandleSaveMap(MsgReference msgRef)
         {
+            Debug.LogError("SAVE MAP");
+
+            msgRef.msg._msg.Read(out int slot);
+
+            // replace map if exists
+
+            MatchData matchData = msgRef.matchData;
+            DateTime time = DateTime.Now;
+            int hashId = MapGenerator.instance.GetHashIdForTime(time);
+            //todo modemask
+            RegMap regMap = new RegMap(hashId, msgRef.client.name + "@Aurora", matchData.cachedUMI.Alias, time, 0, true, false, 0, 0, 0, 0, 0, 0, 0, false);
+            // fix thumbnail
+            regMap.Thumbnail = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
+            matchData.cachedMap.map = hashId;
+            matchData.cachedUMI.regMap = regMap;
+            matchData.cachedUMI.slot = hashId;
+
+            matchData.cachedUMI.regMap.Save();
+            matchData.cachedMap.Save(hashId, matchData.cachedMap.skybox);
+
+            msgRef.client.chunkedBuffer = null;
+
+            MsgBody msgBody = new MsgBody();
+
+            msgBody.Write(slot);
+            msgBody.Write(0); //success
+
+            Say(new MsgReference(40, msgBody, msgRef.client, SendType.Unicast));
+
             /*MsgBody msgBody = new MsgBody();
             msgBody.Write(slot);
             msgBody.Write(thumbnail.Length);
@@ -4399,31 +4452,6 @@ namespace _Emulator
 				MessageBoxMgr.Instance.AddMessage(string.Format(StringMgr.Instance.Get("SAVE_FAIL"), userMapInfo.Alias));
 			}
 		}*/
-        }
-
-
-        private void HandleZombieObserverRequest(MsgReference msgRef)
-        {
-            msgRef.msg._msg.Read(out int seq); //MyInfoManager.Instance.Seq
-            /*MatchData data = msgRef.client.matchData;
-            data.zombiePlayers.Remove(seq);
-            data.killedPlayers.Add(seq);
-            if (debugSend)
-            {
-                Debug.LogWarning("ZombieObserver: Zombies:" + data.zombiePlayers.Count + " Humans: " + data.humanPlayers.Count);
-            }
-            if (data.zombiePlayers.Count == 0)
-            {
-                if (data.zombieRoundsLeft > 0)
-                {
-                    SendRoundEnd(msgRef.client, data);
-                }
-                else
-                {
-                    data.EndMatch();
-                }
-            }*/
-            // No Response
         }
 
         public static void UnpackTimerOption(int packed, out int build, out int battle, out int rpt)

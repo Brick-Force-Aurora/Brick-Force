@@ -2072,8 +2072,8 @@ public class CreateRoomDialog : Dialog
 				int num2 = 3 * i + j;
 				if (num2 < umi.Length)
 				{
-					Texture2D texture2D = null;
-					texture2D = ((umi[num2].Alias.Length <= 0) ? emptySlot : ((!(umi[num2].Thumbnail == null)) ? umi[num2].Thumbnail : nonAvailable));
+					Texture2D texture2D = nonAvailable;
+					//texture2D = ((umi[num2].Alias.Length <= 0) ? emptySlot : ((!(umi[num2].Thumbnail == null)) ? umi[num2].Thumbnail : nonAvailable));
 					Rect rect = new Rect((float)j * (crdMapSize.x + crdMapOffset.x), (float)i * (crdMapSize.y + crdMapOffset.y), crdMapSize.x, crdMapSize.y);
 					Rect position = new Rect(rect.x, rect.y, rect.width, rect.width);
 					TextureUtil.DrawTexture(position, texture2D, ScaleMode.StretchToFill);

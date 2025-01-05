@@ -209,7 +209,7 @@ public class UserMap
 		return true;
 	}
 
-	public void CalcCRC(int seq, byte template)
+    public void CalcCRC(int seq, byte template)
 	{
 		crc ^= seq + template;
 	}
@@ -328,7 +328,7 @@ public class UserMap
 		{
 			string fileName = Path.Combine(text, "downloaded" + mapIndex + ".geometry");
 			Save(fileName, mapIndex, skyboxIndex);
-		}
+        }
 	}
 
 	public void CacheDone(int mapIndex, int skyboxIndex)

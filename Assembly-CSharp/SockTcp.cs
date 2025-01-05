@@ -3774,6 +3774,7 @@ public class SockTcp
 		}
 	}
 
+    //Hooked
 	public void SendCS_SAVE_REQ(int slot, byte[] thumbnail)
 	{
 		MsgBody msgBody = new MsgBody();

@@ -116,7 +116,7 @@ public class BackConfirmDialog : Dialog
                 GetCopyRight();
                 ThumbnailToPNG();
                 //umi is missing or wrong on create should generate this and add to new slot
-                CSNetManager.Instance.Sock.SendCS_SAVE_REQ(-1, ThumbnailToPNG());
+                CSNetManager.Instance.Sock.SendCS_SAVE_REQ(0, ThumbnailToPNG());
                 //CSNetManager.Instance.Sock.SendCS_SAVE_REQ(umi.Slot, ThumbnailToPNG());
 				BackToScene();
 			}

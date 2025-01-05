@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 namespace _Emulator
@@ -19,6 +20,7 @@ namespace _Emulator
         Vector2 scrollPosition;
         bool hidden = true;
         bool collapse = true;
+        private const string logFileName = "ClientLog.log";
 
         static readonly Dictionary<LogType, Color> logTypeColors = new Dictionary<LogType, Color>()
     {
@@ -108,12 +110,31 @@ namespace _Emulator
 
         void HandleLog(string message, string stackTrace, LogType type)
         {
-            logs.Add(new Log()
+            var logEntry = new Log()
             {
                 message = message,
                 stackTrace = stackTrace,
                 type = type,
-            });
+            };
+
+            logs.Add(logEntry);
+
+            // Append the log entry to the file
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(logFileName, true))
+                {
+                    writer.WriteLine($"[{System.DateTime.Now}] [{type}] {message}");
+                    if (!string.IsNullOrEmpty(stackTrace))
+                    {
+                        writer.WriteLine(stackTrace);
+                    }
+                }
+            }
+            catch (IOException ex)
+            {
+                Debug.LogError($"Failed to write log to file: {ex.Message}");
+            }
         }
     }
 }

@@ -66,7 +66,11 @@ namespace _Emulator
 		static MethodInfo hSockTcpRegisterReqInfo = typeof(Hooks).GetMethod("hSockTcpRegisterReq", BindingFlags.Public | BindingFlags.Instance);
 		static Hook SockTcpRegisterReqHook;
 
-		static MethodInfo oMyInfoManagerSetItemUsageInfo = typeof(MyInfoManager).GetMethod("SetItemUsage", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo oSockTcpSaveMapReqInfo = typeof(SockTcp).GetMethod("SendCS_SAVE_REQ", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hSockTcpSaveMapReqInfo = typeof(Hooks).GetMethod("hSockTcpSaveMapReq", BindingFlags.Public | BindingFlags.Instance);
+        static Hook SockTcpSaveMapReqHook;
+
+        static MethodInfo oMyInfoManagerSetItemUsageInfo = typeof(MyInfoManager).GetMethod("SetItemUsage", BindingFlags.Public | BindingFlags.Instance);
 		static MethodInfo hMyInfoManagerSetItemUsageInfo = typeof(Hooks).GetMethod("hMyInfoManagerSetItemUsage", BindingFlags.Public | BindingFlags.Instance);
 		static Hook MyInfoManagerSetItemUsageHook;
 
@@ -389,7 +393,17 @@ namespace _Emulator
 			CSNetManager.Instance.Sock.Say(51, msgBody);
 		}
 
-		public static void Initialize()
+        public void hSockTcpSaveMapReq(int slot, byte[] thumbnail)
+        {
+            ClientExtension.instance.SendBeginChunkedBuffer(ExtensionOpcodes.opChunkedBufferThumbnailReq, thumbnail);
+
+            MsgBody msgBody = new MsgBody();
+            msgBody.Write(slot);
+            Debug.LogError("SAVEREQ");
+            CSNetManager.Instance.Sock.Say(39, msgBody);
+        }
+
+        public static void Initialize()
         {
 			P2PManagerHandshakeHook = new Hook(oP2PManagerHandshakeInfo, hP2PManagerHandshakeInfo);
 			P2PManagerHandshakeHook.ApplyHook();
@@ -421,7 +435,9 @@ namespace _Emulator
 			SockTcpHandleWeaponSlotListAckHook.ApplyHook();
 			SockTcpRegisterReqHook = new Hook(oSockTcpRegisterReqInfo, hSockTcpRegisterReqInfo);
 			SockTcpRegisterReqHook.ApplyHook();
-			ApplicationQuitHook = new Hook(oApplicationQuitInfo, hApplicationQuitInfo);
+            SockTcpSaveMapReqHook = new Hook(oSockTcpSaveMapReqInfo, hSockTcpSaveMapReqInfo);
+            SockTcpSaveMapReqHook.ApplyHook();
+            ApplicationQuitHook = new Hook(oApplicationQuitInfo, hApplicationQuitInfo);
 			ApplicationQuitHook.ApplyHook();
 		}
     }
