@@ -226,6 +226,7 @@ public class RegMapManager : MonoBehaviour
 	{
 		if (!dicRegMap.ContainsKey(regMap.Map))
 		{
+			Debug.LogError("Map Added to RegMapManager: " + regMap.Map);
 			dicRegMap.Add(regMap.Map, regMap);
 		}
 	}
@@ -241,6 +242,7 @@ public class RegMapManager : MonoBehaviour
 
 	private void Start()
 	{
+		//This loads all regmap files
 		string path = Path.Combine(Application.dataPath, "Resources/Cache");
 		if (!Directory.Exists(path))
 		{

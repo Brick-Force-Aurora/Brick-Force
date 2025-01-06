@@ -59,6 +59,7 @@ namespace _Emulator
                 Debug.LogError("SetupServer: " + ex.Message);
             }
 
+            //Pulls all loaded RegMaps into the emulator
             regMaps = RegMapManager.Instance.dicRegMap.ToList();
         }
 
@@ -585,7 +586,7 @@ namespace _Emulator
                         break;
 
                     case 431:
-                        Debug.LogWarning("AllMapRequest:");
+                        Debug.LogWarning("AllMapRequest from: " + msgRef.client.GetIdentifier());
                         break;
 
                     case 447:
@@ -1659,7 +1660,18 @@ namespace _Emulator
 
                 if (item.Code == "s92" || item.Code == "s09" || item.Code == "s08" || item.Code == "s07")
                 {
-                    //TODO UNequip Brick Gun
+                    string[] targetCodes = { "s92", "s09", "s08", "s07" };
+
+                    // Find and unequip any items with matching codes in equipment
+                    foreach (string code in targetCodes)
+                    {
+                        Item equippedItem = msgRef.client.inventory.equipment.Find(x => x.Code == code);
+                        if (equippedItem != null)
+                        {
+                            equippedItem.Usage = Item.USAGE.UNEQUIP;
+                            SendUnequip(msgRef.client, equippedItem.Seq, equippedItem.Code);
+                        }
+                    }
                 }
 
                 item.Usage = Item.USAGE.EQUIP;
@@ -3707,7 +3719,7 @@ namespace _Emulator
             int chunkSize = 200;
             int chunkCount = Mathf.CeilToInt((float)regMaps.Count / (float)chunkSize);
             int processedCount = 0;
-            Debug.LogWarning("RegMaspCount: " + regMaps.Count);
+            Debug.LogWarning("RegMapCount: " + regMaps.Count);
 
             for (int chunk = 0; chunk < chunkCount; chunk++)
             {
@@ -4398,11 +4410,10 @@ namespace _Emulator
 
         private void HandleSaveMap(MsgReference msgRef)
         {
-            Debug.LogError("SAVE MAP");
-
             msgRef.msg._msg.Read(out int slot);
 
             // replace map if exists
+            // map is saved with updated blocks but empty map if loaded directly after saving a reedited map
 
             MatchData matchData = msgRef.matchData;
             DateTime time = DateTime.Now;
@@ -4410,22 +4421,53 @@ namespace _Emulator
             //todo modemask
             RegMap regMap = new RegMap(hashId, msgRef.client.name + "@Aurora", matchData.cachedUMI.Alias, time, 0, true, false, 0, 0, 0, 0, 0, 0, 0, false);
             // fix thumbnail
-            regMap.Thumbnail = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
+            //regMaps.Add(new KeyValuePair<int, RegMap>(hashId, regMap));
+            Texture2D thumbnail = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
+            UserMapInfoManager.Instance.AddOrUpdate(hashId, regMap.Alias, matchData.cachedUMI.BrickCount, time, 0);
+            if (msgRef.client.chunkedBuffer.id == ExtensionOpcodes.opChunkedBufferThumbnailReq)
+            {
+                if (msgRef.client.chunkedBuffer.finished)
+                {
+                    thumbnail.LoadImage(msgRef.client.chunkedBuffer.buffer);
+                    thumbnail.Apply();
+                    Debug.Log("Load Thumbnail");
+                }
+                else
+                    Debug.LogError("HandleRegisterMapRequest: ChunkedBuffer not finished");
+            }
+            regMap.Thumbnail = thumbnail;
+            UserMapInfoManager.Instance.SetThumbnail(hashId, thumbnail);
             matchData.cachedMap.map = hashId;
-            matchData.cachedUMI.regMap = regMap;
-            matchData.cachedUMI.slot = hashId;
+            //matchData.cachedUMI.regMap = regMap;
+            //matchData.cachedUMI.slot = hashId;
 
-            matchData.cachedUMI.regMap.Save();
+            //matchData.cachedUMI.regMap.Save();
             matchData.cachedMap.Save(hashId, matchData.cachedMap.skybox);
 
             msgRef.client.chunkedBuffer = null;
 
             MsgBody msgBody = new MsgBody();
+            //RegMapmanager??
 
-            msgBody.Write(slot);
+            //Keine Ahnung was hier falsch läuft
+            UserMapInfoManager.Instance.CurMapName = String.Empty;
+            UserMapInfoManager.Instance.CurSlot = 0;
+            UserMapInfoManager.Instance.AddOrUpdate(0, String.Empty, 0, new DateTime(1971, 12, 29), 0);
+            //matchData.cachedMap.Clear();
+            //matchData.cachedUMI.slot = 0;
+            RegMapManager.Instance.Add(regMap);
+            RegMapManager.Instance.SetThumbnail(regMap.map, thumbnail);
+
+            regMaps = RegMapManager.Instance.dicRegMap.ToList();
+            UserMapInfoManager.Instance.Verify();
+
+            msgBody.Write(UserMapInfoManager.Instance.ToArray().Length);
             msgBody.Write(0); //success
 
+            // I guess the current map like the one with is the empty one is not getting resettet
             Say(new MsgReference(40, msgBody, msgRef.client, SendType.Unicast));
+            //Answer with register
+            //Say(new MsgReference(52, msgBody, msgRef.client, SendType.Unicast));
 
             /*MsgBody msgBody = new MsgBody();
             msgBody.Write(slot);

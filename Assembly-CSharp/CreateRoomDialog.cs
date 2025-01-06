@@ -2065,16 +2065,44 @@ public class CreateRoomDialog : Dialog
 			viewRect.height += crdMapOffset.y * (float)(num - 1);
 		}
 		umiScrollPosition = GUI.BeginScrollView(crdUserMapRect, umiScrollPosition, viewRect);
-		for (int i = 0; i < num; i++)
+        for (int i = 0; i < num; i++)
 		{
 			for (int j = 0; j < 3; j++)
 			{
 				int num2 = 3 * i + j;
-				if (num2 < umi.Length)
+                if (num2 < umi.Length)
 				{
-					Texture2D texture2D = nonAvailable;
-					//texture2D = ((umi[num2].Alias.Length <= 0) ? emptySlot : ((!(umi[num2].Thumbnail == null)) ? umi[num2].Thumbnail : nonAvailable));
-					Rect rect = new Rect((float)j * (crdMapSize.x + crdMapOffset.x), (float)i * (crdMapSize.y + crdMapOffset.y), crdMapSize.x, crdMapSize.y);
+                    Texture2D texture2D = emptySlot;
+					//wrapped with try catch to catch that anoying nullpointer, this gets called like every frame but atleast the map loads
+                    try
+                    {
+                        if (umi[num2] == null || num2 == 0)
+                        {
+                            texture2D = emptySlot;
+                        }
+                        else
+                        {
+                            if (umi[num2].Alias.Length <= 0 || umi[num2].regMap.Alias.Length <= 0)
+                            {
+                                texture2D = emptySlot;
+                            }
+                            else
+                            {
+                                texture2D = umi[num2].Thumbnail;
+                            }
+
+                            if (texture2D == null)
+                            {
+                                texture2D = nonAvailable;
+                            }
+                        }
+                    }
+                    catch (NullReferenceException ex)
+                    {
+                        Debug.LogError($"NullReferenceException encountered: {ex.Message}");
+                        texture2D = nonAvailable; // Assign a default value to ensure stability
+                    }
+                    Rect rect = new Rect((float)j * (crdMapSize.x + crdMapOffset.x), (float)i * (crdMapSize.y + crdMapOffset.y), crdMapSize.x, crdMapSize.y);
 					Rect position = new Rect(rect.x, rect.y, rect.width, rect.width);
 					TextureUtil.DrawTexture(position, texture2D, ScaleMode.StretchToFill);
 					if (GlobalVars.Instance.MyButton(rect, string.Empty, (!umi[num2].IsPremium) ? "BoxMapSelectBorder" : "BoxMapSelectBorderPremium") && (!umi[num2].IsPremium || flag))

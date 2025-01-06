@@ -22,7 +22,12 @@ public class UserMapInfo
 	{
 		get
 		{
-			if (regMap.Thumbnail != null)
+            if (regMap == null)
+            {
+				Debug.LogError("REGMAP IS NULL");
+				return null;
+            }
+            if (regMap.Thumbnail != null)
 			{
 				return regMap.Thumbnail;
 			}

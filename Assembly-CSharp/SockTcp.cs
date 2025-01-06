@@ -4625,7 +4625,7 @@ public class SockTcp
 				MessageBoxMgr.Instance.AddMessage(string.Format(StringMgr.Instance.Get("SAVE_FAIL"), userMapInfo.Alias));
 			}
 		}
-	}
+    }
 
 	private void HandleCS_ROOM_CONFIG_ACK(MsgBody msg)
 	{

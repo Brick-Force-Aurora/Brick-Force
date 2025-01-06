@@ -285,7 +285,7 @@ namespace _Emulator
                             }
                             else if (item.Code == "s92" || item.Code == "s08" || item.Code == "s09" || item.Code == "s07")
                             {
-                                //Check the Brick Guns, because they dont have a slot
+                                //check for all build guns but only if in starting gear
                                 item.Usage = Item.USAGE.EQUIP;
                             }
                         }

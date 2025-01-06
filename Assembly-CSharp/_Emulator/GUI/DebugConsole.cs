@@ -38,6 +38,22 @@ namespace _Emulator
         GUIContent clearLabel = new GUIContent("Clear", "Clear the contents of the console.");
         GUIContent collapseLabel = new GUIContent("Collapse", "Hide repeated messages.");
 
+        void Awake()
+        {
+            // Clear the log file at the start of the program
+            try
+            {
+                if (File.Exists(logFileName))
+                {
+                    File.WriteAllText(logFileName, string.Empty); // Clear the file
+                }
+            }
+            catch (IOException ex)
+            {
+                Debug.LogError($"Failed to clear log file: {ex.Message}");
+            }
+        }
+
         void OnEnable()
         {
             Application.RegisterLogCallback(HandleLog);
