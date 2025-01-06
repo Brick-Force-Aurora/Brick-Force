@@ -7,11 +7,11 @@ on:
 
 jobs:
   build:
-    runs-on: [windows-latest]
+    runs-on: windows-2019
     steps:
-      - name: Checkout
+      - name: checkout
         uses: actions/checkout@v1
-      - name: Build DotNET
+      - name: Build DotNET35
         run: |
            cd "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\MSBuild\Current\Bin\"
            .\MSBuild.exe $Env:GITHUB_WORKSPACE\Brick-Force.sln
