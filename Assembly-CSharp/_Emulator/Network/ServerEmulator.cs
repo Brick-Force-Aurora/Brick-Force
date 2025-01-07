@@ -598,8 +598,7 @@ namespace _Emulator
                         break;
 
                     case 460:
-                        msgRef.msg._msg.Read(out int opt);
-                        Debug.LogWarning("SaveCommonOpt: " + opt);
+                        HandleCommonOpt(msgRef);
                         break;
 
                     case 469:
@@ -4414,16 +4413,18 @@ namespace _Emulator
 
             // replace map if exists
             // map is saved with updated blocks but empty map if loaded directly after saving a reedited map
+            // saving a map which has been edited before, creates a new empty slot?
+            // slot is 0 when opening an existing map and saving?
+            Debug.LogError(slot);
 
             MatchData matchData = msgRef.matchData;
             DateTime time = DateTime.Now;
             int hashId = MapGenerator.instance.GetHashIdForTime(time);
             //todo modemask
             RegMap regMap = new RegMap(hashId, msgRef.client.name + "@Aurora", matchData.cachedUMI.Alias, time, 0, true, false, 0, 0, 0, 0, 0, 0, 0, false);
-            // fix thumbnail
-            //regMaps.Add(new KeyValuePair<int, RegMap>(hashId, regMap));
+
             Texture2D thumbnail = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
-            UserMapInfoManager.Instance.AddOrUpdate(hashId, regMap.Alias, matchData.cachedUMI.BrickCount, time, 0);
+            
             if (msgRef.client.chunkedBuffer.id == ExtensionOpcodes.opChunkedBufferThumbnailReq)
             {
                 if (msgRef.client.chunkedBuffer.finished)
@@ -4436,64 +4437,50 @@ namespace _Emulator
                     Debug.LogError("HandleRegisterMapRequest: ChunkedBuffer not finished");
             }
             regMap.Thumbnail = thumbnail;
-            UserMapInfoManager.Instance.SetThumbnail(hashId, thumbnail);
-            matchData.cachedMap.map = hashId;
-            //matchData.cachedUMI.regMap = regMap;
-            //matchData.cachedUMI.slot = hashId;
-
-            //matchData.cachedUMI.regMap.Save();
-            matchData.cachedMap.Save(hashId, matchData.cachedMap.skybox);
-
-            msgRef.client.chunkedBuffer = null;
-
-            MsgBody msgBody = new MsgBody();
-            //RegMapmanager??
-
-            //Keine Ahnung was hier falsch läuft
-            UserMapInfoManager.Instance.CurMapName = String.Empty;
-            UserMapInfoManager.Instance.CurSlot = 0;
-            UserMapInfoManager.Instance.AddOrUpdate(0, String.Empty, 0, new DateTime(1971, 12, 29), 0);
-            //matchData.cachedMap.Clear();
-            //matchData.cachedUMI.slot = 0;
             RegMapManager.Instance.Add(regMap);
             RegMapManager.Instance.SetThumbnail(regMap.map, thumbnail);
+            // It is important that we first add the thumbnail and regmap to the RegMapManager 
+            // and then add the map to the User Info Manager
+            // Because when a new UserMap is created with a slot > 0 the regMap is retrieved from the RegMapManager
+            UserMapInfoManager.Instance.AddOrUpdate(hashId, regMap.Alias, matchData.cachedUMI.BrickCount, time, 0);
+            UserMapInfoManager.Instance.SetThumbnail(hashId, thumbnail);
 
+            //Update MatchData
+            // is map == slot?
+            matchData.cachedMap.map = hashId;
+            matchData.cachedUMI.regMap = regMap;
+            matchData.cachedUMI.slot = hashId;
+            //Save Files
+            matchData.cachedUMI.regMap.Save();
+            matchData.cachedMap.Save(hashId, matchData.cachedMap.skybox);
+
+            // Reset chunkedBuffer to be able to recieve the next thumbnail
+            msgRef.client.chunkedBuffer = null;
+
+            //UserMapInfoManager.Instance.CurMapName = String.Empty;
+            //UserMapInfoManager.Instance.CurSlot = 0;
+            //UserMapInfoManager.Instance.AddOrUpdate(0, String.Empty, 0, new DateTime(1971, 12, 29), 0);
+            // Clean up the current Map to be able to open a new map
+            //matchData.cachedMap.Clear();
+            //matchData.cachedUMI.slot = 0;
+
+            // Pull current map list into the emulator
             regMaps = RegMapManager.Instance.dicRegMap.ToList();
-            UserMapInfoManager.Instance.Verify();
 
-            msgBody.Write(UserMapInfoManager.Instance.ToArray().Length);
+            // Answer the Request
+            MsgBody msgBody = new MsgBody();
+
+            msgBody.Write(hashId);
             msgBody.Write(0); //success
 
-            // I guess the current map like the one with is the empty one is not getting resettet
             Say(new MsgReference(40, msgBody, msgRef.client, SendType.Unicast));
-            //Answer with register
-            //Say(new MsgReference(52, msgBody, msgRef.client, SendType.Unicast));
+        }
 
-            /*MsgBody msgBody = new MsgBody();
-            msgBody.Write(slot);
-            msgBody.Write(thumbnail.Length);
-            for (int i = 0; i < thumbnail.Length; i++)
-            {
-                msgBody.Write(thumbnail[i]);
-            }*/
-            // 40
-            /*
-            msg.Read(out byte val);
-		msg.Read(out int val2);
-		UserMapInfo userMapInfo = UserMapInfoManager.Instance.Get(val);
-		if (userMapInfo != null)
-		{
-			if (val2 == 0)
-			{
-				userMapInfo.Alias = UserMapInfoManager.Instance.CurMapName;
-				MessageBoxMgr.Instance.AddMessage(string.Format(StringMgr.Instance.Get("SAVE_SUCCESS"), userMapInfo.Alias));
-				MyInfoManager.Instance.IsModified = false;
-			}
-			else
-			{
-				MessageBoxMgr.Instance.AddMessage(string.Format(StringMgr.Instance.Get("SAVE_FAIL"), userMapInfo.Alias));
-			}
-		}*/
+        private void HandleCommonOpt(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out int opt);
+            Debug.LogWarning("SaveCommonOpt: " + opt);
+            MyInfoManager.COMMON_OPT;
         }
 
         public static void UnpackTimerOption(int packed, out int build, out int battle, out int rpt)

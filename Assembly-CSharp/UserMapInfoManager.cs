@@ -271,7 +271,6 @@ public class UserMapInfoManager : MonoBehaviour
 		{
 			if (item.Value.Slot == slot)
 			{
-				Debug.LogError("SetThumbnail");
 				item.Value.Thumbnail = thumbnail;
 				item.Value.SaveCache();
 				break;
@@ -374,7 +373,6 @@ public class UserMapInfoManager : MonoBehaviour
 				userMapInfo.LastModified = lastModified;
 				userMapInfo.Thumbnail = null;
 			}
-			Debug.LogError("Add to UMI");
 			listUMI.Add(slot, userMapInfo);
 		}
 	}

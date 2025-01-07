@@ -399,7 +399,6 @@ namespace _Emulator
 
             MsgBody msgBody = new MsgBody();
             msgBody.Write(slot);
-            Debug.LogError("SAVEREQ");
             CSNetManager.Instance.Sock.Say(39, msgBody);
         }
 
