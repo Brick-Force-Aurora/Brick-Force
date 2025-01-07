@@ -4,6 +4,7 @@ using System.Text;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using System.IO;
 
 namespace _Emulator
 {
@@ -61,7 +62,15 @@ namespace _Emulator
 		static MethodInfo hSockTcpHandleWeaponSlotListAckInfo = typeof(Hooks).GetMethod("hSockTcpHandleWeaponSlotListAck", BindingFlags.NonPublic | BindingFlags.Instance);
 		static Hook SockTcpHandleWeaponSlotListAckHook;
 
-		static MethodInfo oMyInfoManagerSetItemUsageInfo = typeof(MyInfoManager).GetMethod("SetItemUsage", BindingFlags.Public | BindingFlags.Instance);
+		static MethodInfo oSockTcpRegisterReqInfo = typeof(SockTcp).GetMethod("SendCS_REGISTER_REQ", BindingFlags.Public | BindingFlags.Instance);
+		static MethodInfo hSockTcpRegisterReqInfo = typeof(Hooks).GetMethod("hSockTcpRegisterReq", BindingFlags.Public | BindingFlags.Instance);
+		static Hook SockTcpRegisterReqHook;
+
+        static MethodInfo oSockTcpSaveMapReqInfo = typeof(SockTcp).GetMethod("SendCS_SAVE_REQ", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hSockTcpSaveMapReqInfo = typeof(Hooks).GetMethod("hSockTcpSaveMapReq", BindingFlags.Public | BindingFlags.Instance);
+        static Hook SockTcpSaveMapReqHook;
+
+        static MethodInfo oMyInfoManagerSetItemUsageInfo = typeof(MyInfoManager).GetMethod("SetItemUsage", BindingFlags.Public | BindingFlags.Instance);
 		static MethodInfo hMyInfoManagerSetItemUsageInfo = typeof(Hooks).GetMethod("hMyInfoManagerSetItemUsage", BindingFlags.Public | BindingFlags.Instance);
 		static Hook MyInfoManagerSetItemUsageHook;
 
@@ -180,6 +189,13 @@ namespace _Emulator
 		{
 			PimpManager.Instance.LoadFromLocalFileSystem();
 			PimpManager.Instance.updateValue((int)UPGRADE_CAT.HANDGUN, (int)PIMP.PROP_RPM, 9, 400);
+			for (PIMP pimp = PIMP.PROP_ATK_POW; pimp < PIMP.PROP_MAX; pimp++)
+			{
+				for (int lv = 0; lv < 10; lv++)
+				{
+					PimpManager.Instance.updateValue((int)UPGRADE_CAT.OTHER, (int)pimp, lv, 0f);
+				}
+			}
 		}
 
 		private void hP2PManagerReliableSend(uint to, byte id, P2PMsgBody mb)
@@ -363,7 +379,30 @@ namespace _Emulator
 			ApplicationQuitHook.CallOriginal(null, null);
 		}
 
-		public static void Initialize()
+		public void hSockTcpRegisterReq(int slot, ushort modeMask, int regHow, int point, int downloadFee, byte[] thumbnail, string msgEval)
+		{
+			ClientExtension.instance.SendBeginChunkedBuffer(ExtensionOpcodes.opChunkedBufferThumbnailReq, thumbnail);
+
+			MsgBody msgBody = new MsgBody();
+			msgBody.Write(slot);
+			msgBody.Write(modeMask);
+			msgBody.Write(regHow);
+			msgBody.Write(point);
+			msgBody.Write(downloadFee);
+			msgBody.Write(msgEval);
+			CSNetManager.Instance.Sock.Say(51, msgBody);
+		}
+
+        public void hSockTcpSaveMapReq(int slot, byte[] thumbnail)
+        {
+            ClientExtension.instance.SendBeginChunkedBuffer(ExtensionOpcodes.opChunkedBufferThumbnailReq, thumbnail);
+
+            MsgBody msgBody = new MsgBody();
+            msgBody.Write(slot);
+            CSNetManager.Instance.Sock.Say(39, msgBody);
+        }
+
+        public static void Initialize()
         {
 			P2PManagerHandshakeHook = new Hook(oP2PManagerHandshakeInfo, hP2PManagerHandshakeInfo);
 			P2PManagerHandshakeHook.ApplyHook();
@@ -393,7 +432,11 @@ namespace _Emulator
 			SockTcpHandleWeaponSlotAckHook.ApplyHook();
 			SockTcpHandleWeaponSlotListAckHook = new Hook(oSockTcpHandleWeaponSlotListAckInfo, hSockTcpHandleWeaponSlotListAckInfo);
 			SockTcpHandleWeaponSlotListAckHook.ApplyHook();
-			ApplicationQuitHook = new Hook(oApplicationQuitInfo, hApplicationQuitInfo);
+			SockTcpRegisterReqHook = new Hook(oSockTcpRegisterReqInfo, hSockTcpRegisterReqInfo);
+			SockTcpRegisterReqHook.ApplyHook();
+            SockTcpSaveMapReqHook = new Hook(oSockTcpSaveMapReqInfo, hSockTcpSaveMapReqInfo);
+            SockTcpSaveMapReqHook.ApplyHook();
+            ApplicationQuitHook = new Hook(oApplicationQuitInfo, hApplicationQuitInfo);
 			ApplicationQuitHook.ApplyHook();
 		}
     }

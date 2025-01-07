@@ -1,4 +1,7 @@
-﻿using UnityEngine;
+﻿using System;
+using System.Diagnostics;
+using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace _Emulator
 {
@@ -21,6 +24,9 @@ namespace _Emulator
             {
                 gameObject.BroadcastMessage("OnRoundRobin");
             }
+            ShopEmulator shop = new ShopEmulator();
+            //shop.LoadAndSave();
+            shop.ParseData();
         }
 
         public void Say(ushort id, MsgBody msgBody)
@@ -69,7 +75,7 @@ namespace _Emulator
                 case ExtensionOpcodes.opDisconnectAck:
                     HandleDisconnected(msg._msg);
                     break;
-
+                
                 default:
                     result = false;
                     break;
@@ -164,16 +170,17 @@ namespace _Emulator
         {
             MsgBody body = new MsgBody();
 
-            body.Write(inventory.csv._rows.Count);
-            for (int row = 0; row < inventory.csv._rows.Count; row++)
+            body.Write(inventory.equipment.Count);
+
+            // Write each item's slot (category) and code
+            foreach (var item in inventory.equipment)
             {
-                body.Write(inventory.csv._rows[row].Length);
-                for (int col = 0; col < inventory.csv._rows[row].Length; col++)
-                {
-                    body.Write(inventory.csv._rows[row][col]);
-                }
+                body.Write(item.Template.slot.ToString()); // Write the slot (e.g., Main, Secondary)
+                body.Write(item.Code);                     // Write the item code
+                body.Write(item.Usage.ToString());         // Write the item Usage
             }
 
+            // Send the data
             Say(ExtensionOpcodes.opInventoryAck, body);
         }
 
@@ -182,6 +189,64 @@ namespace _Emulator
             MsgBody body = new MsgBody();
 
             Say(ExtensionOpcodes.opDisconnectReq, body);
+        }
+
+        public void SendBeginChunkedBuffer(ushort opcode, byte[] buffer)
+        {
+            const int maxBufferSize = 1000000000;
+            if (buffer.Length > maxBufferSize)
+            {
+                Debug.LogWarning("ClientExtension.SendBeginChunkedBuffer: Buffer was " + buffer.Length + " bytes");
+                return;
+            }
+
+            uint crc = CRC32.computeUnsigned(buffer);
+
+            MsgBody body = new MsgBody();
+            body.Write(opcode);
+            body.Write(buffer.Length);
+            body.Write(crc);
+
+            Debug.LogWarning("Begin");
+            Say(ExtensionOpcodes.opBeginChunkedBufferReq, body);
+            SendChunkedBuffer(opcode, buffer);
+            SendEndChunkedBuffer(opcode, crc);
+        }
+
+        public void SendChunkedBuffer(ushort opcode, byte[] buffer)
+        {
+            int chunkSize = 4096;
+            int chunkCount = Mathf.CeilToInt((float)buffer.Length / (float)chunkSize);
+            int processedCount = 0;
+
+            Debug.Log(chunkSize + " " + buffer.Length + " " + chunkCount);
+            for (int chunk = 0; chunk < chunkCount; chunk++)
+            {
+                int remaining = buffer.Length - processedCount;
+                if (remaining < chunkSize)
+                    chunkSize = remaining;
+
+                MsgBody body = new MsgBody();
+
+                byte[] next = new byte[chunkSize];
+                Array.Copy(buffer, processedCount, next, 0, chunkSize);
+                body.Write(opcode);
+                body.Write(chunk);
+                body.Write(next);
+                processedCount += chunkSize;
+
+                Debug.LogWarning("Send " + chunk + " " + chunkSize + " " + processedCount);
+                Say(ExtensionOpcodes.opChunkedBufferReq, body);
+            }
+        }
+
+        public void SendEndChunkedBuffer(ushort opcode, uint crc)
+        {
+            MsgBody body = new MsgBody();
+            body.Write(opcode);
+
+            Debug.LogWarning("End");
+            Say(ExtensionOpcodes.opEndChunkedBufferReq, body);
         }
     }
 }

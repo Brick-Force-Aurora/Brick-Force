@@ -13,19 +13,14 @@ public class TWeapon : TItem
 		SPECIAL
 	}
 
-	private GameObject prefab;
+    private GameObject prefab;      // Main prefab (game object) of the weapon
+    private GameObject prefab11;    // Alternative prefab of the weapon
+    public string bone;             // Bone associated with the weapon
+    public int cat;                 // Weapon category index
+    public int durabilityMax;       // Maximum durability of the weapon
+    public bool IsTwoHands;         // Flag indicating if the weapon requires both hands
 
-	private GameObject prefab11;
-
-	public string bone;
-
-	public int cat;
-
-	public int durabilityMax;
-
-	public bool IsTwoHands;
-
-	private static string[] categories = new string[7]
+    private static string[] categories = new string[7]
 	{
 		"heavy",
 		"assault",
@@ -52,7 +47,9 @@ public class TWeapon : TItem
 		durabilityMax = itemDurabilityMax;
 	}
 
-	public GameObject CurPrefab()
+    // Returns the current prefab of the weapon
+    // Check developer options and age restrictions to determine which prefab to return
+    public GameObject CurPrefab()
 	{
 		if (BuildOption.Instance.IsDeveloper && BuildOption.Instance.Props.MyAge < 12 && prefab11 != null)
 		{
@@ -65,7 +62,8 @@ public class TWeapon : TItem
 		return prefab;
 	}
 
-	public static int String2WeaponCategory(string category)
+    // Converts a string category to an integer index
+    public static int String2WeaponCategory(string category)
 	{
 		for (int i = 0; i < categories.Length; i++)
 		{
@@ -78,12 +76,14 @@ public class TWeapon : TItem
 		return -1;
 	}
 
-	public Weapon.TYPE GetWeaponType()
+    // Gets the weapon type based on the slot value
+    public Weapon.TYPE GetWeaponType()
 	{
 		return (Weapon.TYPE)(slot - 2);
 	}
 
-	public static int GetDiscountRatio(int lv)
+    // Calculates and returns the discount ratio based on the provided level
+    public static int GetDiscountRatio(int lv)
 	{
 		if (lv >= 5)
 		{
@@ -104,7 +104,8 @@ public class TWeapon : TItem
 		return 0;
 	}
 
-	public int GetDiscountRatio()
+    // Calculates and returns the discount ratio based on the weapon category and player's XP values
+    public int GetDiscountRatio()
 	{
 		int result = 0;
 		switch (cat)

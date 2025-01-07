@@ -20,3 +20,37 @@ Changelog v1.1.0:
 	Other Changes
 	+Added string lookup for CSV loader
 	+Refactored match ending
+	
+Changelog v1.2.0:
+	Game Features:
+	+Added Ingame Shop
+	
+Changelog v1.3.0:
+	Game Features:
+	+Added Build and Destroy Mode
+	
+Changelog v1.3.1:
+	Game Features:
+	+Added Capture the Flag Mode
+	
+	Bugfixes:
+	-Fixed BnD Bugs
+
+Changelog v1.4.0:
+	Game Features:
+	+Added Zombie Mode
+	+Added Build Mode
+	
+	Bugfixes:
+	-Fixed Shop and Inventory System
+	-Migrated Config File to JSON
+	-Fixed Build Mode Load and Save
+	-Fixed Brick-Gun Equip
+	
+	Other:
+	-Merged to Main Repo
+	-Update available in the Brick-Force Launcher
+	
+	Known Issues:
+	-Maps get out of sync when Players disconnect from host (To fix, manually serve the .regmap and .geometry files)
+	-Build Room does not get terminated if host leaves (when another user leaves after the host, the room persists)

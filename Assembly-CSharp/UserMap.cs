@@ -15,7 +15,7 @@ public class UserMap
 
 	public int crc;
 
-	private Dictionary<int, BrickInst> dic;
+	public Dictionary<int, BrickInst> dic;
 
 	private BrickInst[,,] geometry;
 
@@ -87,7 +87,7 @@ public class UserMap
 		Clear();
 	}
 
-	private bool IsDefenseBrick(int seq)
+    private bool IsDefenseBrick(int seq)
 	{
 		if (seq == 134 || seq == 135 || seq == 136)
 		{
@@ -209,7 +209,7 @@ public class UserMap
 		return true;
 	}
 
-	public void CalcCRC(int seq, byte template)
+    public void CalcCRC(int seq, byte template)
 	{
 		crc ^= seq + template;
 	}
@@ -328,7 +328,7 @@ public class UserMap
 		{
 			string fileName = Path.Combine(text, "downloaded" + mapIndex + ".geometry");
 			Save(fileName, mapIndex, skyboxIndex);
-		}
+        }
 	}
 
 	public void CacheDone(int mapIndex, int skyboxIndex)

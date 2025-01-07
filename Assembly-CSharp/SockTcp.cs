@@ -7,7 +7,6 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using UnityEngine;
 using wlic;
-
 public class SockTcp
 {
 	private const int REQ_SUCCESS = 0;
@@ -1446,7 +1445,8 @@ public class SockTcp
 				while (_readQueue != null && _readQueue.Count > 0)
 				{
 					Msg2Handle msg2Handle = (Msg2Handle)_readQueue.Peek();
-					if (!ClientExtension.instance.HandleMessage(msg2Handle))
+
+                    if (!ClientExtension.instance.HandleMessage(msg2Handle))
 					switch (msg2Handle._id)
 					{
 					case 2:
@@ -3115,8 +3115,11 @@ public class SockTcp
 
 	public void SendCS_BND_SHIFT_PHASE_REQ(int repeat, bool isBuildPhase)
 	{
+        Debug.LogWarning("Send BND # Req");
 		MsgBody msgBody = new MsgBody();
+        Debug.LogWarning(repeat);
 		msgBody.Write(repeat);
+        Debug.LogWarning(isBuildPhase);
 		msgBody.Write(isBuildPhase);
 		Say(349, msgBody);
 	}
@@ -3623,7 +3626,7 @@ public class SockTcp
 		Say(65, msgBody);
 	}
 
-	public void SendCS_CHANGE_USERMAP_ALIAS_REQ(sbyte slot, string alias)
+	public void SendCS_CHANGE_USERMAP_ALIAS_REQ(int slot, string alias)
 	{
 		MsgBody msgBody = new MsgBody();
 		msgBody.Write(slot);
@@ -3770,7 +3773,8 @@ public class SockTcp
 		}
 	}
 
-	public void SendCS_SAVE_REQ(byte slot, byte[] thumbnail)
+    //Hooked
+	public void SendCS_SAVE_REQ(int slot, byte[] thumbnail)
 	{
 		MsgBody msgBody = new MsgBody();
 		msgBody.Write(slot);
@@ -3782,7 +3786,8 @@ public class SockTcp
 		Say(39, msgBody);
 	}
 
-	public void SendCS_REGISTER_REQ(byte slot, ushort modeMask, int regHow, int point, int downloadFee, byte[] thumbnail, string msgEval)
+	//Hooked
+	public void SendCS_REGISTER_REQ(int slot, ushort modeMask, int regHow, int point, int downloadFee, byte[] thumbnail, string msgEval)
 	{
 		MsgBody msgBody = new MsgBody();
 		msgBody.Write(slot);
@@ -4619,7 +4624,7 @@ public class SockTcp
 				MessageBoxMgr.Instance.AddMessage(string.Format(StringMgr.Instance.Get("SAVE_FAIL"), userMapInfo.Alias));
 			}
 		}
-	}
+    }
 
 	private void HandleCS_ROOM_CONFIG_ACK(MsgBody msg)
 	{
@@ -6197,7 +6202,7 @@ public class SockTcp
 	private void HandleCS_COPYRIGHT_ACK(MsgBody msg)
 	{
 		msg.Read(out int val);
-		msg.Read(out byte val2);
+		msg.Read(out int val2);
 		UserMapInfoManager.Instance.master = val;
 		if (val == MyInfoManager.Instance.Seq)
 		{
@@ -7180,12 +7185,17 @@ public class SockTcp
 
 	private void HandleCS_BUY_ITEM_ACK(MsgBody msg)
 	{
+        // val = sequence (unique key)
+        // val2 = code
+        // val3 = remain (time in days)
+        // val4 = premium 0 || 1
+        // val5 = durability
 		msg.Read(out long val);
 		msg.Read(out string val2);
 		msg.Read(out int val3);
 		msg.Read(out sbyte val4);
 		msg.Read(out int val5);
-		if (val >= 0)
+        if (val >= 0)
 		{
 			MyInfoManager.Instance.BuyItem(val, val2, val3, val4, val5);
 			TItem tItem = TItemManager.Instance.Get<TItem>(val2);
@@ -9050,24 +9060,26 @@ public class SockTcp
 
 	private void HandleCS_BND_SHIFT_PHASE_ACK(MsgBody msg)
 	{
-		msg.Read(out int val);
-		msg.Read(out bool val2);
+		msg.Read(out int repeat);
+		msg.Read(out bool isBuildPhase);
 		GameObject gameObject = GameObject.Find("Main");
 		if (null != gameObject)
 		{
-			gameObject.BroadcastMessage("OnRoundEnd", val);
+            Debug.LogWarning(repeat);
+			gameObject.BroadcastMessage("OnRoundEnd", repeat);
 			if (RoomManager.Instance.Master != MyInfoManager.Instance.Seq)
 			{
 				BndTimer component = gameObject.GetComponent<BndTimer>();
 				if (null != component)
 				{
-					component.ShiftPhase(val2);
+                    Debug.LogWarning("Shift Phase not host");
+					component.ShiftPhase(isBuildPhase);
 				}
 			}
 		}
 		if (MyInfoManager.Instance.BndModeDesc != null)
 		{
-			MyInfoManager.Instance.BndModeDesc.buildPhase = val2;
+			MyInfoManager.Instance.BndModeDesc.buildPhase = isBuildPhase;
 		}
 	}
 
@@ -9429,6 +9441,7 @@ public class SockTcp
 		BrickManManager.Instance.haveFlagSeq = val;
 		BrickManManager.Instance.bSendTcpCheckOnce = false;
 		GameObject gameObject = GameObject.Find("Main");
+
 		if (null != gameObject)
 		{
 			gameObject.BroadcastMessage("OnPicked", val);
@@ -10357,7 +10370,7 @@ public class SockTcp
 		}
 		for (int i = 0; i < val2; i++)
 		{
-			msg.Read(out byte val3);
+			msg.Read(out int val3);
 			msg.Read(out string val4);
 			msg.Read(out int val5);
 			msg.Read(out int val6);
@@ -11558,6 +11571,7 @@ public class SockTcp
 
 	private void HandleCS_BND_STATUS_ACK(MsgBody msg)
 	{
+        Debug.LogWarning("BND Status ACK");
 		msg.Read(out bool val);
 		MyInfoManager.Instance.BndModeDesc = new BuildNDestroyModeDesc();
 		MyInfoManager.Instance.BndModeDesc.buildPhase = val;
@@ -12090,7 +12104,10 @@ public class SockTcp
 			msg.Read(out int val13);
 			msg.Read(out long val14);
 			list.Add(new ResultUnitZombie(val2, val3, val4, val5, val6, val7, val8, val9, val10, val11, val12, val13, val14));
-		}
+            // Debug log for this client's data
+            Debug.Log($"Info Recieced Player {i + 1}: isRed={val2}, Seq={val3}, Name={val4}, Kills={val5}, Deaths={val6}, Assists={val7}, " +
+                      $"Score={val8}, Points={val9}, XP={val10}, Mission={val11}, PrevXP={val12}, NextXP={val13}, Buff={val14}");
+        }
 		list.Sort((ResultUnitZombie prev, ResultUnitZombie next) => prev.Compare(next));
 		RoomManager.Instance.RU = list.ToArray();
 		RoomManager.Instance.endCode = 0;

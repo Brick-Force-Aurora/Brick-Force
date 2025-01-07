@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 namespace _Emulator
@@ -19,6 +20,7 @@ namespace _Emulator
         Vector2 scrollPosition;
         bool hidden = true;
         bool collapse = true;
+        private const string logFileName = "ClientLog.log";
 
         static readonly Dictionary<LogType, Color> logTypeColors = new Dictionary<LogType, Color>()
     {
@@ -35,6 +37,22 @@ namespace _Emulator
         Rect titleBarRect = new Rect(0, 0, 10000, 20);
         GUIContent clearLabel = new GUIContent("Clear", "Clear the contents of the console.");
         GUIContent collapseLabel = new GUIContent("Collapse", "Hide repeated messages.");
+
+        void Awake()
+        {
+            // Clear the log file at the start of the program
+            try
+            {
+                if (File.Exists(logFileName))
+                {
+                    File.WriteAllText(logFileName, string.Empty); // Clear the file
+                }
+            }
+            catch (IOException ex)
+            {
+                Debug.LogError($"Failed to clear log file: {ex.Message}");
+            }
+        }
 
         void OnEnable()
         {
@@ -84,6 +102,8 @@ namespace _Emulator
 
                 GUI.contentColor = logTypeColors[log.type];
                 GUILayout.Label(log.message);
+                if (log.stackTrace != string.Empty)
+                    GUILayout.Label(log.stackTrace);
             }
 
             GUILayout.EndScrollView();
@@ -106,12 +126,31 @@ namespace _Emulator
 
         void HandleLog(string message, string stackTrace, LogType type)
         {
-            logs.Add(new Log()
+            var logEntry = new Log()
             {
                 message = message,
                 stackTrace = stackTrace,
                 type = type,
-            });
+            };
+
+            logs.Add(logEntry);
+
+            // Append the log entry to the file
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(logFileName, true))
+                {
+                    writer.WriteLine($"[{System.DateTime.Now}] [{type}] {message}");
+                    if (!string.IsNullOrEmpty(stackTrace))
+                    {
+                        writer.WriteLine(stackTrace);
+                    }
+                }
+            }
+            catch (IOException ex)
+            {
+                Debug.LogError($"Failed to write log to file: {ex.Message}");
+            }
         }
     }
 }

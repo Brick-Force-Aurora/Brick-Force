@@ -68,20 +68,20 @@ namespace _Emulator
 
                 if (GUI.Button(updateButtonRect, "Update Inventory"))
                 {
-                    ClientExtension.instance.inventory.UpdateCSV();
+                    //ClientExtension.instance.inventory.UpdateCSV();
                     ClientExtension.instance.SendInventoryCSV();
                 }
 
                 if (GUI.Button(saveButtonRect, "Save Inventory"))
                 {
-                    ClientExtension.instance.inventory.UpdateCSV();
-                    ClientExtension.instance.inventory.Save();
+                    //ClientExtension.instance.inventory.UpdateCSV();
+                    //ClientExtension.instance.inventory.Save();
                     ClientExtension.instance.SendInventoryCSV();
                 }
 
                 if (GUI.Button(loadButtonRect, "Load Inventory"))
                 {
-                    ClientExtension.instance.inventory.LoadInventoryFromDisk();
+                    //ClientExtension.instance.inventory.LoadInventoryFromDisk();
                     if (sortInventory)
                         ClientExtension.instance.inventory.Sort();
                     ClientExtension.instance.SendInventoryCSV();

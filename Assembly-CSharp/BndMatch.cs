@@ -259,9 +259,17 @@ public class BndMatch : MonoBehaviour
 	private void StartLoad()
 	{
 		GC.Collect();
-		BrickManager.Instance.userMap = new UserMap();
-		CSNetManager.Instance.Sock.SendCS_CACHE_BRICK_REQ();
-	}
+        UserMap userMap = new UserMap();
+        if (userMap.Load(RoomManager.Instance.CurMap))
+        {
+            BrickManager.Instance.userMap = userMap;
+        }
+        else
+        {
+            BrickManager.Instance.userMap = new UserMap();
+            CSNetManager.Instance.Sock.SendCS_CACHE_BRICK_REQ();
+        }
+    }
 
 	private void ResetGameStuff()
 	{

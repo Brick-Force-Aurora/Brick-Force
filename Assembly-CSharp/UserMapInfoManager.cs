@@ -6,7 +6,7 @@ public class UserMapInfoManager : MonoBehaviour
 {
 	public int master = -1;
 
-	private SortedList<byte, UserMapInfo> listUMI;
+	private SortedList<int, UserMapInfo> listUMI;
 
 	private Dictionary<int, int> dicRegMap;
 
@@ -14,7 +14,7 @@ public class UserMapInfoManager : MonoBehaviour
 
 	private string curMapName = string.Empty;
 
-	private byte curSlot = byte.MaxValue;
+	private int curSlot = int.MaxValue;
 
 	private static UserMapInfoManager _instance;
 
@@ -36,7 +36,7 @@ public class UserMapInfoManager : MonoBehaviour
 		}
 	}
 
-	public byte CurSlot
+	public int CurSlot
 	{
 		get
 		{
@@ -189,16 +189,16 @@ public class UserMapInfoManager : MonoBehaviour
 
 	private void Awake()
 	{
-		listUMI = new SortedList<byte, UserMapInfo>();
+		listUMI = new SortedList<int, UserMapInfo>();
 		dicRegMap = new Dictionary<int, int>();
 		cacheRegMap = new List<int>();
 		UnityEngine.Object.DontDestroyOnLoad(this);
 	}
 
-	public void VerifyCurMapName(byte slot)
+	public void VerifyCurMapName(int slot)
 	{
 		curSlot = slot;
-		foreach (KeyValuePair<byte, UserMapInfo> item in listUMI)
+		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			if (item.Key == slot)
 			{
@@ -207,7 +207,7 @@ public class UserMapInfoManager : MonoBehaviour
 		}
 	}
 
-	public void CreateBuildMode(byte slot, string alias)
+	public void CreateBuildMode(int slot, string alias)
 	{
 		curSlot = slot;
 		curMapName = alias;
@@ -238,7 +238,7 @@ public class UserMapInfoManager : MonoBehaviour
 
 	public void Verify()
 	{
-		foreach (KeyValuePair<byte, UserMapInfo> item in listUMI)
+		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			if (item.Value.BrickCount == 0)
 			{
@@ -253,7 +253,7 @@ public class UserMapInfoManager : MonoBehaviour
 
 	public void VerifySavedData()
 	{
-		foreach (KeyValuePair<byte, UserMapInfo> item in listUMI)
+		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			item.Value.VerifySavedData();
 		}
@@ -262,12 +262,12 @@ public class UserMapInfoManager : MonoBehaviour
 	public void Clear()
 	{
 		listUMI.Clear();
-		curSlot = byte.MaxValue;
+		curSlot = int.MaxValue;
 	}
 
-	public void SetThumbnail(byte slot, Texture2D thumbnail)
+	public void SetThumbnail(int slot, Texture2D thumbnail)
 	{
-		foreach (KeyValuePair<byte, UserMapInfo> item in listUMI)
+		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			if (item.Value.Slot == slot)
 			{
@@ -278,7 +278,7 @@ public class UserMapInfoManager : MonoBehaviour
 		}
 	}
 
-	public void Remove(byte key)
+	public void Remove(int key)
 	{
 		if (listUMI.ContainsKey(key))
 		{
@@ -288,8 +288,8 @@ public class UserMapInfoManager : MonoBehaviour
 
 	public void ValidateEmpty()
 	{
-		List<byte> list = new List<byte>();
-		foreach (KeyValuePair<byte, UserMapInfo> item in listUMI)
+		List<int> list = new List<int>();
+		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			if (item.Value.Alias.Length <= 0)
 			{
@@ -307,7 +307,7 @@ public class UserMapInfoManager : MonoBehaviour
 			num = 0;
 		}
 		num2 += MyInfoManager.Instance.ExtraSlots;
-		foreach (KeyValuePair<byte, UserMapInfo> item2 in listUMI)
+		foreach (KeyValuePair<int, UserMapInfo> item2 in listUMI)
 		{
 			if (item2.Value.IsPremium)
 			{
@@ -326,7 +326,7 @@ public class UserMapInfoManager : MonoBehaviour
 		{
 			num2 = 0;
 		}
-		byte b = 1;
+		int b = 1;
 		while (num2 > 0 && b < 200)
 		{
 			UserMapInfo userMapInfo = Get(b);
@@ -335,9 +335,9 @@ public class UserMapInfoManager : MonoBehaviour
 				num2--;
 				listUMI.Add(b, new UserMapInfo(b, 0));
 			}
-			b = (byte)(b + 1);
+			b = (int)(b + 1);
 		}
-		byte b2 = 1;
+		int b2 = 1;
 		while (num > 0 && b2 < 200)
 		{
 			UserMapInfo userMapInfo2 = Get(b2);
@@ -346,13 +346,13 @@ public class UserMapInfoManager : MonoBehaviour
 				num--;
 				listUMI.Add(b2, new UserMapInfo(b2, 1));
 			}
-			b2 = (byte)(b2 + 1);
+			b2 = (int)(b2 + 1);
 		}
 	}
 
-	public void AddOrUpdate(byte slot, string alias, int brickCount, DateTime lastModified, sbyte premium)
+	public void AddOrUpdate(int slot, string alias, int brickCount, DateTime lastModified, sbyte premium)
 	{
-		foreach (KeyValuePair<byte, UserMapInfo> item in listUMI)
+		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			if (item.Value.Slot == slot)
 			{
@@ -377,9 +377,9 @@ public class UserMapInfoManager : MonoBehaviour
 		}
 	}
 
-	public UserMapInfo Get(byte slot)
+	public UserMapInfo Get(int slot)
 	{
-		foreach (KeyValuePair<byte, UserMapInfo> item in listUMI)
+		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			if (item.Value.Slot == slot)
 			{
@@ -391,7 +391,7 @@ public class UserMapInfoManager : MonoBehaviour
 
 	public bool HaveUserMap()
 	{
-		foreach (KeyValuePair<byte, UserMapInfo> item in listUMI)
+		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			if (item.Value.Alias.Length > 0)
 			{
@@ -403,7 +403,7 @@ public class UserMapInfoManager : MonoBehaviour
 
 	public bool HaveEmptyUserMap()
 	{
-		foreach (KeyValuePair<byte, UserMapInfo> item in listUMI)
+		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			if (item.Value.Alias.Length <= 0)
 			{
@@ -415,7 +415,7 @@ public class UserMapInfoManager : MonoBehaviour
 
 	public UserMapInfo GetCur()
 	{
-		foreach (KeyValuePair<byte, UserMapInfo> item in listUMI)
+		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			if (item.Value.Slot == curSlot)
 			{
@@ -429,7 +429,7 @@ public class UserMapInfoManager : MonoBehaviour
 	{
 		UserMapInfo[] array = new UserMapInfo[listUMI.Count];
 		int num = 0;
-		foreach (KeyValuePair<byte, UserMapInfo> item in listUMI)
+		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			array[num++] = item.Value;
 		}
@@ -442,7 +442,7 @@ public class UserMapInfoManager : MonoBehaviour
 		int num2 = (page - 1) * 12;
 		int num3 = 0;
 		List<UserMapInfo> list = new List<UserMapInfo>();
-		foreach (KeyValuePair<byte, UserMapInfo> item in listUMI)
+		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			if (num3 >= 12)
 			{

@@ -7,7 +7,7 @@ public class ShooterTools : MonoBehaviour
 
 	public ShooterTool[] desc;
 
-	private ShooterTool[] tools;
+	public ShooterTool[] tools;
 
 	private Vector2 crdToolSize = new Vector2(64f, 74f);
 

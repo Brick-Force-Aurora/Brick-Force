@@ -230,7 +230,15 @@ public class RegMapManager : MonoBehaviour
 		}
 	}
 
-	public bool Del(int map)
+    public void UpdateMap(RegMap regMap)
+    {
+        if (dicRegMap.ContainsKey(regMap.Map))
+        {
+            dicRegMap[regMap.Map] = regMap;
+        }
+    }
+
+    public bool Del(int map)
 	{
 		if (!dicRegMap.ContainsKey(map))
 		{
@@ -241,6 +249,7 @@ public class RegMapManager : MonoBehaviour
 
 	private void Start()
 	{
+		//This loads all regmap files
 		string path = Path.Combine(Application.dataPath, "Resources/Cache");
 		if (!Directory.Exists(path))
 		{

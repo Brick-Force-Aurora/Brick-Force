@@ -112,9 +112,18 @@ public class BackConfirmDialog : Dialog
 			if (GlobalVars.Instance.MyButton(new Rect(GlobalVars.Instance.ScreenRect.width / 2f - 110f, size.y - sizeOk.y - 25f, sizeOk.x, sizeOk.y), StringMgr.Instance.Get("SAVE"), "BtnAction") || GlobalVars.Instance.IsReturnPressed())
 			{
 				result = true;
-				GetCopyRight();
-				ThumbnailToPNG();
-				CSNetManager.Instance.Sock.SendCS_SAVE_REQ(umi.Slot, ThumbnailToPNG());
+
+                bool copy = GetCopyRight();
+                ThumbnailToPNG();
+				//if umi does not exist, its a new map
+				if (copy)
+				{
+                    CSNetManager.Instance.Sock.SendCS_SAVE_REQ(umi.Slot, ThumbnailToPNG());
+                } else
+				{
+                    CSNetManager.Instance.Sock.SendCS_SAVE_REQ(0, ThumbnailToPNG());
+                }
+                //CSNetManager.Instance.Sock.SendCS_SAVE_REQ(umi.Slot, ThumbnailToPNG());
 				BackToScene();
 			}
 			if (GlobalVars.Instance.MyButton(new Rect(GlobalVars.Instance.ScreenRect.width / 2f + 10f, size.y - sizeOk.y - 25f, sizeOk.x, sizeOk.y), StringMgr.Instance.Get("CANCEL"), "BtnAction") || GlobalVars.Instance.IsReturnPressed())

@@ -78,7 +78,7 @@ public class RenameMapDlg : Dialog
 		}
 		if (GlobalVars.Instance.MyButton(crdOk, StringMgr.Instance.Get("OK"), "BtnAction") && CheckAlias())
 		{
-			CSNetManager.Instance.Sock.SendCS_CHANGE_USERMAP_ALIAS_REQ((sbyte)userMap.Slot, newMapAlias);
+			CSNetManager.Instance.Sock.SendCS_CHANGE_USERMAP_ALIAS_REQ(userMap.Slot, newMapAlias);
 			result = true;
 		}
 		Rect rc = new Rect(size.x - 44f, 5f, 34f, 34f);

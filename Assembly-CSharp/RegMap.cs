@@ -10,13 +10,13 @@ public class RegMap
 
 	private int ver = 3;
 
-	private int map = -1;
+	public int map = -1;
 
 	private string developer;
 
 	private string alias;
 
-	private DateTime regDate;
+	public DateTime regDate;
 
 	private ushort modeMask;
 

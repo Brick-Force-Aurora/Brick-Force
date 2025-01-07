@@ -128,7 +128,7 @@ public class Room
 
 	private bool locked;
 
-	private int no;
+	public int no;
 
 	private int squad;
 
@@ -136,7 +136,7 @@ public class Room
 
 	private string title;
 
-	private ROOM_TYPE type;
+	public ROOM_TYPE type;
 
 	private ROOM_STATUS status;
 

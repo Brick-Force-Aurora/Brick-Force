@@ -5,7 +5,7 @@ using UnityEngine;
 
 public class ShopManager : MonoBehaviour
 {
-	private Dictionary<string, Good> dic;
+	public Dictionary<string, Good> dic;
 
 	private Dictionary<string, Good> cache;
 
@@ -84,7 +84,7 @@ public class ShopManager : MonoBehaviour
 		}
 	}
 
-	private bool LoadFromLocalFileSystem()
+	public bool LoadFromLocalFileSystem()
 	{
 		string text = Path.Combine(Application.dataPath, "Resources");
 		if (!Directory.Exists(text))
@@ -96,7 +96,7 @@ public class ShopManager : MonoBehaviour
 		string text3 = Path.Combine(text, "Template/shopCategory.txt");
 		CSVLoader cSVLoader = new CSVLoader();
 		CSVLoader cSVLoader2 = new CSVLoader();
-		if (Application.platform == RuntimePlatform.WindowsEditor || !cSVLoader.SecuredLoad(text2))
+		if (Application.platform == RuntimePlatform.WindowsEditor || !cSVLoader.Load(text2))
 		{
 			if (!cSVLoader.Load(text2))
 			{
@@ -171,7 +171,7 @@ public class ShopManager : MonoBehaviour
 			}
 			else
 			{
-				dic[Value13].AddPrice(Value14, Value15, Value16, Value17, Value18, 0, 0, 0, 0, 0, 0, 314816281);
+				dic[Value13].AddPrice(Value14, Value15, Value16, Value17, Value18, 0, 1, 0, 0, 0, 0, 314816281);
 			}
 		}
 	}

@@ -1,11 +1,12 @@
 ![](https://i.imgur.com/fThs88a.png)
 
-[<p align="center">Join The Discord</p>](https://discord.gg/qktjAYsKwH)
-[<p align="center">Latest Release</p>](https://github.com/Brick-Force-Aurora/Brick-Force/releases/latest)
-
-[<p align="center">Gameplay Video</p>](https://www.youtube.com/watch?v=mslPRyCIKgo)
-
-[<p align="center">Tutorial by Amorph (German)</p>](https://www.youtube.com/watch?v=OuJ-qxDsTrA)
+<div align="center">
+  <a href="https://discord.gg/qktjAYsKwH">Join The Discord</a> |
+  <a href="https://github.com/Brick-Force-Aurora/Brick-Force/releases/latest">Latest Release</a> |
+  <a href="https://brick-force-aurora.github.io/Website/">Website</a> |
+  <a href="https://www.youtube.com/watch?v=mslPRyCIKgo">Gameplay Video</a> |
+  <a href="https://www.youtube.com/watch?v=OuJ-qxDsTrA">Tutorial by Amorph (German)</a>
+</div>
 
 <p align="center">Full rewrite of the original server emulator project with more features and better stability, now available for everyone!</p>
 
@@ -39,15 +40,6 @@
 
 ![](https://i.imgur.com/6ncbt4O.png)
 
-## Inventory Editor
-![](https://i.imgur.com/teJ36Lz.png)
-
-- Click on items in the left list to add them to the inventory.
-- Click on items in the inventory to remove them.
-- Hold CTRL while clicking in the inventory to equip items.
-- Click Update Inventory to apply changes to your ingame inventory.
-- Click Save Inventory to update and save the current inventory to Inventory.csv.
-
 ## Host Menu
 ![](https://i.imgur.com/zg6pEny.png)
 
@@ -69,13 +61,31 @@
 - F8: Debug Console
 
 ## Limitations
-- Only TDM & Deathmtach are fully implemented currently, other modes should load but might not fully work.
-- Future support for Build Mode is planned.
-- Only one room per host to simplify server.
+- There are still a lot of bugs, if you encounter any, open an Issue or head to our Discord
+- Freefall, Defense and Defusion don't work
+- No ingame progression
+- No Missions
+- No Pick'n'Win
+- No Clans or Friends
+- Map Manager does not work
+- Weapon Upgrading does not work
+- Performance needs improvement
+- Temporary Shop prices
+- No user information persists apart from Inventory and Config
+- Action Panel untested
+- Build Mode: No Swappie or Streamliner
 - Item stats are mostly backup values loaded from disk and are different from Infernum servers.
-- Most rare weapons and max up variants have empty stats and are therefore useless in game.
+- ~Most rare weapons and max up variants have empty stats and are therefore useless in game.~
 - Game languages need to be english, otherwise you will get stuck in the loading screen.
 - Can be changed under registry path HKEY_CURRENT_USER\SOFTWARE\EXE Games\BrickForce (set BfVoice & BfLanguage to 1 for english).
+
+## How to develop
+- Install Visual Studio
+- Open the solution file Brick-Force.sln
+- Install the Launcher and the Game into the same folder where the Brick-Force Repository Folder is to resolve all Dependencies
+- Change Build Output Path to Brick-Force_Data/Managed in project properties to match original game folder
+- If necessary reimport ICSharpCode.SharpZipLib.dll as reference
+- To Debug select the Brick-Force.exe as the external Program
 
 ## Notes
 - This is a non-commercial fan project and not associated with any of the companies originally involved in the development and publishing of the game.
