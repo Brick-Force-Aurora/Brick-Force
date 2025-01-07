@@ -1445,7 +1445,6 @@ public class SockTcp
 				while (_readQueue != null && _readQueue.Count > 0)
 				{
 					Msg2Handle msg2Handle = (Msg2Handle)_readQueue.Peek();
-                    Debug.LogWarning("Message with ID: " + msg2Handle._id);
 
                     if (!ClientExtension.instance.HandleMessage(msg2Handle))
 					switch (msg2Handle._id)

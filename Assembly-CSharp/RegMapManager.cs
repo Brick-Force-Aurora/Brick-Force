@@ -235,7 +235,6 @@ public class RegMapManager : MonoBehaviour
         if (dicRegMap.ContainsKey(regMap.Map))
         {
             dicRegMap[regMap.Map] = regMap;
-			Debug.LogError("Map updated");
         }
     }
 

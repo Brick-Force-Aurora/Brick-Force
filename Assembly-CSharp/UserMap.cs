@@ -87,7 +87,7 @@ public class UserMap
 		Clear();
 	}
 
-	private bool IsDefenseBrick(int seq)
+    private bool IsDefenseBrick(int seq)
 	{
 		if (seq == 134 || seq == 135 || seq == 136)
 		{

@@ -5,8 +5,10 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Policy;
 using System.Text.RegularExpressions;
 using UnityEngine;
+using static Room;
 using Debug = UnityEngine.Debug;
 
 namespace _Emulator
@@ -319,8 +321,9 @@ namespace _Emulator
             MsgReference msgRef = readQueue.Peek();
 
             try
-            {
-                //Debug.Log($"[Verbose] Processing message ID: {msgRef.msg._id} from client: {msgRef.client.GetIdentifier()}");
+            {   
+                if (debugSend)
+                    Debug.Log($"[Verbose] Processing message ID: {msgRef.msg._id} from client: {msgRef.client.GetIdentifier()}");
                 switch (msgRef.msg._id)
                 {
                     case 1:
@@ -501,6 +504,10 @@ namespace _Emulator
 
                     case 295:
                         HandleCTFScoreRequest(msgRef);
+                        break;
+
+                    case 304:
+                        HandleChangeEditorPermissionRequest(msgRef);
                         break;
 
                     case 307:
@@ -724,6 +731,8 @@ namespace _Emulator
             catch (Exception ex)
             {
                 Debug.LogError("SendMessages: " + ex.Message);
+                if (debugHandle)
+                    Debug.LogError("SendMessages StackTrace: " + ex.StackTrace);
             }
 
             finally
@@ -2181,7 +2190,8 @@ namespace _Emulator
                     {
                         thumbnail.LoadImage(msgRef.client.chunkedBuffer.buffer);
                         thumbnail.Apply();
-                        Debug.Log("Load Thumbnail");
+                        if (debugSend)
+                            Debug.Log("Load Thumbnail");
                     }
                     else
                         Debug.LogError("HandleRegisterMapRequest: ChunkedBuffer not finished");
@@ -4420,21 +4430,27 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int slot);
 
             MatchData matchData = msgRef.matchData;
+
+            //Generate ModeMask by counting the special bricks
+            ushort modeMask = GenerateModeMask(matchData.cachedMap.dic);    
+
             int hashId = slot;
             DateTime time = DateTime.Now;
-
             RegMap regMap = null;
 
             if (hashId == 0)
             {
                 hashId = MapGenerator.instance.GetHashIdForTime(time);
                 //todo ModeMask
-                regMap = new RegMap(hashId, msgRef.client.name + "@Aurora", matchData.cachedUMI.Alias, time, 0, true, false, 0, 0, 0, 0, 0, 0, 0, false);
-                Debug.Log("Generated new Hash");
+                regMap = new RegMap(hashId, msgRef.client.name + "@Aurora", matchData.cachedUMI.Alias, time, modeMask, true, false, 0, 0, 0, 0, 0, 0, 0, false);
+                if (debugHandle)
+                    Debug.Log("Generated new Hash");
             } else
             {
                 regMap = RegMapManager.Instance.dicRegMap.FirstOrDefault(map => map.Value != null && map.Value.map == hashId).Value;
-                Debug.LogWarning("Saving Map: " + regMap.map);
+                regMap.ModeMask = modeMask;
+                if (debugHandle)
+                    Debug.Log("Saving Map: " + regMap.map);
             }
 
             Texture2D thumbnail = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
@@ -4445,7 +4461,8 @@ namespace _Emulator
                 {
                     thumbnail.LoadImage(msgRef.client.chunkedBuffer.buffer);
                     thumbnail.Apply();
-                    Debug.Log("Load Thumbnail");
+                    if (debugSend)
+                        Debug.Log("Load Thumbnail");
                 }
                 else
                     Debug.LogError("HandleRegisterMapRequest: ChunkedBuffer not finished");
@@ -4463,7 +4480,6 @@ namespace _Emulator
             UserMapInfoManager.Instance.SetThumbnail(hashId, thumbnail);
 
             //Update MatchData
-            // is map == slot?
             matchData.cachedMap.map = hashId;
             matchData.cachedUMI.regMap = regMap;
             matchData.cachedUMI.slot = hashId;
@@ -4474,13 +4490,6 @@ namespace _Emulator
             // Reset chunkedBuffer to be able to recieve the next thumbnail
             msgRef.client.chunkedBuffer = null;
 
-            //UserMapInfoManager.Instance.CurMapName = String.Empty;
-            //UserMapInfoManager.Instance.CurSlot = 0;
-            //UserMapInfoManager.Instance.AddOrUpdate(0, String.Empty, 0, new DateTime(1971, 12, 29), 0);
-            // Clean up the current Map to be able to open a new map
-            //matchData.cachedMap.Clear();
-            //matchData.cachedUMI.slot = 0;
-
             // Pull current map list into the emulator
             regMaps = RegMapManager.Instance.dicRegMap.ToList();
 
@@ -4490,13 +4499,77 @@ namespace _Emulator
             msgBody.Write(hashId);
             msgBody.Write(0); //success
 
-            Say(new MsgReference(40, msgBody, msgRef.client, SendType.Unicast));
+            Say(new MsgReference(40, msgBody, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));
+        }
+
+        private void HandleChangeEditorPermissionRequest(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out int seq);
+            msgRef.msg._msg.Read(out bool isEditor);
+
+            MatchData matchData = msgRef.matchData;
+            MsgBody msgBody = new MsgBody();
+
+            msgBody.Write(seq);
+            msgBody.Write(isEditor);
+            Say(new MsgReference(305, msgBody, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));
         }
 
         private void HandleCommonOpt(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out int opt);
             Debug.LogWarning("SaveCommonOpt: " + opt);
+        }
+
+        public static ushort GenerateModeMask(Dictionary<int, BrickInst> brickInstances)
+        {
+            ushort modeMask = 0;
+            // Count occurrences of each Template
+            var templateCounts = brickInstances
+                .GroupBy(brick => brick.Value.Template)
+                .ToDictionary(group => group.Key, group => group.Count());
+
+            // Retrieve counts for specific templates
+            int count23 = templateCounts.TryGetValue(23, out var c23) ? c23 : 0;
+            int count22 = templateCounts.TryGetValue(22, out var c22) ? c22 : 0;
+            int count24 = templateCounts.TryGetValue(24, out var c24) ? c24 : 0;
+            int count121 = templateCounts.TryGetValue(121, out var c121) ? c121 : 0;
+            int count122 = templateCounts.TryGetValue(122, out var c122) ? c122 : 0;
+            int count123 = templateCounts.TryGetValue(123, out var c123) ? c123 : 0;
+            int count124 = templateCounts.TryGetValue(124, out var c124) ? c124 : 0;
+            int count134 = templateCounts.TryGetValue(134, out var c134) ? c134 : 0;
+            int count135 = templateCounts.TryGetValue(135, out var c135) ? c135 : 0;
+            int count136 = templateCounts.TryGetValue(136, out var c136) ? c136 : 0;
+            int count181 = templateCounts.TryGetValue(181, out var c181) ? c181 : 0;
+
+            // Calculate mode mask
+            if (count23 >= 8 && count22 >= 8)
+            {
+                modeMask |= 1; // Team match mode
+            }
+            if (count24 >= 16)
+            {
+                modeMask |= 2; // Individual match mode
+                modeMask |= 0x100; // Zombie mode
+            }
+            if (count23 >= 8 && count22 >= 8 && count121 >= 1 && count122 >= 1 && count123 >= 1)
+            {
+                modeMask |= 4; // CTF match mode
+            }
+            if (count124 >= 2 && count23 >= 8 && count22 >= 8)
+            {
+                modeMask |= 8; // Explosion match mode
+            }
+            if (count23 >= 8 && count22 >= 8 && count134 > 0 && count135 > 0 && count136 > 0)
+            {
+                modeMask |= 0x10; // Defense match mode
+            }
+            if (count24 >= 16 && count181 >= 1)
+            {
+                modeMask |= 0x80; // Escape mode
+            }
+
+            return modeMask;
         }
 
         public static void UnpackTimerOption(int packed, out int build, out int battle, out int rpt)
