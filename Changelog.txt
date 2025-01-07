@@ -45,7 +45,12 @@ Changelog v1.4.0:
 	-Fixed Shop and Inventory System
 	-Migrated Config File to JSON
 	-Fixed Build Mode Load and Save
+	-Fixed Brick-Gun Equip
 	
 	Other:
 	-Merged to Main Repo
 	-Update available in the Brick-Force Launcher
+	
+	Known Issues:
+	-Maps get out of sync when Players disconnect from host (To fix, manually serve the .regmap and .geometry files)
+	-Build Room does not get terminated if host leaves (when another user leaves after the host, the room persists)

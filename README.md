@@ -61,9 +61,19 @@
 - F8: Debug Console
 
 ## Limitations
-- Only TDM & Deathmtach are fully implemented currently, other modes should load but might not fully work.
-- Future support for Build Mode is planned.
-- Only one room per host to simplify server.
+- There are still a lot of bugs, if you encounter any, open an Issue or head to our Discord
+- Freefall, Defense and Defusion don't work
+- No ingame progression
+- No Missions
+- No Pick'n'Win
+- No Clans or Friends
+- Map Manager does not work
+- Weapon Upgrading does not work
+- Performance needs improvement
+- Temporary Shop prices
+- No user information persists apart from Inventory and Config
+- Action Panel untested
+- Build Mode: No Swappie or Streamliner
 - Item stats are mostly backup values loaded from disk and are different from Infernum servers.
 - ~Most rare weapons and max up variants have empty stats and are therefore useless in game.~
 - Game languages need to be english, otherwise you will get stuck in the loading screen.
