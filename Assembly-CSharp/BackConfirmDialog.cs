@@ -113,10 +113,16 @@ public class BackConfirmDialog : Dialog
 			{
 				result = true;
 
-                GetCopyRight();
+                bool copy = GetCopyRight();
                 ThumbnailToPNG();
-                //umi is missing or wrong on create should generate this and add to new slot
-                CSNetManager.Instance.Sock.SendCS_SAVE_REQ(0, ThumbnailToPNG());
+				//if umi does not exist, its a new map
+				if (copy)
+				{
+                    CSNetManager.Instance.Sock.SendCS_SAVE_REQ(umi.Slot, ThumbnailToPNG());
+                } else
+				{
+                    CSNetManager.Instance.Sock.SendCS_SAVE_REQ(0, ThumbnailToPNG());
+                }
                 //CSNetManager.Instance.Sock.SendCS_SAVE_REQ(umi.Slot, ThumbnailToPNG());
 				BackToScene();
 			}

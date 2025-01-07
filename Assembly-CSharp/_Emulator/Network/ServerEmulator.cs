@@ -1050,10 +1050,18 @@ namespace _Emulator
 
             if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.MAP_EDITOR)
             {
+                //UserMapInfoManager.Instance.AddOrUpdate(param2, alias, param3, DateTime.Now, (sbyte)param5);
+                //UserMapInfoManager.Instance.CurSlot = param2;
+                //UserMapInfoManager.Instance.CurMapName = alias;
                 if (param1 == 1)
-                    matchData.CacheMap(regMaps.Find(x => x.Value.Map == param2).Value, new UserMapInfo(param2, (sbyte)param5));
+                {
+                    //matchData.CacheMap(regMaps.Find(x => x.Value.Map == param2).Value, new UserMapInfo(param2, (sbyte)param5));
+                    matchData.CacheMap(regMaps.Find(x => x.Value.Map == param2).Value, UserMapInfoManager.Instance.Get(param2));
+                }
                 else
+                {
                     matchData.CacheMapGenerate(param3, param4, alias);
+                }
             }
 
             else
@@ -4411,17 +4419,23 @@ namespace _Emulator
         {
             msgRef.msg._msg.Read(out int slot);
 
-            // replace map if exists
-            // map is saved with updated blocks but empty map if loaded directly after saving a reedited map
-            // saving a map which has been edited before, creates a new empty slot?
-            // slot is 0 when opening an existing map and saving?
-            Debug.LogError(slot);
-
             MatchData matchData = msgRef.matchData;
+            int hashId = slot;
             DateTime time = DateTime.Now;
-            int hashId = MapGenerator.instance.GetHashIdForTime(time);
-            //todo modemask
-            RegMap regMap = new RegMap(hashId, msgRef.client.name + "@Aurora", matchData.cachedUMI.Alias, time, 0, true, false, 0, 0, 0, 0, 0, 0, 0, false);
+
+            RegMap regMap = null;
+
+            if (hashId == 0)
+            {
+                hashId = MapGenerator.instance.GetHashIdForTime(time);
+                //todo ModeMask
+                regMap = new RegMap(hashId, msgRef.client.name + "@Aurora", matchData.cachedUMI.Alias, time, 0, true, false, 0, 0, 0, 0, 0, 0, 0, false);
+                Debug.Log("Generated new Hash");
+            } else
+            {
+                regMap = RegMapManager.Instance.dicRegMap.FirstOrDefault(map => map.Value != null && map.Value.map == hashId).Value;
+                Debug.LogWarning("Saving Map: " + regMap.map);
+            }
 
             Texture2D thumbnail = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
             
@@ -4437,7 +4451,10 @@ namespace _Emulator
                     Debug.LogError("HandleRegisterMapRequest: ChunkedBuffer not finished");
             }
             regMap.Thumbnail = thumbnail;
-            RegMapManager.Instance.Add(regMap);
+            if (slot == 0)
+                RegMapManager.Instance.Add(regMap);
+            else 
+                RegMapManager.Instance.UpdateMap(regMap);
             RegMapManager.Instance.SetThumbnail(regMap.map, thumbnail);
             // It is important that we first add the thumbnail and regmap to the RegMapManager 
             // and then add the map to the User Info Manager
@@ -4480,7 +4497,6 @@ namespace _Emulator
         {
             msgRef.msg._msg.Read(out int opt);
             Debug.LogWarning("SaveCommonOpt: " + opt);
-            MyInfoManager.COMMON_OPT;
         }
 
         public static void UnpackTimerOption(int packed, out int build, out int battle, out int rpt)

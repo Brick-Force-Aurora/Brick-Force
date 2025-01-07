@@ -230,7 +230,16 @@ public class RegMapManager : MonoBehaviour
 		}
 	}
 
-	public bool Del(int map)
+    public void UpdateMap(RegMap regMap)
+    {
+        if (dicRegMap.ContainsKey(regMap.Map))
+        {
+            dicRegMap[regMap.Map] = regMap;
+			Debug.LogError("Map updated");
+        }
+    }
+
+    public bool Del(int map)
 	{
 		if (!dicRegMap.ContainsKey(map))
 		{
