@@ -37,6 +37,17 @@
 - Make sure everyone has the files for the current map loaded.
 - Room master can start the match once every player is ready (you can also start alone).
 
+## Host Via Steam
+- Download the newest [BfLauncher](https://github.com/Brick-Force-Aurora/Launcher/releases).
+- Start it to install the game and receive the newest updates (can be disabled in launcher settings).
+- Download Spacewar (Steam example location for developers) by opening `steam://install/480/` in your browser and installing it.
+- Put your custom username into the regular E-mail text field.
+- Everyone needs to click Steam
+- Host needs to create a Lobby
+- Everyone else should see the lobby pop up, click join
+- If the host clicks leave, the server gets closed.
+- Make sure everyone has the files for the current map loaded.
+
 
 ![](https://i.imgur.com/6ncbt4O.png)
 
@@ -59,6 +70,7 @@
 - F6: Setup Menu
 - F7: Config Menu
 - F8: Debug Console
+- F10: Steam Menu
 
 ## Limitations
 - There are still a lot of bugs, if you encounter any, open an Issue or head to our Discord
