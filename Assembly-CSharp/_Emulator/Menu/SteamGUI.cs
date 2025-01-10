@@ -101,11 +101,10 @@ namespace _Emulator
                         GUILayout.Label("");
                         GUILayout.Label("Members:");
                         lobbyMembersScrollPosition = GUILayout.BeginScrollView(lobbyMembersScrollPosition, false, true);
-                        foreach (var member in SteamLobbyManager.instance.currentLobby.lobbyMembers)
+                        foreach (var member in lobby.lobbyMembers)
                         {
                             if (GUILayout.Button(member.name))
                             {
-                                Debug.Log("Overlay: " + SteamUtils.IsOverlayEnabled());
                                 SteamFriends.ActivateGameOverlayToUser("steamid", member.steamID);
                             }
                         }

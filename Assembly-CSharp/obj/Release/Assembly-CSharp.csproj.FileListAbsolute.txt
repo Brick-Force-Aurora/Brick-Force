@@ -1,2 +1,0 @@
-F:\g\Brick-Force\Brick-Force_2\Assembly-CSharp\obj\Release\Assembly-CSharp.csproj.AssemblyReference.cache
-F:\g\Brick-Force\Brick-Force_2\Assembly-CSharp\obj\Release\Assembly-CSharp.csproj.CoreCompileInputs.cache
