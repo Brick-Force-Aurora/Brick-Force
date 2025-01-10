@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <ProjectGuid>{1EDA9103-BCA4-4E5B-8A4C-56973646003F}</ProjectGuid>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -29,9 +29,13 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
     <OutputPath>..\..\BfLauncher\BrickForce_Data\Managed\</OutputPath>
+    <Prefer32Bit>false</Prefer32Bit>
+    <DefineConstants>
+    </DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
     <OutputPath>..\..\Brick-Force\BrickForce_Data\Managed\</OutputPath>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Accessory.cs" />
@@ -585,7 +589,7 @@
     <Compile Include="SquadMode.cs" />
     <Compile Include="SquadTool.cs" />
     <Compile Include="Stamp.cs" />
-    <Compile Include="SteamManager.cs" />
+    <Compile Include="SteamManager_o.cs" />
     <Compile Include="StreamedLevelLoadibilityChecker.cs" />
     <Compile Include="StringMgr.cs" />
     <Compile Include="Stroking.cs" />
@@ -724,12 +728,13 @@
     <Compile Include="ZombieVirus.cs" />
     <Compile Include="ZombieVsHumanManager.cs" />
     <Compile Include="_Emulator\Config.cs" />
-    <Compile Include="_Emulator\GUI\ConfigGUI.cs" />
-    <Compile Include="_Emulator\GUI\InventoryGUI.cs" />
+    <Compile Include="_Emulator\Menu\ConfigGUI.cs" />
+    <Compile Include="_Emulator\Menu\InventoryGUI.cs" />
+    <Compile Include="_Emulator\Menu\SteamGUI.cs" />
     <Compile Include="_Emulator\Hooks.cs" />
     <Compile Include="_Emulator\Core.cs" />
-    <Compile Include="_Emulator\GUI\MainGUI.cs" />
-    <Compile Include="_Emulator\GUI\DebugConsole.cs" />
+    <Compile Include="_Emulator\Menu\MainGUI.cs" />
+    <Compile Include="_Emulator\Menu\DebugConsole.cs" />
     <Compile Include="_Emulator\JSON\JsonObject.cs" />
     <Compile Include="_Emulator\JSON\JsonReader.cs" />
     <Compile Include="_Emulator\JSON\JsonWriter.cs" />
@@ -737,11 +742,12 @@
     <Compile Include="_Emulator\Network\ChannelManager.cs" />
     <Compile Include="_Emulator\Network\ChannelReference.cs" />
     <Compile Include="_Emulator\Network\ChunkedBuffer.cs" />
-    <Compile Include="_Emulator\Network\PlayerInfo.cs" />
+    <Compile Include="_Emulator\Network\Extension\P2PExtension.cs" />
+    <Compile Include="_Emulator\Network\Extension\P2PExtensionOpcodes.cs" />
     <Compile Include="_Emulator\Network\ShopEmulator.cs" />
-    <Compile Include="_Emulator\Network\ClientExtension.cs" />
+    <Compile Include="_Emulator\Network\Extension\ClientExtension.cs" />
     <Compile Include="_Emulator\Network\ClientReference.cs" />
-    <Compile Include="_Emulator\Network\ExtensionOpcodes.cs" />
+    <Compile Include="_Emulator\Network\Extension\ExtensionOpcodes.cs" />
     <Compile Include="_Emulator\Network\Inventory.cs" />
     <Compile Include="_Emulator\Network\KillLogEntry.cs" />
     <Compile Include="_Emulator\Network\MatchData.cs" />
@@ -749,6 +755,13 @@
     <Compile Include="_Emulator\Network\DummyData.cs" />
     <Compile Include="_Emulator\Network\ServerEmulator.cs" />
     <Compile Include="_Emulator\Network\SlotData.cs" />
+    <Compile Include="_Emulator\Steam\SteamLobbyConstants.cs" />
+    <Compile Include="_Emulator\Steam\SteamLobbyInfo.cs" />
+    <Compile Include="_Emulator\Steam\SteamLobbyManager.cs" />
+    <Compile Include="_Emulator\Steam\SteamLobbyMember.cs" />
+    <Compile Include="_Emulator\Steam\SteamManager.cs" />
+    <Compile Include="_Emulator\Steam\SteamNetworkingChannel.cs" />
+    <Compile Include="_Emulator\Steam\SteamNetworkingManager.cs" />
     <Compile Include="_Emulator\Utils\CRC32.cs" />
     <Compile Include="_Emulator\Utils\Utils.cs" />
     <Compile Include="_Emulator\Utils\Hook.cs" />
@@ -756,9 +769,6 @@
     <Compile Include="_Emulator\Utils\Zip.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Assembly-CSharp">
-      <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\Assembly-CSharp.dll</HintPath>
-    </Reference>
     <Reference Include="Assembly-CSharp-firstpass">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
     </Reference>
@@ -770,6 +780,10 @@
     </Reference>
     <Reference Include="Mono.Security">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\Mono.Security.dll</HintPath>
+    </Reference>
+    <Reference Include="Steamworks.NET, Version=2024.8.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\BfLauncher\Steamworks.NET.dll</HintPath>
     </Reference>
     <Reference Include="System">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\System.dll</HintPath>

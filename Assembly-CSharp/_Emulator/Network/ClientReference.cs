@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Net.Sockets;
+using Steamworks;
 
 namespace _Emulator
 {
@@ -14,9 +15,11 @@ namespace _Emulator
         }
 
         public Socket socket;
-        public byte[] buffer;
         public string ip;
         public int port;
+        public byte[] buffer;
+        public CSteamID steamID = CSteamID.Nil;
+        public bool isSteam = false;
         public float lastHeartBeatTime;
         public string name;
         public int seq;
@@ -54,12 +57,35 @@ namespace _Emulator
             isHost = ServerEmulator.instance.clientList.Count == 0;
             buffer = new byte[8192];
             toleranceTime = 0f;
+            isSteam = false;
+        }
+
+        public ClientReference(CSteamID _steamID, string _name = "", int _seq = -1)
+        {
+            lastHeartBeatTime = float.MaxValue;
+            steamID = _steamID;
+            name = _name;
+            seq = _seq;
+            clientStatus = ClientStatus.Invalid;
+            status = BrickManDesc.STATUS.PLAYER_WAITING;
+            data = new DummyData();
+            isLoaded = false;
+            isHost = ServerEmulator.instance.clientList.Count == 0;
+            buffer = new byte[8192];
+            toleranceTime = 0f;
+            isSteam = true;
         }
 
         public void Disconnect(bool send = true)
         {
-            socket.Shutdown(SocketShutdown.Both);
-            socket.Close();
+            if (isSteam)
+            {
+            }
+            else
+            {
+                socket.Shutdown(SocketShutdown.Both);
+                socket.Close();
+            }
             lock (dataLock)
             {
                 if (matchData != null)
@@ -72,7 +98,10 @@ namespace _Emulator
             if (send)
             {
                 ServerEmulator.instance.SendLeave(this);
-                ServerEmulator.instance.SendSlotData(matchData);
+                if (isSteam)
+                    ServerEmulator.instance.SendSlotDataSteam(matchData);
+                else
+                    ServerEmulator.instance.SendSlotData(matchData);
             }
         }
 
@@ -101,7 +130,10 @@ namespace _Emulator
 
         public string GetIdentifier()
         {
-            return name + "-" + seq + "-" + ip;
+            if (isSteam)
+                return name + "-" + seq + "-" + steamID;
+            else
+                return name + "-" + seq + "-" + ip;
         }
     }
 }

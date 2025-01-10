@@ -57,5 +57,8 @@ namespace _Emulator
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern void OutputDebugString(string lpOutputString);
+
+        [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Ansi)]
+        public static extern IntPtr LoadLibrary([MarshalAs(UnmanagedType.LPStr)] string lpFileName);
     }
 }

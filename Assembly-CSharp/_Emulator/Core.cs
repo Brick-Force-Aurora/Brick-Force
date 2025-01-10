@@ -16,6 +16,10 @@ namespace _Emulator
             ConfigGUI.instance = coreObject.AddComponent<ConfigGUI>();
             DebugConsole.instance = coreObject.AddComponent<DebugConsole>();
             ServerEmulator.instance = coreObject.AddComponent<ServerEmulator>();
+            SteamManager.Instance = coreObject.AddComponent<SteamManager>();
+            SteamLobbyManager.instance = coreObject.AddComponent<SteamLobbyManager>();
+            SteamNetworkingManager.instance = coreObject.AddComponent<SteamNetworkingManager>();
+            SteamGUI.instance = coreObject.AddComponent<SteamGUI>();
             UnityEngine.Object.DontDestroyOnLoad(coreObject);
             Config.instance = new Config();
             SetupBuildConfig();

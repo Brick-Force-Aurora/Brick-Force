@@ -72,7 +72,7 @@ public class AutoLogout : MonoBehaviour
 			{
 				MyInfoManager.Instance.AutoLogin = MyInfoManager.AUTOLOGIN.INFERNUM;
 				string a = CommandInterpreter.ExtractValueFromParameter(parameters, "sitecode", string.Empty).ToLower();
-				if (a == "steam" && !SteamManager.Instance.LoadSteamDll())
+				if (a == "steam" && !SteamManager_o.Instance.LoadSteamDll())
 				{
 					Debug.Log("SteamAPI_Init Failed");
 				}

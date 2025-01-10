@@ -167,7 +167,15 @@ public class MsgBody
 		return Copy(memoryStream.ToArray());
 	}
 
-	public bool Read(out string val)
+    public bool Write(ulong val)
+    {
+        MemoryStream memoryStream = new MemoryStream();
+        BinaryWriter binaryWriter = new BinaryWriter(memoryStream);
+        binaryWriter.Write(val);
+        return Copy(memoryStream.ToArray());
+    }
+
+    public bool Read(out string val)
 	{
 		val = string.Empty;
 		if (!Read(out int val2))
@@ -326,4 +334,20 @@ public class MsgBody
 		val = binaryReader.ReadInt64();
 		return true;
 	}
+
+    public bool Read(out ulong val)
+    {
+        val = 0L;
+        if (_offset + 8 > _buffer.Length)
+        {
+            return false;
+        }
+        MemoryStream memoryStream = new MemoryStream();
+        memoryStream.Write(_buffer, _offset, 8);
+        _offset += 8;
+        memoryStream.Position = 0L;
+        BinaryReader binaryReader = new BinaryReader(memoryStream);
+        val = binaryReader.ReadUInt64();
+        return true;
+    }
 }

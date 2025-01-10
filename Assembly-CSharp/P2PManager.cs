@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using _Emulator;
 using UnityEngine;
 
 public class P2PManager : MonoBehaviour
@@ -199,11 +200,11 @@ public class P2PManager : MonoBehaviour
 
 	private long prevServerTick = 9223372036854775807L;
 
-	private Queue readQueue;
+	public Queue readQueue;
 
 	private ushort reliableIndex;
 
-	private Queue<P2PMsg4Send> queueReliable;
+	public Queue<P2PMsg4Send> queueReliable;
 
 	private ushort processedReliableIndex;
 
@@ -221,7 +222,7 @@ public class P2PManager : MonoBehaviour
 
 	public int remotePort;
 
-	private P2PMsg4Recv recv;
+	public P2PMsg4Recv recv;
 
 	public bool rendezvousPointed;
 
@@ -311,7 +312,7 @@ public class P2PManager : MonoBehaviour
 		prevServerTick = 9223372036854775807L;
 	}
 
-	private void ResetReliables()
+	public void ResetReliables()
 	{
 		reliableIndex = 0;
 		reliableTime = 0f;
@@ -827,7 +828,7 @@ public class P2PManager : MonoBehaviour
 
 	private void Update()
 	{
-		if (sock != null && recv != null && readQueue != null)
+		if (((P2PExtension.instance.isSteam && P2PExtension.instance.listenSteam) || sock != null) && recv != null && readQueue != null)
 		{
 			Handshake();
 			CheckP2pingDone();
@@ -869,6 +870,7 @@ public class P2PManager : MonoBehaviour
 					flag = true;
 					if (flag)
 					{
+						if (!P2PExtension.instance.HandleMessage(p2PMsg2Handle))
                         switch (p2PMsg2Handle._id)
 						{
 						case 26:

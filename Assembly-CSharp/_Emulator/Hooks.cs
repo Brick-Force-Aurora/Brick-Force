@@ -5,6 +5,10 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 using System.IO;
+using System.Net.Sockets;
+using System.Net;
+using static Brick;
+using Steamworks;
 
 namespace _Emulator
 {
@@ -14,8 +18,8 @@ namespace _Emulator
         static MethodInfo hP2PManagerHandshakeInfo = typeof(Hooks).GetMethod("hP2PManagerHandshake", BindingFlags.NonPublic | BindingFlags.Instance);
         static Hook P2PManagerHandshakeHook;
 
-		static MethodInfo oSockTcpGetSendKeyInfo = typeof(SockTcp).GetMethod("GetSendKey", BindingFlags.NonPublic | BindingFlags.Instance);
-		static MethodInfo hSockTcpGetSendKeyInfo = typeof(Hooks).GetMethod("hSockTcpGetSendKey", BindingFlags.NonPublic | BindingFlags.Instance);
+		static MethodInfo oSockTcpGetSendKeyInfo = typeof(SockTcp).GetMethod("GetSendKey", BindingFlags.Public | BindingFlags.Instance);
+		static MethodInfo hSockTcpGetSendKeyInfo = typeof(Hooks).GetMethod("hSockTcpGetSendKey", BindingFlags.Public | BindingFlags.Instance);
 		static Hook SockTcpGetSendKeyHook;
 
 		static MethodInfo oSockTcpEnterAckInfo = typeof(SockTcp).GetMethod("HandleCS_ENTER_ACK", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -70,6 +74,14 @@ namespace _Emulator
         static MethodInfo hSockTcpSaveMapReqInfo = typeof(Hooks).GetMethod("hSockTcpSaveMapReq", BindingFlags.Public | BindingFlags.Instance);
         static Hook SockTcpSaveMapReqHook;
 
+        static MethodInfo oSockTcpSayInfo = typeof(SockTcp).GetMethod("Say", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hSockTcpSayInfo = typeof(Hooks).GetMethod("hSockTcpSay", BindingFlags.Public | BindingFlags.Instance);
+        static Hook SockTcpSayHook;
+
+        static MethodInfo oSockTcpIsConnectedInfo = typeof(SockTcp).GetMethod("IsConnected", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hSockTcpIsConnectedInfo = typeof(Hooks).GetMethod("hSockTcpIsConnected", BindingFlags.Public | BindingFlags.Instance);
+        static Hook SockTcpIsConnectedHook;
+
         static MethodInfo oMyInfoManagerSetItemUsageInfo = typeof(MyInfoManager).GetMethod("SetItemUsage", BindingFlags.Public | BindingFlags.Instance);
 		static MethodInfo hMyInfoManagerSetItemUsageInfo = typeof(Hooks).GetMethod("hMyInfoManagerSetItemUsage", BindingFlags.Public | BindingFlags.Instance);
 		static Hook MyInfoManagerSetItemUsageHook;
@@ -78,11 +90,35 @@ namespace _Emulator
 		static MethodInfo hApplicationQuitInfo = typeof(Hooks).GetMethod("hApplicationQuit", BindingFlags.Public | BindingFlags.Static);
 		static Hook ApplicationQuitHook;
 
-		private void hP2PManagerHandshake()
+        static MethodInfo oBuildOptionExitInfo = typeof(BuildOption).GetMethod("Exit", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hBuildOptionExitInfo = typeof(Hooks).GetMethod("hBuildOptionExit", BindingFlags.Public | BindingFlags.Instance);
+        static Hook BuildOptionExitHook;
+
+        static MethodInfo oP2PManagerSendPEER_RELIABLE_ACKInfo = typeof(P2PManager).GetMethod("SendPEER_RELIABLE_ACK", BindingFlags.NonPublic| BindingFlags.Instance);
+        static MethodInfo hP2PManagerSendPEER_RELIABLE_ACKInfo = typeof(Hooks).GetMethod("hP2PManagerSendPEER_RELIABLE_ACK", BindingFlags.NonPublic | BindingFlags.Instance);
+        static Hook P2PManagerSendPEER_RELIABLE_ACKHook;
+
+        static MethodInfo oP2PManagerSendReliableInfo = typeof(P2PManager).GetMethod("SendReliable", BindingFlags.NonPublic | BindingFlags.Instance);
+        static MethodInfo hP2PManagerSendReliableInfo = typeof(Hooks).GetMethod("hP2PManagerSendReliable", BindingFlags.NonPublic | BindingFlags.Instance);
+        static Hook P2PManagerSendReliableHook;
+
+        static MethodInfo oP2PManagerSayInfo = typeof(P2PManager).GetMethod("Say", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hP2PManagerSayInfo = typeof(Hooks).GetMethod("hP2PManagerSay", BindingFlags.Public | BindingFlags.Instance);
+        static Hook P2PManagerSayHook;
+
+        static MethodInfo oP2PManagerWhisperInfo = typeof(P2PManager).GetMethod("Whisper", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hP2PManagerWhisperInfo = typeof(Hooks).GetMethod("hP2PManagerWhisper", BindingFlags.Public | BindingFlags.Instance);
+        static Hook P2PManagerWhisperHook;
+
+        static MethodInfo oP2PManagerSendPEER_LEAVEInfo = typeof(P2PManager).GetMethod("SendPEER_LEAVE", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hP2PManagerSendPEER_LEAVEInfo = typeof(Hooks).GetMethod("hP2PManagerSendPEER_LEAVE", BindingFlags.Public | BindingFlags.Instance);
+        static Hook P2PManagerSendPEER_LEAVEHook;
+
+        private void hP2PManagerHandshake()
         {
-			if (MyInfoManager.Instance.Status == 3 || MyInfoManager.Instance.Status == 4)
+            if (MyInfoManager.Instance.Status == 3 || MyInfoManager.Instance.Status == 4)
 			{
-				bool flag = false;
+                bool flag = false;
 				P2PManager.Instance.handshakeTime += Time.deltaTime;
 				if (P2PManager.Instance.handshakeTime > 0.1f)
 				{
@@ -96,20 +132,28 @@ namespace _Emulator
 					{
 						if (flag)
 						{
-							P2PManager.Instance.SendPEER_PRIVATE_HAND(peer.Value.LocalIp, peer.Value.LocalPort);
-							if (P2PManager.Instance.OutputDebug)
+							if (P2PExtension.instance.isSteam)
 							{
-								Debug.Log("SendPEER_PRIVATE_HAND to " + peer.Value.Seq.ToString());
-								Debug.Log("addr: " + peer.Value.LocalIp);
-								Debug.Log("port: " + peer.Value.LocalPort.ToString());
-							}
-							P2PManager.Instance.SendPEER_PUBLIC_HAND(peer.Value.RemoteIp, peer.Value.RemotePort);
-							if (P2PManager.Instance.OutputDebug)
-							{
-								Debug.Log("SendPEER_PUBLIC_HAND to " + peer.Value.Seq.ToString());
-								Debug.Log("addr: " + peer.Value.RemoteIp);
-								Debug.Log("port: " + peer.Value.RemotePort.ToString());
-							}
+								P2PExtension.instance.SendPeerPrivateHandSteam(peer.Value.steamID);
+                                P2PExtension.instance.SendPeerPublicHandSteam(peer.Value.steamID);
+                            }
+                            else
+                            {
+                                P2PManager.Instance.SendPEER_PRIVATE_HAND(peer.Value.LocalIp, peer.Value.LocalPort);
+                                if (P2PManager.Instance.OutputDebug)
+                                {
+                                    Debug.Log("SendPEER_PRIVATE_HAND to " + peer.Value.Seq.ToString());
+                                    Debug.Log("addr: " + peer.Value.LocalIp);
+                                    Debug.Log("port: " + peer.Value.LocalPort.ToString());
+                                }
+                                P2PManager.Instance.SendPEER_PUBLIC_HAND(peer.Value.RemoteIp, peer.Value.RemotePort);
+                                if (P2PManager.Instance.OutputDebug)
+                                {
+                                    Debug.Log("SendPEER_PUBLIC_HAND to " + peer.Value.Seq.ToString());
+                                    Debug.Log("addr: " + peer.Value.RemoteIp);
+                                    Debug.Log("port: " + peer.Value.RemotePort.ToString());
+                                }
+                            }
 						}
 						peer.Value.Update();
 					}
@@ -117,7 +161,7 @@ namespace _Emulator
 			}
 		}
 
-		private byte hSockTcpGetSendKey()
+		public byte hSockTcpGetSendKey()
 		{
 			return byte.MaxValue;
 		}
@@ -178,7 +222,7 @@ namespace _Emulator
 
 		private void hSockTcpRendezvousInfoAck(MsgBody msg)
 		{
-			msg.Read(out int _);
+			msg.Read(out int val1);
 			msg.Read(out string val2);
 			msg.Read(out int val3);
 			P2PManager.Instance.Bootup(val2, val3);
@@ -366,6 +410,11 @@ namespace _Emulator
 
 		public static void hApplicationQuit()
 		{
+			if (ClientExtension.instance.isSteam)
+			{
+                SteamLobbyManager.instance.LeaveCurrentLobby();
+            }
+
 			if (ServerEmulator.instance.serverCreated)
 			{
 				ServerEmulator.instance.ShutdownInit();
@@ -379,7 +428,37 @@ namespace _Emulator
 			ApplicationQuitHook.CallOriginal(null, null);
 		}
 
-		public void hSockTcpRegisterReq(int slot, ushort modeMask, int regHow, int point, int downloadFee, byte[] thumbnail, string msgEval)
+        public void hBuildOptionExit()
+        {
+            if (ClientExtension.instance.isSteam)
+            {
+                if (ServerEmulator.instance.serverCreated)
+                {
+                    try
+                    {
+                        ServerEmulator.instance.ShutdownInit();
+                        ServerEmulator.instance.ShutdownFinally();
+                    }
+                    catch { }
+                }
+
+                else
+                {
+                    try
+                    {
+                        ClientExtension.instance.SendDisconnect();
+                    }
+                    catch { }
+                }
+
+                SteamNetworkingManager.instance.EndReceive();
+                SteamLobbyManager.instance.LeaveCurrentLobby();
+            }
+
+            BuildOptionExitHook.CallOriginal(BuildOption.Instance, null);
+        }
+
+        public void hSockTcpRegisterReq(int slot, ushort modeMask, int regHow, int point, int downloadFee, byte[] thumbnail, string msgEval)
 		{
 			ClientExtension.instance.SendBeginChunkedBuffer(ExtensionOpcodes.opChunkedBufferThumbnailReq, thumbnail);
 
@@ -400,6 +479,203 @@ namespace _Emulator
             MsgBody msgBody = new MsgBody();
             msgBody.Write(slot);
             CSNetManager.Instance.Sock.Say(39, msgBody);
+        }
+
+		public void hSockTcpSay(ushort id, MsgBody msgBody)
+		{
+            Msg4Send msg4Send = new Msg4Send(id, uint.MaxValue, uint.MaxValue, msgBody, CSNetManager.Instance.Sock.GetSendKey());
+
+			if (ClientExtension.instance.isSteam)
+			{
+				SteamNetworkingManager.instance.SendMessageToHost(msg4Send);
+			}
+
+            else if (CSNetManager.Instance.Sock._writeQueue != null)
+            {
+                lock (this)
+                {
+                    if (CSNetManager.Instance.Sock._writeQueue.Count > 0)
+                    {
+                        CSNetManager.Instance.Sock._writeQueue.Enqueue(msg4Send);
+                    }
+                    else
+                    {
+                        CSNetManager.Instance.Sock._writeQueue.Enqueue(msg4Send);
+                        try
+                        {
+							if (CSNetManager.Instance.Sock._sock != null)
+                                CSNetManager.Instance.Sock._sock.BeginSend(msg4Send.Buffer, 0, msg4Send.Buffer.Length, SocketFlags.None, CSNetManager.Instance.Sock.SendCallback, null);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogError("Error, " + ex.Message.ToString());
+                            CSNetManager.Instance.Sock.Close();
+                        }
+                    }
+                }
+            }
+        }
+
+        public bool hSockTcpIsConnected()
+        {
+            if (ClientExtension.instance.isSteam)
+                return true;
+
+            if (CSNetManager.Instance.Sock._sock == null)
+            {
+                return false;
+            }
+
+            return CSNetManager.Instance.Sock._sock.Connected;
+        }
+
+        private void hP2PManagerSendPEER_RELIABLE_ACK(uint reliable)
+        {
+			if (P2PExtension.instance.isSteam)
+			{
+				P2PMsgBody p2PMsgBody = new P2PMsgBody();
+				p2PMsgBody.Write(reliable);
+                P2PManager.Instance.Say(27, p2PMsgBody);
+			}
+
+			else
+			{
+				P2PMsgBody p2PMsgBody = new P2PMsgBody();
+				p2PMsgBody.Write(reliable);
+				P2PMsg4Send p2PMsg4Send = new P2PMsg4Send(27, ushort.MaxValue, P2PManager.Seq2Slot((uint)MyInfoManager.Instance.Seq), byte.MaxValue, p2PMsgBody, byte.MaxValue);
+
+				IPEndPoint iPEndPoint = new IPEndPoint(IPAddress.Parse(P2PManager.Instance.rendezvousIp), P2PManager.Instance.rendezvousPort);
+				if (iPEndPoint != null && p2PMsg4Send != null)
+				{
+					P2PManager.Instance.sock.SendTo(p2PMsg4Send.Buffer, p2PMsg4Send.Buffer.Length, SocketFlags.None, iPEndPoint);
+				}
+			}
+        }
+
+        private void hP2PManagerSendReliable()
+        {
+            if (P2PExtension.instance.isSteam)
+            {
+                //Debug.LogError("P2PManager.SendReliable during Steam P2P");
+                return;
+            }
+
+            if (P2PManager.Instance.sock != null && P2PManager.Instance.queueReliable != null && P2PManager.Instance.queueReliable.Count > 0)
+            {
+                P2PMsg4Send p2PMsg4Send = P2PManager.Instance.queueReliable.Peek();
+                IPEndPoint iPEndPoint = new IPEndPoint(IPAddress.Parse(P2PManager.Instance.rendezvousIp), P2PManager.Instance.rendezvousPort);
+                if (iPEndPoint != null && p2PMsg4Send != null)
+                {
+                    P2PManager.Instance.sock.SendTo(p2PMsg4Send.Buffer, p2PMsg4Send.Buffer.Length, SocketFlags.None, iPEndPoint);
+                }
+            }
+        }
+
+        public void hP2PManagerSay(byte id, P2PMsgBody mb)
+        {
+            try
+            {
+				if (P2PExtension.instance.isSteam)
+				{
+                    foreach (KeyValuePair<int, Peer> item in P2PManager.Instance.dic)
+					{
+                        if (item.Value.P2pStatus != 0)
+						{
+                            var p2PMsg4Send = new P2PMsg4Send(id, ushort.MaxValue, P2PManager.Seq2Slot((uint)MyInfoManager.Instance.Seq), P2PManager.Seq2Slot((uint)item.Key), mb, byte.MaxValue);
+							SteamNetworkingManager.instance.SendMessageToPeer(item.Value.steamID, p2PMsg4Send);
+                        }
+					}
+				}
+
+				else
+				{
+					bool flag = false;
+					foreach (KeyValuePair<int, Peer> item in P2PManager.Instance.dic)
+					{
+						if (item.Value.P2pStatus != 0)
+						{
+							P2PMsg4Send p2PMsg4Send = null;
+							IPEndPoint iPEndPoint = null;
+							if (item.Value.P2pStatus == Peer.P2P_STATUS.PRIVATE)
+							{
+								p2PMsg4Send = new P2PMsg4Send(id, ushort.MaxValue, P2PManager.Seq2Slot((uint)MyInfoManager.Instance.Seq), P2PManager.Seq2Slot((uint)item.Key), mb, byte.MaxValue);
+								iPEndPoint = new IPEndPoint(IPAddress.Parse(item.Value.LocalIp), item.Value.LocalPort);
+							}
+							else if (item.Value.P2pStatus == Peer.P2P_STATUS.PUBLIC)
+							{
+								p2PMsg4Send = new P2PMsg4Send(id, ushort.MaxValue, P2PManager.Seq2Slot((uint)MyInfoManager.Instance.Seq), P2PManager.Seq2Slot((uint)item.Key), mb, byte.MaxValue);
+								iPEndPoint = new IPEndPoint(IPAddress.Parse(item.Value.RemoteIp), item.Value.RemotePort);
+							}
+							else if (!flag)
+							{
+								flag = true;
+								p2PMsg4Send = new P2PMsg4Send(id, ushort.MaxValue, P2PManager.Seq2Slot((uint)MyInfoManager.Instance.Seq), byte.MaxValue, mb, byte.MaxValue);
+								iPEndPoint = new IPEndPoint(IPAddress.Parse(P2PManager.Instance.rendezvousIp), P2PManager.Instance.rendezvousPort);
+							}
+							if (iPEndPoint != null && p2PMsg4Send != null)
+							{
+								P2PManager.Instance.sock.SendTo(p2PMsg4Send.Buffer, p2PMsg4Send.Buffer.Length, SocketFlags.None, iPEndPoint);
+							}
+						}
+					}
+                }
+            }
+            catch (SocketException ex)
+            {
+                Debug.LogError("Error, " + ex.Message.ToString() + " : P2PManager.Say");
+            }
+        }
+
+        public void hP2PManagerWhisper(int to, byte id, P2PMsgBody mb)
+        {
+            if (P2PManager.Instance.dic.ContainsKey(to) && P2PManager.Instance.dic[to].P2pStatus != 0)
+            {
+                try
+                {
+                    P2PMsg4Send p2PMsg4Send = new P2PMsg4Send(id, ushort.MaxValue, P2PManager.Seq2Slot((uint)MyInfoManager.Instance.Seq), P2PManager.Seq2Slot((uint)to), mb, byte.MaxValue);
+					if (P2PExtension.instance.isSteam)
+					{
+                        SteamNetworkingManager.instance.SendMessageToPeer(P2PManager.Instance.dic[to].steamID, p2PMsg4Send);
+                    }
+
+					else
+					{
+						IPEndPoint iPEndPoint = null;
+						iPEndPoint = ((P2PManager.Instance.dic[to].P2pStatus == Peer.P2P_STATUS.PRIVATE) ? new IPEndPoint(IPAddress.Parse(P2PManager.Instance.dic[to].LocalIp), P2PManager.Instance.dic[to].LocalPort) : ((P2PManager.Instance.dic[to].P2pStatus != Peer.P2P_STATUS.PUBLIC) ? new IPEndPoint(IPAddress.Parse(P2PManager.Instance.rendezvousIp), P2PManager.Instance.rendezvousPort) : new IPEndPoint(IPAddress.Parse(P2PManager.Instance.dic[to].RemoteIp), P2PManager.Instance.dic[to].RemotePort)));
+						P2PManager.Instance.sock.SendTo(p2PMsg4Send.Buffer, p2PMsg4Send.Buffer.Length, SocketFlags.None, iPEndPoint);
+					}
+                }
+                catch (SocketException ex)
+                {
+                    Debug.LogError("Error, " + ex.Message.ToString() + " : P2PManager.Whisper");
+                }
+            }
+        }
+
+		public void hP2PManagerSendPEER_LEAVE()
+        {
+            if (P2PExtension.instance.isSteam)
+            {
+                P2PMsgBody p2PMsgBody = new P2PMsgBody();
+                p2PMsgBody.Write(MyInfoManager.Instance.Seq);
+				P2PManager.Instance.Say(67, p2PMsgBody);
+            }
+
+            else if (P2PManager.Instance.sock != null)
+            {
+                try
+                {
+                    P2PMsgBody p2PMsgBody = new P2PMsgBody();
+                    p2PMsgBody.Write(MyInfoManager.Instance.Seq);
+                    P2PMsg4Send p2PMsg4Send = new P2PMsg4Send(67, ushort.MaxValue, P2PManager.Seq2Slot((uint)MyInfoManager.Instance.Seq), byte.MaxValue, p2PMsgBody, byte.MaxValue);
+                    IPEndPoint remote_end = new IPEndPoint(IPAddress.Parse(P2PManager.Instance.rendezvousIp), P2PManager.Instance.rendezvousPort);
+                    P2PManager.Instance.sock.SendTo(p2PMsg4Send.Buffer, p2PMsg4Send.Buffer.Length, SocketFlags.None, remote_end);
+                }
+                catch (SocketException ex)
+                {
+                    Debug.LogError("Error, " + ex.Message.ToString() + " : P2PManager.RandezvousPing");
+                }
+            }
         }
 
         public static void Initialize()
@@ -436,8 +712,24 @@ namespace _Emulator
 			SockTcpRegisterReqHook.ApplyHook();
             SockTcpSaveMapReqHook = new Hook(oSockTcpSaveMapReqInfo, hSockTcpSaveMapReqInfo);
             SockTcpSaveMapReqHook.ApplyHook();
+            SockTcpSayHook = new Hook(oSockTcpSayInfo, hSockTcpSayInfo);
+            SockTcpSayHook.ApplyHook();
+            SockTcpIsConnectedHook = new Hook(oSockTcpIsConnectedInfo, hSockTcpIsConnectedInfo);
+            SockTcpIsConnectedHook.ApplyHook();
             ApplicationQuitHook = new Hook(oApplicationQuitInfo, hApplicationQuitInfo);
 			ApplicationQuitHook.ApplyHook();
-		}
+            BuildOptionExitHook = new Hook(oBuildOptionExitInfo, hBuildOptionExitInfo);
+            BuildOptionExitHook.ApplyHook();
+            P2PManagerSendPEER_RELIABLE_ACKHook = new Hook(oP2PManagerSendPEER_RELIABLE_ACKInfo, hP2PManagerSendPEER_RELIABLE_ACKInfo);
+            P2PManagerSendPEER_RELIABLE_ACKHook.ApplyHook();
+            P2PManagerSendReliableHook = new Hook(oP2PManagerSendReliableInfo, hP2PManagerSendReliableInfo);
+            P2PManagerSendReliableHook.ApplyHook();
+            P2PManagerSayHook = new Hook(oP2PManagerSayInfo, hP2PManagerSayInfo);
+            P2PManagerSayHook.ApplyHook();
+            P2PManagerWhisperHook = new Hook(oP2PManagerWhisperInfo, hP2PManagerWhisperInfo);
+            P2PManagerWhisperHook.ApplyHook();
+            P2PManagerSendPEER_LEAVEHook = new Hook(oP2PManagerSendPEER_LEAVEInfo, hP2PManagerSendPEER_LEAVEInfo);
+            P2PManagerSendPEER_LEAVEHook.ApplyHook();
+        }
     }
 }

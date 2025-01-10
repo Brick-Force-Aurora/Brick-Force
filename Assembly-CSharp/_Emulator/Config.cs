@@ -38,6 +38,7 @@ namespace _Emulator
                     { "debug_handle", ServerEmulator.instance.debugHandle },
                     { "debug_send", ServerEmulator.instance.debugSend },
                     { "debug_ping", ServerEmulator.instance.debugPing },
+                    { "debug_steam", SteamManager.debug },
                     { "crosshair_r", crosshairColor.r },
                     { "crosshair_g", crosshairColor.g },
                     { "crosshair_b", crosshairColor.b },
@@ -71,6 +72,7 @@ namespace _Emulator
             ServerEmulator.instance.debugHandle = configData.Get<bool>("debug_handle");
             ServerEmulator.instance.debugSend = configData.Get<bool>("debug_send");
             ServerEmulator.instance.debugPing = configData.Get<bool>("debug_ping");
+            SteamManager.debug = configData.Get<bool>("debug_steam");
             crosshairColor.r = configData.Get<float>("crosshair_r");
             crosshairColor.g = configData.Get<float>("crosshair_g");
             crosshairColor.b = configData.Get<float>("crosshair_b");
@@ -84,6 +86,8 @@ namespace _Emulator
             autoClearDeadClients = configData.Get<bool>("auto_clear_dead_clients");
             maxConnections = configData.Get<int>("max_connections");
             ApplyUskTextures();
+            ApplyAxisRatio();
+            ApplyCrosshairHue();
         }
 
         public void ApplyAxisRatio()
