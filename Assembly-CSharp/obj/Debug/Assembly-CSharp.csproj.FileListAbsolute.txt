@@ -11,3 +11,4 @@ F:\g\Brick-Force\Brick-Force_2\Assembly-CSharp\obj\Debug\Assembly-CSharp.pdb
 F:\g\Brick-Force\BfLauncher\BrickForce_Data\Managed\Assembly-CSharp.dll
 F:\g\Brick-Force\BfLauncher\BrickForce_Data\Managed\Assembly-CSharp.pdb
 F:\g\Brick-Force\Brick-Force_2\Assembly-CSharp\obj\Debug\Assembly.44154EF1.Up2Date
+C:\Users\Jan\Documents\GitHub\BfLauncher\BrickForce_Data\Managed\Assembly-CSharp.dll

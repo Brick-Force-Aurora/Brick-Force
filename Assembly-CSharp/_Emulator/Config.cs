@@ -68,23 +68,23 @@ namespace _Emulator
                 configData = jsonReader.ReadObject();
             }
 
-            ClientExtension.instance.hostIP = configData.Get<string>("host_ip");
-            ServerEmulator.instance.debugHandle = configData.Get<bool>("debug_handle");
-            ServerEmulator.instance.debugSend = configData.Get<bool>("debug_send");
-            ServerEmulator.instance.debugPing = configData.Get<bool>("debug_ping");
-            SteamManager.debug = configData.Get<bool>("debug_steam");
-            crosshairColor.r = configData.Get<float>("crosshair_r");
-            crosshairColor.g = configData.Get<float>("crosshair_g");
-            crosshairColor.b = configData.Get<float>("crosshair_b");
+            ClientExtension.instance.hostIP = configData.Get<string>("host_ip", "");
+            ServerEmulator.instance.debugHandle = configData.Get<bool>("debug_handle", false);
+            ServerEmulator.instance.debugSend = configData.Get<bool>("debug_send", false);
+            ServerEmulator.instance.debugPing = configData.Get<bool>("debug_ping", false);
+            SteamManager.debug = configData.Get<bool>("debug_steam", false);
+            crosshairColor.r = configData.Get<float>("crosshair_r", 0.0f);
+            crosshairColor.g = configData.Get<float>("crosshair_g", 1.0f);
+            crosshairColor.b = configData.Get<float>("crosshair_b", 0.0f);
             Utils.RGBToHSV(crosshairColor, out float H, out float S, out float V);
             crosshairHue = H * 360f;
-            uskTextures = configData.Get<bool>("usk_textures");
+            uskTextures = configData.Get<bool>("usk_textures", false);
             oldUskTextures = !uskTextures;
-            axisRatio = configData.Get<float>("axis_ratio");
-            oneClientPerIP = configData.Get<bool>("one_client_per_ip");
-            blockConnections = configData.Get<bool>("block_connections");
-            autoClearDeadClients = configData.Get<bool>("auto_clear_dead_clients");
-            maxConnections = configData.Get<int>("max_connections");
+            axisRatio = configData.Get<float>("axis_ratio", 2.25f);
+            oneClientPerIP = configData.Get<bool>("one_client_per_ip", true);
+            blockConnections = configData.Get<bool>("block_connections", false);
+            autoClearDeadClients = configData.Get<bool>("auto_clear_dead_clients", false);
+            maxConnections = configData.Get<int>("max_connections", 16);
             ApplyUskTextures();
             ApplyAxisRatio();
             ApplyCrosshairHue();
