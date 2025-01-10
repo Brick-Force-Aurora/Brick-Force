@@ -38,7 +38,7 @@
 - To join an existing lobby with at least one open slot, hit 'Join' on the right of a lobby entry.
 - If the host disconnects or leaves, the server and lobby get closed.
 - Ingame player names are determined by the Steam names.
-- While in a lobby, it can be left by clicking 'Leave' in the 'Manage Steam Lobby' window (recommended way of leaving)
+- While in a lobby, it can be left by clicking 'Leave' in the 'Manage Steam Lobby' window (recommended way of leaving).
 - 'Manage Steam Lobby' window also contains a list of players in the current lobby. Clicking on a name will open the respective Steam profile.
 - After connecting, click Play to proceed to the main menu and create a room (others may need to refresh the room list in order to join).
 - Make sure everyone has the files for the current map in their BrickForce_Data\Resources\Cache folder.
