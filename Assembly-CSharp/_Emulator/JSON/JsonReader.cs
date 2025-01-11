@@ -8,10 +8,8 @@ using UnityEngine;
 namespace _Emulator.JSON
 {
     /*
-     * This is a JSON Reader class, this class only supports the following datatypes:
-     * String, Boolean, Float, Integer, Null
-     * This JSON implementation can currently not use any arrays.
-     * This JSON implementation can currently not use any nested objects.
+     * This is a JSON Reader class, this class supports the following datatypes:
+     * String, Boolean, Float, Integer, Null, Arrays, Nested Objects
      */
     class JsonReader
     {
@@ -22,26 +20,72 @@ namespace _Emulator.JSON
             _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         }
 
-        public JsonObject ReadObject()
+        public T ReadObject<T>() where T : class, new()
         {
-            var result = new JsonObject();
-            string line;
-            while ((line = _reader.ReadLine()) != null)
+            T result = new T();
+
+            if (result is JsonObject jsonObject)
             {
-                line = line.Trim();
-                if (string.IsNullOrEmpty(line) || line.StartsWith("#") || line.StartsWith("{") || line.StartsWith("}")) // Skip empty lines or comments
-                    continue;
+                string line;
+                while ((line = _reader.ReadLine()) != null)
+                {
+                    line = line.Trim();
+                    if (string.IsNullOrEmpty(line) || line.StartsWith("#") || line.StartsWith("{") || line.StartsWith("}")) // Skip empty lines or comments
+                        continue;
 
-                int separatorIndex = line.IndexOf(":");
-                if (separatorIndex < 0)
-                    throw new FormatException("Invalid format: Missing ':' separator.");
+                    int separatorIndex = line.IndexOf(":");
+                    if (separatorIndex < 0)
+                        throw new FormatException("Invalid format: Missing ':' separator.");
 
-                string key = ParseKey(line.Substring(0, separatorIndex));
-                object value = ParseValue(line.Substring(separatorIndex + 1).Trim());
-                result.Add(key, value);
+                    string key = ParseKey(line.Substring(0, separatorIndex));
+                    object value = ParseValue(line.Substring(separatorIndex + 1).Trim());
+                    jsonObject.Add(key, value);
+                }
+
+                return result;
             }
-            return result;
+            else if (result is JsonArray jsonArray)
+            {
+                string line;
+                while ((line = _reader.ReadLine()) != null)
+                {
+                    line = line.Trim();
+                    if (string.IsNullOrEmpty(line) || line.StartsWith("#") || line.StartsWith("[") || line.StartsWith("]")) // Skip comments or start/end of array
+                        continue;
+
+                    if (line.StartsWith("{"))
+                    {
+                        // Parse nested JsonObject
+                        StringBuilder nestedObjectBuilder = new StringBuilder();
+                        nestedObjectBuilder.AppendLine(line); // Add the opening brace
+
+                        while ((line = _reader.ReadLine()) != null)
+                        {
+                            line = line.Trim();
+                            nestedObjectBuilder.AppendLine(line);
+
+                            if (line.StartsWith("}")) // End of JsonObject
+                                break;
+                        }
+
+                        using (var nestedReader = new StringReader(nestedObjectBuilder.ToString()))
+                        {
+                            var nestedJsonReader = new JsonReader(nestedReader);
+                            JsonObject nestedObject = nestedJsonReader.ReadObject<JsonObject>();
+                            jsonArray.Add(nestedObject);
+                        }
+                    }
+                }
+
+                return result;
+            }
+            else
+            {
+                throw new InvalidOperationException($"Unsupported type: {typeof(T).Name}");
+            }
         }
+
+
 
         private string ParseKey(string value)
         {
@@ -50,7 +94,20 @@ namespace _Emulator.JSON
 
         private object ParseValue(string value)
         {
-            if (value.StartsWith("\"") && value.EndsWith("\"")) // String
+            if (value.EndsWith(","))
+            {
+                value = value.Substring(0, value.Length - 1);
+            }
+
+            if (value.StartsWith("[") && value.EndsWith("]")) // JSON Array
+            {
+                return ParseArray(value);
+            }
+            else if (value.StartsWith("{") && value.EndsWith("}")) // Nested JSON Object
+            {
+                return ParseNestedObject(value);
+            }
+            else if (value.StartsWith("\"") && value.EndsWith("\"")) // String
             {
                 return value.Substring(1, value.Length - 2);
             }
@@ -74,6 +131,64 @@ namespace _Emulator.JSON
             {
                 throw new FormatException("Unsupported value type: " + value);
             }
+        }
+
+        private JsonArray ParseArray(string value)
+        {
+            var jsonArray = new JsonArray();
+            // Remove the square brackets
+            value = value.Substring(1, value.Length - 2).Trim();
+
+            var elements = SplitJsonArrayElements(value);
+            foreach (var element in elements)
+            {
+                jsonArray.Add((JsonObject)ParseValue(element.Trim()));
+            }
+
+            return jsonArray;
+        }
+
+        private JsonObject ParseNestedObject(string value)
+        {
+            var nestedReader = new StringReader(value);
+            var nestedJsonReader = new JsonReader(nestedReader);
+            return nestedJsonReader.ReadObject<JsonObject>();
+        }
+
+        private List<string> SplitJsonArrayElements(string value)
+        {
+            var elements = new List<string>();
+            var currentElement = new StringBuilder();
+            int depth = 0;
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+
+                if (c == '[' || c == '{')
+                {
+                    depth++;
+                }
+                else if (c == ']' || c == '}')
+                {
+                    depth--;
+                }
+                else if (c == ',' && depth == 0)
+                {
+                    elements.Add(currentElement.ToString());
+                    currentElement = new StringBuilder();
+                    continue;
+                }
+
+                currentElement.Append(c);
+            }
+
+            if (currentElement.Length > 0)
+            {
+                elements.Add(currentElement.ToString());
+            }
+
+            return elements;
         }
     }
 }

@@ -51,5 +51,94 @@ namespace _Emulator.JSON
         {
             return GetEnumerator();
         }
+
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\n");
+            int count = 0;
+            foreach (var kvp in _data)
+            {
+                Serialize(sb, kvp);
+
+                if (count < _data.Count - 1)
+                {
+                    sb.Append(",\n");
+                } else if (count == _data.Count -1)
+                {
+                    sb.Append("\n");
+                }
+                count++;
+            }
+            sb.Append("}");
+            return sb.ToString();
+        }
+
+        public string ToString(string prefix)
+        {
+            var sb = new StringBuilder();
+            sb.Append(prefix + "{\n");
+            int count = 0;
+            foreach (var kvp in _data)
+            {
+                Serialize(sb, kvp, prefix);
+
+                if (count < _data.Count - 1)
+                {
+                    sb.Append(",\n");
+                }
+                else if (count == _data.Count - 1)
+                {
+                    sb.Append("\n");
+                }
+                count++;
+            }
+            sb.Append(prefix + "}");
+            return sb.ToString();
+        }
+
+        public void Serialize(StringBuilder sb, KeyValuePair<string, object> kvp, string prefix = "")
+        {
+            sb.Append($"{prefix}\t\"{kvp.Key}\": ");
+            if (kvp.Value is string)
+            {
+                sb.Append($"\"{kvp.Value}\"");
+            }
+            else if (kvp.Value is JsonObject)
+            {
+                JsonObject val = (JsonObject)kvp.Value;
+                sb.Append(val.ToString("\t"));
+            }
+            else if (kvp.Value is JsonArray)
+            {
+                JsonArray val = (JsonArray)kvp.Value;
+                sb.Append(val.ToString("\t"));
+            }
+            else if (kvp.Value is bool)
+            {
+                sb.Append(kvp.Value.ToString().ToLower());
+            }
+            else if (kvp.Value is float || kvp.Value is double)
+            {
+                string value = kvp.Value.ToString();
+                if (!value.Contains("."))
+                {
+                    value += ".0"; // Add .0 if not present
+                }
+                sb.Append(value);
+            }
+            else if (kvp.Value is Item.USAGE)
+            {
+                sb.Append($"\"{kvp.Value}\"");
+            }
+            else if (kvp.Value is TItem.SLOT)
+            {
+                sb.Append($"\"{kvp.Value}\"");
+            }
+            else
+            {
+                sb.Append(kvp.Value);
+            }
+        }
     }
 }
