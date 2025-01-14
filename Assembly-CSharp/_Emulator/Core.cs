@@ -9,7 +9,7 @@ namespace _Emulator
 
         public void Initialize()
         {
-            Hooks.Initialize();
+            HooksManaged.Initialize();
             coreObject = new GameObject();
             MainGUI.instance = coreObject.AddComponent<MainGUI>();
             InventoryGUI.instance = coreObject.AddComponent<InventoryGUI>();
@@ -20,7 +20,8 @@ namespace _Emulator
             SteamLobbyManager.instance = coreObject.AddComponent<SteamLobbyManager>();
             SteamNetworkingManager.instance = coreObject.AddComponent<SteamNetworkingManager>();
             SteamGUI.instance = coreObject.AddComponent<SteamGUI>();
-            UnityEngine.Object.DontDestroyOnLoad(coreObject);
+            ImGuiBackend.instance = coreObject.AddComponent<ImGuiBackend>();
+            Object.DontDestroyOnLoad(coreObject);
             Config.instance = new Config();
             SetupBuildConfig();
         }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -22,6 +23,7 @@ namespace _Emulator
 
         private void OnGUI()
         {
+            return;
             if (!hidden)
             {
                 configGUIRect = GUILayout.Window(104, configGUIRect, ConfigGUIWindow, "Config");

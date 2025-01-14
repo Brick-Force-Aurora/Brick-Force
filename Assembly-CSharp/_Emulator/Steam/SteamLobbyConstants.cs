@@ -7,10 +7,12 @@ namespace _Emulator
 {
     public class SteamLobbyConstants
     {
-        public static readonly string gameIDKey = "game_id";
-        public static readonly string gameIDValue = "bfaurora";
-        public static readonly string lobbyNameKey = "lobby_name";
-        public static readonly string ownerNameKey = "owner_name";
-        public static readonly string memberNameKey = "member_name";
+        public const string gameIDKey = "game_id";
+        public const string gameIDValue = "bfaurora";
+        public const string lobbyNameKey = "lobby_name";
+        public const string ownerNameKey = "owner_name";
+        public const string memberNameKey = "member_name";
+        public const string gamemodeKey = "gamemode";
+        public const string mapNameKey = "map_name";
     }
 }

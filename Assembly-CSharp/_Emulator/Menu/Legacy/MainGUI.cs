@@ -24,6 +24,7 @@ namespace _Emulator
 
         private void OnGUI()
         {
+            return;
             if (!setupHidden)
                 setupGUIRect = GUILayout.Window(100, setupGUIRect, SetupGUIWindow, "Setup");
 

@@ -23,6 +23,7 @@ namespace _Emulator.JSON
                 {
                     return typedValue;
                 }
+
                 throw new InvalidCastException($"Value for key '{key}' is not of type {typeof(T).Name}.");
             }
             return fallback;

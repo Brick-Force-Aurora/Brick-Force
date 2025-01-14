@@ -9,110 +9,119 @@ using System.Net.Sockets;
 using System.Net;
 using static Brick;
 using Steamworks;
+using System.Linq;
 
 namespace _Emulator
 {
-    class Hooks
+    class HooksManaged
     {
         static MethodInfo oP2PManagerHandshakeInfo = typeof(P2PManager).GetMethod("Handshake", BindingFlags.NonPublic | BindingFlags.Instance);
-        static MethodInfo hP2PManagerHandshakeInfo = typeof(Hooks).GetMethod("hP2PManagerHandshake", BindingFlags.NonPublic | BindingFlags.Instance);
-        static Hook P2PManagerHandshakeHook;
+        static MethodInfo hP2PManagerHandshakeInfo = typeof(HooksManaged).GetMethod("hP2PManagerHandshake", BindingFlags.NonPublic | BindingFlags.Instance);
+        static ManagedHook P2PManagerHandshakeHook;
 
 		static MethodInfo oSockTcpGetSendKeyInfo = typeof(SockTcp).GetMethod("GetSendKey", BindingFlags.Public | BindingFlags.Instance);
-		static MethodInfo hSockTcpGetSendKeyInfo = typeof(Hooks).GetMethod("hSockTcpGetSendKey", BindingFlags.Public | BindingFlags.Instance);
-		static Hook SockTcpGetSendKeyHook;
+		static MethodInfo hSockTcpGetSendKeyInfo = typeof(HooksManaged).GetMethod("hSockTcpGetSendKey", BindingFlags.Public | BindingFlags.Instance);
+		static ManagedHook SockTcpGetSendKeyHook;
 
 		static MethodInfo oSockTcpEnterAckInfo = typeof(SockTcp).GetMethod("HandleCS_ENTER_ACK", BindingFlags.NonPublic | BindingFlags.Instance);
-		static MethodInfo hSockTcpEnterAckInfo = typeof(Hooks).GetMethod("hSockTcpEnterAck", BindingFlags.NonPublic | BindingFlags.Instance);
-		static Hook SockTcpEnterAckHook;
+		static MethodInfo hSockTcpEnterAckInfo = typeof(HooksManaged).GetMethod("hSockTcpEnterAck", BindingFlags.NonPublic | BindingFlags.Instance);
+		static ManagedHook SockTcpEnterAckHook;
 
 		static MethodInfo oSockTcpRendezvousInfoAckInfo = typeof(SockTcp).GetMethod("HandleCS_RENDEZVOUS_INFO_ACK", BindingFlags.NonPublic | BindingFlags.Instance);
-		static MethodInfo hSockTcpRendezvousInfoAckInfo = typeof(Hooks).GetMethod("hSockTcpRendezvousInfoAck", BindingFlags.NonPublic | BindingFlags.Instance);
-		static Hook SockTcpRendezvousInfoAckHook;
+		static MethodInfo hSockTcpRendezvousInfoAckInfo = typeof(HooksManaged).GetMethod("hSockTcpRendezvousInfoAck", BindingFlags.NonPublic | BindingFlags.Instance);
+		static ManagedHook SockTcpRendezvousInfoAckHook;
 
 		static MethodInfo oPimpManagerLoadInfo = typeof(PimpManager).GetMethod("Load", BindingFlags.Public | BindingFlags.Instance);
-		static MethodInfo hPimpManagerLoadInfo = typeof(Hooks).GetMethod("hPimpManagerLoad", BindingFlags.Public | BindingFlags.Instance);
-		static Hook PimpManagerLoadHook;
+		static MethodInfo hPimpManagerLoadInfo = typeof(HooksManaged).GetMethod("hPimpManagerLoad", BindingFlags.Public | BindingFlags.Instance);
+		static ManagedHook PimpManagerLoadHook;
 
 		static MethodInfo oP2PManagerReliableSendInfo = typeof(P2PManager).GetMethod("ReliableSend", BindingFlags.NonPublic | BindingFlags.Instance);
-		static MethodInfo hP2PManagerReliableSendInfo = typeof(Hooks).GetMethod("hP2PManagerReliableSend", BindingFlags.NonPublic | BindingFlags.Instance);
-		static Hook P2PManagerReliableSendHook;
+		static MethodInfo hP2PManagerReliableSendInfo = typeof(HooksManaged).GetMethod("hP2PManagerReliableSend", BindingFlags.NonPublic | BindingFlags.Instance);
+		static ManagedHook P2PManagerReliableSendHook;
 
 		static MethodInfo oSockTcpKilllogReqInfo = typeof(SockTcp).GetMethod("SendCS_KILL_LOG_REQ", BindingFlags.Public | BindingFlags.Instance);
-		static MethodInfo hSockTcpKilllogReqInfo = typeof(Hooks).GetMethod("hSockTcpKilllogReq", BindingFlags.Public | BindingFlags.Instance);
-		static Hook SockTcpKilllogReqHook;
+		static MethodInfo hSockTcpKilllogReqInfo = typeof(HooksManaged).GetMethod("hSockTcpKilllogReq", BindingFlags.Public | BindingFlags.Instance);
+		static ManagedHook SockTcpKilllogReqHook;
 
 		static MethodInfo oSockTcpKilllogAckInfo = typeof(SockTcp).GetMethod("HandleCS_KILL_LOG_ACK", BindingFlags.NonPublic | BindingFlags.Instance);
-		static MethodInfo hSockTcpKilllogAckInfo = typeof(Hooks).GetMethod("hSockTcpKilllogAck", BindingFlags.NonPublic | BindingFlags.Instance);
-		static Hook SockTcpKilllogAckHook;
+		static MethodInfo hSockTcpKilllogAckInfo = typeof(HooksManaged).GetMethod("hSockTcpKilllogAck", BindingFlags.NonPublic | BindingFlags.Instance);
+		static ManagedHook SockTcpKilllogAckHook;
 
 		static MethodInfo oSockTcpHandleItemListAckInfo = typeof(SockTcp).GetMethod("HandleCS_ITEM_LIST_ACK", BindingFlags.NonPublic | BindingFlags.Instance);
-		static MethodInfo hSockTcpHandleItemListAckInfo = typeof(Hooks).GetMethod("hSockTcpHandleItemListAck", BindingFlags.NonPublic | BindingFlags.Instance);
-		static Hook SockTcpHandleItemListAckHook;
+		static MethodInfo hSockTcpHandleItemListAckInfo = typeof(HooksManaged).GetMethod("hSockTcpHandleItemListAck", BindingFlags.NonPublic | BindingFlags.Instance);
+		static ManagedHook SockTcpHandleItemListAckHook;
 
 		static MethodInfo oSockTcpHandleShooterToolAckInfo = typeof(SockTcp).GetMethod("HandleCS_SHOOTER_TOOL_ACK", BindingFlags.NonPublic | BindingFlags.Instance);
-		static MethodInfo hSockTcpHandleShooterToolAckInfo = typeof(Hooks).GetMethod("hSockTcpHandleShooterToolAck", BindingFlags.NonPublic | BindingFlags.Instance);
-		static Hook SockTcpHandleShooterToolAckHook;
+		static MethodInfo hSockTcpHandleShooterToolAckInfo = typeof(HooksManaged).GetMethod("hSockTcpHandleShooterToolAck", BindingFlags.NonPublic | BindingFlags.Instance);
+		static ManagedHook SockTcpHandleShooterToolAckHook;
 
 		static MethodInfo oSockTcpHandleShooterToolListAckInfo = typeof(SockTcp).GetMethod("HandleCS_SHOOTER_TOOL_LIST_ACK", BindingFlags.NonPublic | BindingFlags.Instance);
-		static MethodInfo hSockTcpHandleShooterToolListAckInfo = typeof(Hooks).GetMethod("hSockTcpHandleShooterToolListAck", BindingFlags.NonPublic | BindingFlags.Instance);
-		static Hook SockTcpHandleShooterToolListAckHook;
+		static MethodInfo hSockTcpHandleShooterToolListAckInfo = typeof(HooksManaged).GetMethod("hSockTcpHandleShooterToolListAck", BindingFlags.NonPublic | BindingFlags.Instance);
+		static ManagedHook SockTcpHandleShooterToolListAckHook;
 
 		static MethodInfo oSockTcpHandleWeaponSlotAckInfo = typeof(SockTcp).GetMethod("HandleCS_WEAPON_SLOT_ACK", BindingFlags.NonPublic | BindingFlags.Instance);
-		static MethodInfo hSockTcpHandleWeaponSlotAckInfo = typeof(Hooks).GetMethod("hSockTcpHandleWeaponSlotAck", BindingFlags.NonPublic | BindingFlags.Instance);
-		static Hook SockTcpHandleWeaponSlotAckHook;
+		static MethodInfo hSockTcpHandleWeaponSlotAckInfo = typeof(HooksManaged).GetMethod("hSockTcpHandleWeaponSlotAck", BindingFlags.NonPublic | BindingFlags.Instance);
+		static ManagedHook SockTcpHandleWeaponSlotAckHook;
 
 		static MethodInfo oSockTcpHandleWeaponSlotListAckInfo = typeof(SockTcp).GetMethod("HandleCS_WEAPON_SLOT_LIST_ACK", BindingFlags.NonPublic | BindingFlags.Instance);
-		static MethodInfo hSockTcpHandleWeaponSlotListAckInfo = typeof(Hooks).GetMethod("hSockTcpHandleWeaponSlotListAck", BindingFlags.NonPublic | BindingFlags.Instance);
-		static Hook SockTcpHandleWeaponSlotListAckHook;
+		static MethodInfo hSockTcpHandleWeaponSlotListAckInfo = typeof(HooksManaged).GetMethod("hSockTcpHandleWeaponSlotListAck", BindingFlags.NonPublic | BindingFlags.Instance);
+		static ManagedHook SockTcpHandleWeaponSlotListAckHook;
 
 		static MethodInfo oSockTcpRegisterReqInfo = typeof(SockTcp).GetMethod("SendCS_REGISTER_REQ", BindingFlags.Public | BindingFlags.Instance);
-		static MethodInfo hSockTcpRegisterReqInfo = typeof(Hooks).GetMethod("hSockTcpRegisterReq", BindingFlags.Public | BindingFlags.Instance);
-		static Hook SockTcpRegisterReqHook;
+		static MethodInfo hSockTcpRegisterReqInfo = typeof(HooksManaged).GetMethod("hSockTcpRegisterReq", BindingFlags.Public | BindingFlags.Instance);
+		static ManagedHook SockTcpRegisterReqHook;
 
         static MethodInfo oSockTcpSaveMapReqInfo = typeof(SockTcp).GetMethod("SendCS_SAVE_REQ", BindingFlags.Public | BindingFlags.Instance);
-        static MethodInfo hSockTcpSaveMapReqInfo = typeof(Hooks).GetMethod("hSockTcpSaveMapReq", BindingFlags.Public | BindingFlags.Instance);
-        static Hook SockTcpSaveMapReqHook;
+        static MethodInfo hSockTcpSaveMapReqInfo = typeof(HooksManaged).GetMethod("hSockTcpSaveMapReq", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook SockTcpSaveMapReqHook;
 
         static MethodInfo oSockTcpSayInfo = typeof(SockTcp).GetMethod("Say", BindingFlags.Public | BindingFlags.Instance);
-        static MethodInfo hSockTcpSayInfo = typeof(Hooks).GetMethod("hSockTcpSay", BindingFlags.Public | BindingFlags.Instance);
-        static Hook SockTcpSayHook;
+        static MethodInfo hSockTcpSayInfo = typeof(HooksManaged).GetMethod("hSockTcpSay", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook SockTcpSayHook;
 
         static MethodInfo oSockTcpIsConnectedInfo = typeof(SockTcp).GetMethod("IsConnected", BindingFlags.Public | BindingFlags.Instance);
-        static MethodInfo hSockTcpIsConnectedInfo = typeof(Hooks).GetMethod("hSockTcpIsConnected", BindingFlags.Public | BindingFlags.Instance);
-        static Hook SockTcpIsConnectedHook;
+        static MethodInfo hSockTcpIsConnectedInfo = typeof(HooksManaged).GetMethod("hSockTcpIsConnected", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook SockTcpIsConnectedHook;
 
         static MethodInfo oMyInfoManagerSetItemUsageInfo = typeof(MyInfoManager).GetMethod("SetItemUsage", BindingFlags.Public | BindingFlags.Instance);
-		static MethodInfo hMyInfoManagerSetItemUsageInfo = typeof(Hooks).GetMethod("hMyInfoManagerSetItemUsage", BindingFlags.Public | BindingFlags.Instance);
-		static Hook MyInfoManagerSetItemUsageHook;
+		static MethodInfo hMyInfoManagerSetItemUsageInfo = typeof(HooksManaged).GetMethod("hMyInfoManagerSetItemUsage", BindingFlags.Public | BindingFlags.Instance);
+		static ManagedHook MyInfoManagerSetItemUsageHook;
 
 		static MethodInfo oApplicationQuitInfo = typeof(Application).GetMethod("Quit", BindingFlags.Public | BindingFlags.Static);
-		static MethodInfo hApplicationQuitInfo = typeof(Hooks).GetMethod("hApplicationQuit", BindingFlags.Public | BindingFlags.Static);
-		static Hook ApplicationQuitHook;
+		static MethodInfo hApplicationQuitInfo = typeof(HooksManaged).GetMethod("hApplicationQuit", BindingFlags.Public | BindingFlags.Static);
+		static ManagedHook ApplicationQuitHook;
 
         static MethodInfo oBuildOptionExitInfo = typeof(BuildOption).GetMethod("Exit", BindingFlags.Public | BindingFlags.Instance);
-        static MethodInfo hBuildOptionExitInfo = typeof(Hooks).GetMethod("hBuildOptionExit", BindingFlags.Public | BindingFlags.Instance);
-        static Hook BuildOptionExitHook;
+        static MethodInfo hBuildOptionExitInfo = typeof(HooksManaged).GetMethod("hBuildOptionExit", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook BuildOptionExitHook;
 
         static MethodInfo oP2PManagerSendPEER_RELIABLE_ACKInfo = typeof(P2PManager).GetMethod("SendPEER_RELIABLE_ACK", BindingFlags.NonPublic| BindingFlags.Instance);
-        static MethodInfo hP2PManagerSendPEER_RELIABLE_ACKInfo = typeof(Hooks).GetMethod("hP2PManagerSendPEER_RELIABLE_ACK", BindingFlags.NonPublic | BindingFlags.Instance);
-        static Hook P2PManagerSendPEER_RELIABLE_ACKHook;
+        static MethodInfo hP2PManagerSendPEER_RELIABLE_ACKInfo = typeof(HooksManaged).GetMethod("hP2PManagerSendPEER_RELIABLE_ACK", BindingFlags.NonPublic | BindingFlags.Instance);
+        static ManagedHook P2PManagerSendPEER_RELIABLE_ACKHook;
 
         static MethodInfo oP2PManagerSendReliableInfo = typeof(P2PManager).GetMethod("SendReliable", BindingFlags.NonPublic | BindingFlags.Instance);
-        static MethodInfo hP2PManagerSendReliableInfo = typeof(Hooks).GetMethod("hP2PManagerSendReliable", BindingFlags.NonPublic | BindingFlags.Instance);
-        static Hook P2PManagerSendReliableHook;
+        static MethodInfo hP2PManagerSendReliableInfo = typeof(HooksManaged).GetMethod("hP2PManagerSendReliable", BindingFlags.NonPublic | BindingFlags.Instance);
+        static ManagedHook P2PManagerSendReliableHook;
 
         static MethodInfo oP2PManagerSayInfo = typeof(P2PManager).GetMethod("Say", BindingFlags.Public | BindingFlags.Instance);
-        static MethodInfo hP2PManagerSayInfo = typeof(Hooks).GetMethod("hP2PManagerSay", BindingFlags.Public | BindingFlags.Instance);
-        static Hook P2PManagerSayHook;
+        static MethodInfo hP2PManagerSayInfo = typeof(HooksManaged).GetMethod("hP2PManagerSay", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook P2PManagerSayHook;
 
         static MethodInfo oP2PManagerWhisperInfo = typeof(P2PManager).GetMethod("Whisper", BindingFlags.Public | BindingFlags.Instance);
-        static MethodInfo hP2PManagerWhisperInfo = typeof(Hooks).GetMethod("hP2PManagerWhisper", BindingFlags.Public | BindingFlags.Instance);
-        static Hook P2PManagerWhisperHook;
+        static MethodInfo hP2PManagerWhisperInfo = typeof(HooksManaged).GetMethod("hP2PManagerWhisper", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook P2PManagerWhisperHook;
 
         static MethodInfo oP2PManagerSendPEER_LEAVEInfo = typeof(P2PManager).GetMethod("SendPEER_LEAVE", BindingFlags.Public | BindingFlags.Instance);
-        static MethodInfo hP2PManagerSendPEER_LEAVEInfo = typeof(Hooks).GetMethod("hP2PManagerSendPEER_LEAVE", BindingFlags.Public | BindingFlags.Instance);
-        static Hook P2PManagerSendPEER_LEAVEHook;
+        static MethodInfo hP2PManagerSendPEER_LEAVEInfo = typeof(HooksManaged).GetMethod("hP2PManagerSendPEER_LEAVE", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook P2PManagerSendPEER_LEAVEHook;
+
+        static MethodInfo oLoadBrickMainStartInfo = typeof(LoadOthersMain).GetMethod("Start", BindingFlags.NonPublic | BindingFlags.Instance);
+        static MethodInfo hLoadBrickMainStartInfo = typeof(HooksManaged).GetMethod("hLoadBrickMainStart", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook LoadBrickMainStartHook;
+
+		static MethodInfo oScreenSetResolutionInfo = typeof(Screen).GetMethods(BindingFlags.Public | BindingFlags.Static).ToList().FindLast(x => x.Name == "SetResolution");
+        static MethodInfo hScreenSetResolutionInfo = typeof(HooksManaged).GetMethod("hScreenSetResolution", BindingFlags.Public | BindingFlags.Static);
+        static ManagedHook ScreenSetResolutionHook;
 
         private void hP2PManagerHandshake()
         {
@@ -410,6 +419,7 @@ namespace _Emulator
 
 		public static void hApplicationQuit()
 		{
+			Debug.Log("Quit");
 			if (ClientExtension.instance.isSteam)
 			{
                 SteamLobbyManager.instance.LeaveCurrentLobby();
@@ -425,7 +435,13 @@ namespace _Emulator
 				CSNetManager.Instance.Sock.Close();
 				P2PManager.Instance.Shutdown();
 			}
-			ApplicationQuitHook.CallOriginal(null, null);
+
+            var hProcess = Import.GetCurrentProcess();
+            Import.GetExitCodeProcess(hProcess, out uint exitCode);
+            Import.TerminateProcess(hProcess, exitCode);
+
+            HooksNative.Shutdown();
+			//ApplicationQuitHook.CallOriginal(null, null);
 		}
 
         public void hBuildOptionExit()
@@ -678,58 +694,77 @@ namespace _Emulator
             }
         }
 
+        public static void hScreenSetResolution(int width, int height, bool fullscreen)
+        {
+			lock (ImGuiBackend.instance.imguiLock)
+			{
+				// Reset and briefly disable ImGui to prevent it from crashing when changing resolutions.
+				ImGuiBackend.instance.Shutdown(false, false);
+				ScreenSetResolutionHook.CallOriginal(null, new object[] { width, height, fullscreen });
+			}
+        }
+
+        public void hLoadBrickMainStart()
+		{
+			HooksNative.Initialize();
+        }
+
         public static void Initialize()
         {
-			P2PManagerHandshakeHook = new Hook(oP2PManagerHandshakeInfo, hP2PManagerHandshakeInfo);
+			P2PManagerHandshakeHook = new ManagedHook(oP2PManagerHandshakeInfo, hP2PManagerHandshakeInfo);
 			P2PManagerHandshakeHook.ApplyHook();
-			SockTcpGetSendKeyHook = new Hook(oSockTcpGetSendKeyInfo, hSockTcpGetSendKeyInfo);
+			SockTcpGetSendKeyHook = new ManagedHook(oSockTcpGetSendKeyInfo, hSockTcpGetSendKeyInfo);
 			SockTcpGetSendKeyHook.ApplyHook();
-			SockTcpEnterAckHook = new Hook(oSockTcpEnterAckInfo, hSockTcpEnterAckInfo);
+			SockTcpEnterAckHook = new ManagedHook(oSockTcpEnterAckInfo, hSockTcpEnterAckInfo);
 			SockTcpEnterAckHook.ApplyHook();
-			SockTcpRendezvousInfoAckHook = new Hook(oSockTcpRendezvousInfoAckInfo, hSockTcpRendezvousInfoAckInfo);
+			SockTcpRendezvousInfoAckHook = new ManagedHook(oSockTcpRendezvousInfoAckInfo, hSockTcpRendezvousInfoAckInfo);
 			SockTcpRendezvousInfoAckHook.ApplyHook();
-			PimpManagerLoadHook = new Hook(oPimpManagerLoadInfo, hPimpManagerLoadInfo);
+			PimpManagerLoadHook = new ManagedHook(oPimpManagerLoadInfo, hPimpManagerLoadInfo);
 			PimpManagerLoadHook.ApplyHook();
-			P2PManagerReliableSendHook = new Hook(oP2PManagerReliableSendInfo, hP2PManagerReliableSendInfo);
+			P2PManagerReliableSendHook = new ManagedHook(oP2PManagerReliableSendInfo, hP2PManagerReliableSendInfo);
 			P2PManagerReliableSendHook.ApplyHook();
-			SockTcpKilllogReqHook = new Hook(oSockTcpKilllogReqInfo, hSockTcpKilllogReqInfo);
+			SockTcpKilllogReqHook = new ManagedHook(oSockTcpKilllogReqInfo, hSockTcpKilllogReqInfo);
 			SockTcpKilllogReqHook.ApplyHook();
-			SockTcpKilllogAckHook = new Hook(oSockTcpKilllogAckInfo, hSockTcpKilllogAckInfo);
+			SockTcpKilllogAckHook = new ManagedHook(oSockTcpKilllogAckInfo, hSockTcpKilllogAckInfo);
 			SockTcpKilllogAckHook.ApplyHook();
-			SockTcpHandleItemListAckHook = new Hook(oSockTcpHandleItemListAckInfo, hSockTcpHandleItemListAckInfo);
+			SockTcpHandleItemListAckHook = new ManagedHook(oSockTcpHandleItemListAckInfo, hSockTcpHandleItemListAckInfo);
 			SockTcpHandleItemListAckHook.ApplyHook();
-			MyInfoManagerSetItemUsageHook = new Hook(oMyInfoManagerSetItemUsageInfo, hMyInfoManagerSetItemUsageInfo);
+			MyInfoManagerSetItemUsageHook = new ManagedHook(oMyInfoManagerSetItemUsageInfo, hMyInfoManagerSetItemUsageInfo);
 			MyInfoManagerSetItemUsageHook.ApplyHook();
-			SockTcpHandleShooterToolAckHook = new Hook(oSockTcpHandleShooterToolAckInfo, hSockTcpHandleShooterToolAckInfo);
+			SockTcpHandleShooterToolAckHook = new ManagedHook(oSockTcpHandleShooterToolAckInfo, hSockTcpHandleShooterToolAckInfo);
 			SockTcpHandleShooterToolAckHook.ApplyHook();
-			SockTcpHandleShooterToolListAckHook = new Hook(oSockTcpHandleShooterToolListAckInfo, hSockTcpHandleShooterToolListAckInfo);
+			SockTcpHandleShooterToolListAckHook = new ManagedHook(oSockTcpHandleShooterToolListAckInfo, hSockTcpHandleShooterToolListAckInfo);
 			SockTcpHandleShooterToolListAckHook.ApplyHook();
-			SockTcpHandleWeaponSlotAckHook = new Hook(oSockTcpHandleWeaponSlotAckInfo, hSockTcpHandleWeaponSlotAckInfo);
+			SockTcpHandleWeaponSlotAckHook = new ManagedHook(oSockTcpHandleWeaponSlotAckInfo, hSockTcpHandleWeaponSlotAckInfo);
 			SockTcpHandleWeaponSlotAckHook.ApplyHook();
-			SockTcpHandleWeaponSlotListAckHook = new Hook(oSockTcpHandleWeaponSlotListAckInfo, hSockTcpHandleWeaponSlotListAckInfo);
+			SockTcpHandleWeaponSlotListAckHook = new ManagedHook(oSockTcpHandleWeaponSlotListAckInfo, hSockTcpHandleWeaponSlotListAckInfo);
 			SockTcpHandleWeaponSlotListAckHook.ApplyHook();
-			SockTcpRegisterReqHook = new Hook(oSockTcpRegisterReqInfo, hSockTcpRegisterReqInfo);
+			SockTcpRegisterReqHook = new ManagedHook(oSockTcpRegisterReqInfo, hSockTcpRegisterReqInfo);
 			SockTcpRegisterReqHook.ApplyHook();
-            SockTcpSaveMapReqHook = new Hook(oSockTcpSaveMapReqInfo, hSockTcpSaveMapReqInfo);
+            SockTcpSaveMapReqHook = new ManagedHook(oSockTcpSaveMapReqInfo, hSockTcpSaveMapReqInfo);
             SockTcpSaveMapReqHook.ApplyHook();
-            SockTcpSayHook = new Hook(oSockTcpSayInfo, hSockTcpSayInfo);
+            SockTcpSayHook = new ManagedHook(oSockTcpSayInfo, hSockTcpSayInfo);
             SockTcpSayHook.ApplyHook();
-            SockTcpIsConnectedHook = new Hook(oSockTcpIsConnectedInfo, hSockTcpIsConnectedInfo);
+            SockTcpIsConnectedHook = new ManagedHook(oSockTcpIsConnectedInfo, hSockTcpIsConnectedInfo);
             SockTcpIsConnectedHook.ApplyHook();
-            ApplicationQuitHook = new Hook(oApplicationQuitInfo, hApplicationQuitInfo);
+            ApplicationQuitHook = new ManagedHook(oApplicationQuitInfo, hApplicationQuitInfo);
 			ApplicationQuitHook.ApplyHook();
-            BuildOptionExitHook = new Hook(oBuildOptionExitInfo, hBuildOptionExitInfo);
+            BuildOptionExitHook = new ManagedHook(oBuildOptionExitInfo, hBuildOptionExitInfo);
             BuildOptionExitHook.ApplyHook();
-            P2PManagerSendPEER_RELIABLE_ACKHook = new Hook(oP2PManagerSendPEER_RELIABLE_ACKInfo, hP2PManagerSendPEER_RELIABLE_ACKInfo);
+            P2PManagerSendPEER_RELIABLE_ACKHook = new ManagedHook(oP2PManagerSendPEER_RELIABLE_ACKInfo, hP2PManagerSendPEER_RELIABLE_ACKInfo);
             P2PManagerSendPEER_RELIABLE_ACKHook.ApplyHook();
-            P2PManagerSendReliableHook = new Hook(oP2PManagerSendReliableInfo, hP2PManagerSendReliableInfo);
+            P2PManagerSendReliableHook = new ManagedHook(oP2PManagerSendReliableInfo, hP2PManagerSendReliableInfo);
             P2PManagerSendReliableHook.ApplyHook();
-            P2PManagerSayHook = new Hook(oP2PManagerSayInfo, hP2PManagerSayInfo);
+            P2PManagerSayHook = new ManagedHook(oP2PManagerSayInfo, hP2PManagerSayInfo);
             P2PManagerSayHook.ApplyHook();
-            P2PManagerWhisperHook = new Hook(oP2PManagerWhisperInfo, hP2PManagerWhisperInfo);
+            P2PManagerWhisperHook = new ManagedHook(oP2PManagerWhisperInfo, hP2PManagerWhisperInfo);
             P2PManagerWhisperHook.ApplyHook();
-            P2PManagerSendPEER_LEAVEHook = new Hook(oP2PManagerSendPEER_LEAVEInfo, hP2PManagerSendPEER_LEAVEInfo);
+            P2PManagerSendPEER_LEAVEHook = new ManagedHook(oP2PManagerSendPEER_LEAVEInfo, hP2PManagerSendPEER_LEAVEInfo);
             P2PManagerSendPEER_LEAVEHook.ApplyHook();
+            LoadBrickMainStartHook = new ManagedHook(oLoadBrickMainStartInfo, hLoadBrickMainStartInfo);
+            LoadBrickMainStartHook.ApplyHook();
+            ScreenSetResolutionHook = new ManagedHook(oScreenSetResolutionInfo, hScreenSetResolutionInfo);
+            ScreenSetResolutionHook.ApplyHook();
         }
     }
 }

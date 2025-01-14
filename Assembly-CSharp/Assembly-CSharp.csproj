@@ -728,13 +728,17 @@
     <Compile Include="ZombieVirus.cs" />
     <Compile Include="ZombieVsHumanManager.cs" />
     <Compile Include="_Emulator\Config.cs" />
-    <Compile Include="_Emulator\Menu\ConfigGUI.cs" />
-    <Compile Include="_Emulator\Menu\InventoryGUI.cs" />
-    <Compile Include="_Emulator\Menu\SteamGUI.cs" />
-    <Compile Include="_Emulator\Hooks.cs" />
+    <Compile Include="_Emulator\HooksNative.cs" />
+    <Compile Include="_Emulator\Menu\ImGuiBackend.cs" />
+    <Compile Include="_Emulator\Menu\ImGuiMenu.cs" />
+    <Compile Include="_Emulator\Menu\Legacy\ConfigGUI.cs" />
+    <Compile Include="_Emulator\Menu\ImGuiUtils.cs" />
+    <Compile Include="_Emulator\Menu\Legacy\InventoryGUI.cs" />
+    <Compile Include="_Emulator\Menu\Legacy\SteamGUI.cs" />
+    <Compile Include="_Emulator\HooksManaged.cs" />
     <Compile Include="_Emulator\Core.cs" />
-    <Compile Include="_Emulator\Menu\MainGUI.cs" />
-    <Compile Include="_Emulator\Menu\DebugConsole.cs" />
+    <Compile Include="_Emulator\Menu\Legacy\MainGUI.cs" />
+    <Compile Include="_Emulator\Menu\Legacy\DebugConsole.cs" />
     <Compile Include="_Emulator\JSON\JsonObject.cs" />
     <Compile Include="_Emulator\JSON\JsonReader.cs" />
     <Compile Include="_Emulator\JSON\JsonWriter.cs" />
@@ -762,9 +766,12 @@
     <Compile Include="_Emulator\Steam\SteamManager.cs" />
     <Compile Include="_Emulator\Steam\SteamNetworkingChannel.cs" />
     <Compile Include="_Emulator\Steam\SteamNetworkingManager.cs" />
+    <Compile Include="_Emulator\Steam\SteamUtils.cs" />
+    <Compile Include="_Emulator\Utils\BfUtils.cs" />
     <Compile Include="_Emulator\Utils\CRC32.cs" />
+    <Compile Include="_Emulator\Utils\ImportTypes.cs" />
     <Compile Include="_Emulator\Utils\Utils.cs" />
-    <Compile Include="_Emulator\Utils\Hook.cs" />
+    <Compile Include="_Emulator\Utils\ManagedHook.cs" />
     <Compile Include="_Emulator\Utils\Import.cs" />
     <Compile Include="_Emulator\Utils\Zip.cs" />
   </ItemGroup>
@@ -775,8 +782,16 @@
     <Reference Include="Assembly-UnityScript-firstpass">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\Assembly-UnityScript-firstpass.dll</HintPath>
     </Reference>
+    <Reference Include="EasyHook, Version=2.7.7097.0, Culture=neutral, PublicKeyToken=4b580fca19d0b0c5, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\BfLauncher\BrickForce_Data\Managed\EasyHook.dll</HintPath>
+    </Reference>
     <Reference Include="ICSharpCode.SharpZipLib">
       <HintPath>..\..\BfLauncher\ICSharpCode.SharpZipLib.dll</HintPath>
+    </Reference>
+    <Reference Include="ImGui.NET, Version=1.91.6.1, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\BfLauncher\BrickForce_Data\Managed\ImGui.NET.dll</HintPath>
     </Reference>
     <Reference Include="Mono.Security">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\Mono.Security.dll</HintPath>
@@ -793,6 +808,7 @@
     </Reference>
     <Reference Include="System.Data" />
     <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Runtime.Remoting" />
     <Reference Include="System.Xml" />
     <Reference Include="UnityEngine">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\UnityEngine.dll</HintPath>
@@ -805,7 +821,6 @@
     <EmbeddedResource Include="_Emulator\DATA\shop.txt" />
     <EmbeddedResource Include="_Emulator\DATA\shopCategory.txt" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>

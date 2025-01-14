@@ -2,7 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Numerics;
 using UnityEngine;
+using Vector4 = System.Numerics.Vector4;
 
 namespace _Emulator
 {
@@ -12,6 +14,9 @@ namespace _Emulator
         public JsonObject configData;
 
         public Color crosshairColor = Color.green;
+        public static readonly Vector4 themeColorDefault = new Vector4(1f, 0f, 0.39f, 1f);
+        public Vector4 themeColor = new Vector4(1f, 0f, 0.39f, 1f);
+        public bool dpiAware = false;
         public float crosshairHue = 90f;
         private float oldCrosshairHue = -1f;
         public bool uskTextures = false;
@@ -31,7 +36,7 @@ namespace _Emulator
         {
             using (var writer = new StreamWriter(path))
             {
-                var jsonWriter = new JsonWriter(writer);
+                var jsonWriter = new JsonWriter(writer); 
                 configData = new JsonObject
                 {
                     { "host_ip", ClientExtension.instance.hostIP },
@@ -42,6 +47,10 @@ namespace _Emulator
                     { "crosshair_r", crosshairColor.r },
                     { "crosshair_g", crosshairColor.g },
                     { "crosshair_b", crosshairColor.b },
+                    { "dpi_aware", dpiAware },
+                    { "theme_r", themeColor.X },
+                    { "theme_g", themeColor.Y },
+                    { "theme_b", themeColor.Z },
                     { "usk_textures", uskTextures },
                     { "axis_ratio", axisRatio },
                     { "one_client_per_ip", oneClientPerIP },
@@ -78,6 +87,10 @@ namespace _Emulator
             crosshairColor.b = configData.Get<float>("crosshair_b", 0.0f);
             Utils.RGBToHSV(crosshairColor, out float H, out float S, out float V);
             crosshairHue = H * 360f;
+            dpiAware = configData.Get<bool>("dpi_aware", false);
+            themeColor.X = configData.Get<float>("theme_r", themeColorDefault.X);
+            themeColor.Y = configData.Get<float>("theme_g", themeColorDefault.Y);
+            themeColor.Z = configData.Get<float>("theme_b", themeColorDefault.Z);
             uskTextures = configData.Get<bool>("usk_textures", false);
             oldUskTextures = !uskTextures;
             axisRatio = configData.Get<float>("axis_ratio", 2.25f);

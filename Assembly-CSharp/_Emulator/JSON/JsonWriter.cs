@@ -55,7 +55,7 @@ namespace _Emulator.JSON
             }
             else if (value is float floatValue)
             {
-                return floatValue.ToString("0.0");
+                return floatValue.ToString("0.000");
             }
             else
             {

@@ -40,7 +40,6 @@ namespace _Emulator
 
         private void Start()
         {
-            //matchData = new MatchData();
         }
 
         public void SetupServer()
@@ -479,6 +478,57 @@ namespace _Emulator
                     client.toleranceTime += Time.deltaTime;
                     if (client.toleranceTime >= 3f)
                         client.Disconnect(false);
+                }
+            }
+        }
+
+        public bool GetGamestateStrings(out string roomType, out string roomStatus, out string mapAlias)
+        {
+            if (channelManager != null && channelManager.channels != null)
+            {
+                foreach (var channel in channelManager.channels)
+                {
+                    if (channel != null && channel.matches != null)
+                    {
+                        foreach (var match in channel.matches)
+                        {
+                            if (match != null && match.room != null)
+                            {
+                                roomType = BfUtils.RoomTypeToString(match.room.Type);
+                                roomStatus = BfUtils.RoomStatusToString(match.room.Status);
+                                if (match.room.Type == ROOM_TYPE.MAP_EDITOR)
+                                    mapAlias = UserMapInfoManager.Instance.CurMapName;
+                                else
+                                    mapAlias = match.room.CurMapAlias;
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            roomType = "None";
+            roomStatus = "None";
+            mapAlias = "None";
+            return false;
+        }
+
+        public void EndAllMatches()
+        {
+            if (channelManager != null && channelManager.channels != null)
+            {
+                foreach (var channel in channelManager.channels)
+                {
+                    if (channel != null && channel.matches != null)
+                    {
+                        foreach (var match in channel.matches)
+                        {
+                            if (match != null)
+                            {
+                                match.EndMatch();
+                            }
+                        }
+                    }
                 }
             }
         }

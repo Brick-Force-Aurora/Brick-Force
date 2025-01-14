@@ -16,11 +16,16 @@ namespace _Emulator
         private bool inFindLobbies = false;
         public List<SteamLobbyInfo> list = new List<SteamLobbyInfo>();
         public SteamLobbyInfo currentLobby = null;
+        public string gamemodeName = "";
+        public string mapName = "";
 
         private string lobbyNameToCreate = "";
 
         public readonly object listLock = new object();
         public readonly object currentLobbyLock = new object();
+
+        private const float findUpdateInterval = 2f;
+        private float findUpdateTimer = 0f;
 
         private CallResult<LobbyCreated_t> m_CallResultLobbyCreated;
         private CallResult<LobbyEnter_t> m_CallResultLobbyEnter;
@@ -45,9 +50,40 @@ namespace _Emulator
 
         void Update()
         {
-            if (findLobbies && !inFindLobbies)
+            findUpdateTimer += Time.deltaTime;
+            if (findLobbies && !inFindLobbies && findUpdateTimer >= findUpdateInterval)
             {
+                findUpdateTimer = 0f;
                 FindLobbies();
+            }
+
+            UpdateCurrentMetadata();
+        }
+
+        private void UpdateCurrentMetadata()
+        {
+            if (SteamManager.Initialized && IsUserOwner())
+            {
+                lock (currentLobbyLock)
+                {
+                    if (currentLobby != null)
+                    {
+                        var result = ServerEmulator.instance.GetGamestateStrings(out string roomType, out string roomStatus, out string mapAlias);
+                        var mode = result ? roomType + " (" + roomStatus + ")" : roomType;
+                        var newMapName = mapAlias;
+                        if (mode != gamemodeName)
+                        {
+                            SteamMatchmaking.SetLobbyData(currentLobby.steamID, SteamLobbyConstants.gamemodeKey, mode);
+                            gamemodeName = mode;
+                        }
+
+                        if (newMapName != mapName)
+                        {
+                            SteamMatchmaking.SetLobbyData(currentLobby.steamID, SteamLobbyConstants.mapNameKey, newMapName);
+                            mapName = newMapName;
+                        }
+                    }
+                }
             }
         }
 

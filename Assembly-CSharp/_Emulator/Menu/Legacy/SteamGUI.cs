@@ -60,6 +60,7 @@ namespace _Emulator
 
         private void OnGUI()
         {
+            return;
             if (hidden)
                 return;
 

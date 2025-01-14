@@ -11,8 +11,10 @@ namespace _Emulator
     {
         public CSteamID steamID = CSteamID.Nil;
         public CSteamID ownerSteamID = CSteamID.Nil;
-        public string ownerName;
-        public string lobbyName;
+        public string ownerName = string.Empty;
+        public string lobbyName = string.Empty;
+        public string gamemodeName = string.Empty;
+        public string mapName = string.Empty;
         public List<SteamLobbyMember> lobbyMembers = new List<SteamLobbyMember>();
         public Dictionary<string, string> data = new Dictionary<string, string>();
         public int numMembers = 0;
@@ -46,6 +48,12 @@ namespace _Emulator
 
                 if (data.ContainsKey(SteamLobbyConstants.ownerNameKey))
                     ownerName = data[SteamLobbyConstants.ownerNameKey];
+
+                if (data.ContainsKey(SteamLobbyConstants.gamemodeKey))
+                    gamemodeName = data[SteamLobbyConstants.gamemodeKey];
+
+                if (data.ContainsKey(SteamLobbyConstants.mapNameKey))
+                    mapName = data[SteamLobbyConstants.mapNameKey];
             }
         }
 
