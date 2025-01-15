@@ -17,6 +17,7 @@ namespace _Emulator
         public static readonly Vector4 themeColorDefault = new Vector4(1f, 0f, 0.39f, 1f);
         public Vector4 themeColor = new Vector4(1f, 0f, 0.39f, 1f);
         public bool dpiAware = false;
+        public bool menuBlocksInput = false;
         public float crosshairHue = 90f;
         private float oldCrosshairHue = -1f;
         public bool uskTextures = false;
@@ -27,6 +28,8 @@ namespace _Emulator
         public bool blockConnections = false;
         public bool autoClearDeadClients = false;
         public int maxConnections = 16;
+        public int maxNumRooms = 1;
+        public bool onlyHostRooms = true;
 
         public Config()
         {
@@ -47,16 +50,19 @@ namespace _Emulator
                     { "crosshair_r", crosshairColor.r },
                     { "crosshair_g", crosshairColor.g },
                     { "crosshair_b", crosshairColor.b },
+                    { "usk_textures", uskTextures },
+                    { "axis_ratio", axisRatio },
                     { "dpi_aware", dpiAware },
+                    { "menu_blocks_input", menuBlocksInput },
                     { "theme_r", themeColor.X },
                     { "theme_g", themeColor.Y },
                     { "theme_b", themeColor.Z },
-                    { "usk_textures", uskTextures },
-                    { "axis_ratio", axisRatio },
                     { "one_client_per_ip", oneClientPerIP },
                     { "block_connections", blockConnections },
                     { "auto_clear_dead_clients", autoClearDeadClients },
-                    { "max_connections", maxConnections }
+                    { "max_connections", maxConnections },
+                    { "max_num_rooms", maxNumRooms },
+                    { "only_host_rooms", onlyHostRooms },
                 };
                 jsonWriter.WriteObject(configData);
             }
@@ -88,6 +94,7 @@ namespace _Emulator
             Utils.RGBToHSV(crosshairColor, out float H, out float S, out float V);
             crosshairHue = H * 360f;
             dpiAware = configData.Get<bool>("dpi_aware", false);
+            menuBlocksInput = configData.Get<bool>("menu_blocks_input", false);
             themeColor.X = configData.Get<float>("theme_r", themeColorDefault.X);
             themeColor.Y = configData.Get<float>("theme_g", themeColorDefault.Y);
             themeColor.Z = configData.Get<float>("theme_b", themeColorDefault.Z);
@@ -98,6 +105,8 @@ namespace _Emulator
             blockConnections = configData.Get<bool>("block_connections", false);
             autoClearDeadClients = configData.Get<bool>("auto_clear_dead_clients", false);
             maxConnections = configData.Get<int>("max_connections", 16);
+            maxNumRooms = configData.Get<int>("max_num_rooms", 1);
+            onlyHostRooms = configData.Get<bool>("only_host_rooms", true);
             ApplyUskTextures();
             ApplyAxisRatio();
             ApplyCrosshairHue();

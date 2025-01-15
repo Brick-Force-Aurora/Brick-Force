@@ -431,22 +431,24 @@ namespace _Emulator
 
 			if (ServerEmulator.instance.serverCreated)
 			{
-				ServerEmulator.instance.ShutdownInit();
-				ServerEmulator.instance.ShutdownFinally();
-			}
-			else
+                ServerEmulator.instance.ShutdownInit();
+                ServerEmulator.instance.ShutdownFinally();
+            }
+			else if (ClientExtension.instance.clientConnected)
 			{
-				CSNetManager.Instance.Sock.Close();
-				P2PManager.Instance.Shutdown();
+                CSNetManager.Instance.Sock.Close();
+                P2PManager.Instance.Shutdown();
 			}
+
+            HooksNative.Shutdown();
 
             var hProcess = Import.GetCurrentProcess();
             Import.GetExitCodeProcess(hProcess, out uint exitCode);
+            Debug.Log("Terminate");
             Import.TerminateProcess(hProcess, exitCode);
 
-            HooksNative.Shutdown();
-			//ApplicationQuitHook.CallOriginal(null, null);
-		}
+            //ApplicationQuitHook.CallOriginal(null, null);
+        }
 
         public void hBuildOptionExit()
         {

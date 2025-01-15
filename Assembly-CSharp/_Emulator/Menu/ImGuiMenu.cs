@@ -307,18 +307,37 @@ namespace _Emulator
             ImGui.SameLine();
             if (ImGui.Button("Load"))
                 Config.instance.LoadConfigFromDisk();
+
+            ImGui.Separator();
+
+            ImGui.TextDisabled("Menu");
             ImGui.ColorEdit4("Theme Colour", ref Config.instance.themeColor, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.NoAlpha);
             ImGui.SameLine();
             if (ImGui.Button("Revert"))
                 Config.instance.themeColor = Config.themeColorDefault;
             ImGui.Checkbox("DPI Aware", ref Config.instance.dpiAware);
+            ImGui.Checkbox("Menu Blocks Input", ref Config.instance.menuBlocksInput);
+
+            ImGui.Separator();
+
+            ImGui.TextDisabled("Game");
             ImGui.SliderFloat("Axis Ratio", ref Config.instance.axisRatio, 1f, 2.25f, "%.2f");
             ImGui.SliderFloat("Crosshair Hue", ref Config.instance.crosshairHue, 0f, 360f, "%.2f");
-            ImGui.SliderInt("Max Connections", ref Config.instance.maxConnections, 1, 16);
+            ImGui.Checkbox("USK Textures (Requires Restart)", ref Config.instance.uskTextures);
+
+            ImGui.Separator();
+
+            ImGui.TextDisabled("Host");
+            ImGui.Checkbox("Only Host Can Create Rooms", ref Config.instance.onlyHostRooms);
+            ImGui.SliderInt("Max Num Rooms", ref Config.instance.maxNumRooms, -1, 16);
+            ImGui.SliderInt("Max Num Connections", ref Config.instance.maxConnections, 1, 16);
             ImGui.Checkbox("Auto Clear Dead Clients", ref Config.instance.autoClearDeadClients);
             ImGui.Checkbox("One Client Per IP", ref Config.instance.oneClientPerIP);
             ImGui.Checkbox("Block All Connections", ref Config.instance.blockConnections);
-            ImGui.Checkbox("USK Textures (Requires Restart)", ref Config.instance.uskTextures);
+
+            ImGui.Separator();
+
+            ImGui.TextDisabled("Debug");
             ImGui.Checkbox("Debug Handle", ref ServerEmulator.instance.debugHandle);
             ImGui.Checkbox("Debug Send", ref ServerEmulator.instance.debugSend);
             ImGui.Checkbox("Debug Ping", ref ServerEmulator.instance.debugPing);

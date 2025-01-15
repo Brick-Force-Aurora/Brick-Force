@@ -533,6 +533,29 @@ namespace _Emulator
             }
         }
 
+        public int GetMatchCount()
+        {
+            var result = 0;
+            if (channelManager != null && channelManager.channels != null)
+            {
+                foreach (var channel in channelManager.channels)
+                {
+                    if (channel != null && channel.matches != null)
+                    {
+                        foreach (var match in channel.matches)
+                        {
+                            if (match != null)
+                            {
+                                result++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+
         private void HandleMessages()
         {
             if (readQueue.Count < 1)
@@ -1283,6 +1306,18 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int param8);   //Play: isDrop			Build: N/A
             msgRef.msg._msg.Read(out string alias);
             msgRef.msg._msg.Read(out int master);
+
+            if (Config.instance.onlyHostRooms && !msgRef.client.isHost)
+            {
+                SendCustomMessage("Only host can create rooms.", msgRef.client, SendType.Unicast);
+                return;
+            }
+
+            if (Config.instance.maxNumRooms >= 0 && GetMatchCount() >= Config.instance.maxNumRooms)
+            {
+                SendCustomMessage("Max num rooms reached (" + Config.instance.maxNumRooms + ").", msgRef.client, SendType.Unicast);
+                return;
+            }
 
             MatchData matchData = msgRef.client.channel.AddNewMatch();
 

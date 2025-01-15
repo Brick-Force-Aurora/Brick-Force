@@ -73,6 +73,9 @@ namespace _Emulator
             if (ImGui.ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam) != 0)
                 return (IntPtr)1;
 
+            if (Config.instance.menuBlocksInput && ImGuiMenu.instance.isVisible)
+                return (IntPtr)1;
+
             if (oWndProc != IntPtr.Zero)
                 return Import.CallWindowProc(oWndProc, hWnd, msg, wParam, lParam);
 
@@ -216,14 +219,14 @@ namespace _Emulator
 
         void LoadFont()
         {
-            if (File.Exists("Nunito-SemiBold.ttf"))
+            if (File.Exists("Font.ttf"))
             {
                 ImGui.GetIO().Fonts.Clear();
-                font = ImGui.GetIO().Fonts.AddFontFromFileTTF("Nunito-SemiBold.ttf", 15f * dpiScale);
+                font = ImGui.GetIO().Fonts.AddFontFromFileTTF("Font.ttf", 15f * dpiScale);
                 ImGui.ImGui_ImplDX9_InvalidateDeviceObjects();
             }
             else
-                Debug.LogError("Nunito-SemiBold.ttf missing");
+                Debug.LogError("Font.ttf missing");
         }
 
         void UpdateTheme()
