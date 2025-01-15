@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using _Emulator.JSON;
 using UnityEngine;
 
 namespace _Emulator
@@ -175,19 +176,40 @@ namespace _Emulator
             }
         }
 
-        public void UpdateCSV(string filePath = "Config\\Inventory.csv")
+        public void UpdateCSV(string filePath = "Config\\Inventory.json")
         {
             try
             {
                 // Ensure the directory exists
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+                GenerateActiveSlots();
+                GenerateActiveTools();
+                GenerateActiveChange();
 
-                using (StreamWriter writer = new StreamWriter(filePath))
+                using (var writer = new StreamWriter(filePath))
                 {
+                    var jsonWriter = new JsonWriter(writer);
+                    JsonArray items = new JsonArray();
                     foreach (var item in equipment)
                     {
-                        writer.WriteLine($"{item.Template.slot};{item.Code};{item.Usage}");                  
+                        JsonObject jsonItem = new JsonObject
+                        {
+                            { "name", item.Template.Name },
+                            { "code", item.Code },
+                            { "usage", item.Usage },
+                            { "slot", item.Template.slot },
+                            { "weapon_change", weaponChg.Contains(item) },
+                            { "toolbar", shooterTools.Contains(item) },
+                            { "toolslot", item.toolSlot },
+                            { "starrate", item.starRate},
+                            { "is_upgraded", item.IsUpgradedItem() },
+                            { "is_amount", item.IsAmount },
+                            { "amount", item.Amount },
+                            { "remain", item.Remain }
+                        };
+                        items.Add(jsonItem);
                     }
+                    jsonWriter.WriteObject(items);
                 }
 
                 Debug.Log($"Equipment successfully saved to {filePath}.");
@@ -258,7 +280,7 @@ namespace _Emulator
 
         public void LoadInventoryFromMemory()
         {
-            string filePath = "Config\\Inventory.csv";
+            string filePath = "Config\\Inventory.json";
 
             // Ensure the directory exists
             Directory.CreateDirectory(Path.GetDirectoryName(filePath));
@@ -294,8 +316,36 @@ namespace _Emulator
                 //Debug.Log($"Inventory file created at {filePath}.");
             } else
             {
+                using (var reader = new StreamReader(filePath))
+                {
+                    var jsonReader = new JsonReader(reader);
+                    JsonArray items = jsonReader.ReadObject<JsonArray>();
+                    foreach (JsonObject item in items)
+                    {
+                        string categoryName = item.Get<string>("slot");
+                        string code = item.Get<string>("code");
+                        int toolslot = item.Get<int>("toolslot");
+                        Item.USAGE usage = (Item.USAGE)Enum.Parse(typeof(Item.USAGE), item.Get<string>("usage"), true);
+                        if (!string.IsNullOrEmpty(code))
+                        {
+                            TItem template = TItemManager.Instance.Get<TItem>(code);
+                            if (template == null)
+                                continue;
+
+                            Item addedItem = AddItem(template);
+                            addedItem = equipment.Find(x => x.Code == addedItem.Code);
+
+                            if (addedItem != null)
+                            {
+                                addedItem.Usage = usage;
+                                addedItem.toolSlot = Convert.ToSByte(toolslot);
+                                Debug.Log(equipment.Find(x => x.Code == addedItem.Code).toolSlot);
+                            }
+                        }
+                    }
+                }
                 // Read data from the CSV file
-                foreach (string line in File.ReadAllLines(filePath))
+                /*foreach (string line in File.ReadAllLines(filePath))
                 {
                     string[] parts = line.Split(';');
                     if (parts.Length < 3)
@@ -318,7 +368,7 @@ namespace _Emulator
                             item.Usage = usage;
                         }
                     }
-                }
+                }*/
             }
 
 

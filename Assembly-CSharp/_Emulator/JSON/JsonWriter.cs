@@ -24,15 +24,13 @@ namespace _Emulator.JSON
         public void WriteObject(JsonObject data)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
-            _writer.WriteLine("{");
+            _writer.Write(data.ToString());
+        }
 
-            foreach (var kvp in data)
-            {
-                string valueString = SerializeValue(kvp.Value);
-                _writer.WriteLine($"  \"{kvp.Key}\": {valueString}");
-            }
-
-            _writer.WriteLine("}");
+        public void WriteObject(JsonArray data)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            _writer.Write(data.ToString());
         }
 
         private string SerializeValue(object value)

@@ -739,6 +739,7 @@
     <Compile Include="_Emulator\Core.cs" />
     <Compile Include="_Emulator\Menu\Legacy\MainGUI.cs" />
     <Compile Include="_Emulator\Menu\Legacy\DebugConsole.cs" />
+    <Compile Include="_Emulator\JSON\JsonArray.cs" />
     <Compile Include="_Emulator\JSON\JsonObject.cs" />
     <Compile Include="_Emulator\JSON\JsonReader.cs" />
     <Compile Include="_Emulator\JSON\JsonWriter.cs" />

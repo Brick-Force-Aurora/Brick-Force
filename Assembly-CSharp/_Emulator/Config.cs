@@ -74,7 +74,7 @@ namespace _Emulator
             using (var reader = new StreamReader(path))
             {
                 var jsonReader = new JsonReader(reader);
-                configData = jsonReader.ReadObject();
+                configData = jsonReader.ReadObject<JsonObject>();
             }
 
             ClientExtension.instance.hostIP = configData.Get<string>("host_ip", "");
