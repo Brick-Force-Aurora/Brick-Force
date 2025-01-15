@@ -738,6 +738,7 @@
     <Compile Include="_Emulator\Network\ChannelManager.cs" />
     <Compile Include="_Emulator\Network\ChannelReference.cs" />
     <Compile Include="_Emulator\Network\ChunkedBuffer.cs" />
+    <Compile Include="_Emulator\Network\PlayerInfo.cs" />
     <Compile Include="_Emulator\Network\ShopEmulator.cs" />
     <Compile Include="_Emulator\Network\ClientExtension.cs" />
     <Compile Include="_Emulator\Network\ClientReference.cs" />
