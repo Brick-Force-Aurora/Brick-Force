@@ -347,8 +347,8 @@ namespace _Emulator
         private void HandleRequestInventory(MsgBody msg)
         {
             msg.Read(out int seq);
-            inventory = new Inventory(seq);
-            SendInventoryCSV();
+            inventory = new Inventory(seq, true);
+            SendInventoryData();
         }
 
         private void HandleCustomMessage(MsgBody msg)
@@ -357,7 +357,7 @@ namespace _Emulator
             MessageBoxMgr.Instance.AddMessage(message);
         }
 
-        public void SendInventoryCSV()
+        public void SendInventoryData()
         {
             MsgBody body = new MsgBody();
 
@@ -366,9 +366,9 @@ namespace _Emulator
             // Write each item's slot (category) and code
             foreach (var item in inventory.equipment)
             {
-                body.Write(item.Template.slot.ToString()); // Write the slot (e.g., Main, Secondary)
                 body.Write(item.Code);                     // Write the item code
                 body.Write(item.Usage.ToString());         // Write the item Usage
+                body.Write(item.toolSlot);
             }
 
             // Send the data

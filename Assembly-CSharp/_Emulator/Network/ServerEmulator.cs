@@ -869,7 +869,7 @@ namespace _Emulator
                         break;
 
                     case ExtensionOpcodes.opInventoryAck:
-                        HandleInventoryCSV(msgRef);
+                        HandleInventoryData(msgRef);
                         break;
 
                     case ExtensionOpcodes.opDisconnectReq:
@@ -1858,7 +1858,7 @@ namespace _Emulator
                 Debug.Log("HandleRegMapInfoRequest from: " + msgRef.client.GetIdentifier());
         }
 
-        private void HandleInventoryCSV(MsgReference msgRef)
+        private void HandleInventoryData(MsgReference msgRef)
         {
             // List to hold new equipment
             List<Item> newEquipment = new List<Item>();
@@ -1871,15 +1871,16 @@ namespace _Emulator
             // Read each item's slot and code
             for (int i = 0; i < itemCount; i++)
             {
-                msgRef.msg._msg.Read(out string slotName);
                 msgRef.msg._msg.Read(out string code);
                 msgRef.msg._msg.Read(out string usage);
+                msgRef.msg._msg.Read(out sbyte toolSlot);
 
                 // Fetch the item template
                 TItem template = TItemManager.Instance.Get<TItem>(code);
                 if (template != null)
                 {
-                    msgRef.client.inventory.AddItem(template, false, -1, (Item.USAGE) Enum.Parse(typeof(Item.USAGE), usage, true));
+                    var item = msgRef.client.inventory.AddItem(template, false, -1, (Item.USAGE) Enum.Parse(typeof(Item.USAGE), usage, true));
+                    item.toolSlot = toolSlot;
                 }
                 else
                 {
@@ -1943,7 +1944,6 @@ namespace _Emulator
 
                 item.Usage = Item.USAGE.EQUIP;
                 msgRef.client.inventory.GenerateActiveSlots();
-                msgRef.client.inventory.UpdateCSV();
 
                 SendEquip(msgRef.client, item.Seq, item.Code);
             }
@@ -1986,7 +1986,6 @@ namespace _Emulator
 
                 // Regenerate the active slots to reflect the change in the inventory.
                 msgRef.client.inventory.GenerateActiveSlots();
-                msgRef.client.inventory.UpdateCSV();
             }
         }
 

@@ -19,7 +19,7 @@ namespace _Emulator
         public string[] weaponChgString;
         public const int maxItems = 400;
 
-        public Inventory(int _seq)
+        public Inventory(int _seq, bool load = false)
         {
             equipment = new List<Item>();
             weaponChg = new Item[5];
@@ -27,13 +27,8 @@ namespace _Emulator
             activeSlots = new Item[19];
             seq = _seq;
 
-            LoadInventoryFromMemory();
-
-            /*if (csv != null)
-                LoadInventoryFromMemory();
-            else
-                LoadInventoryFromDisk();*/
-            //Sort();
+            if (load)
+                LoadInventoryFromDisk();
         }
 
         public void Apply()
@@ -120,20 +115,14 @@ namespace _Emulator
         public void RemoveItem(Item item)
         {
             equipment.Remove(item);
-            GenerateActiveSlots();
-            GenerateActiveTools();
-            GenerateActiveChange();
-            UpdateCSV();
+            Update();
         }
 
         public void RemoveItem(long seq)
         {
             Item item = equipment.Find(x => x.Seq == seq);
             equipment.Remove(item);
-            GenerateActiveSlots();
-            GenerateActiveTools();
-            GenerateActiveChange();
-            UpdateCSV();
+            Update();
         }
 
         public void Sort()
@@ -176,15 +165,21 @@ namespace _Emulator
             }
         }
 
-        public void UpdateCSV(string filePath = "Config\\Inventory.json")
+        public void Update()
+        {
+            GenerateActiveSlots();
+            GenerateActiveTools();
+            GenerateActiveChange();
+        }
+
+        // Do not call on server with default path
+        public void Save(string filePath = "Config\\Inventory.json")
         {
             try
             {
+                Update();
                 // Ensure the directory exists
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath));
-                GenerateActiveSlots();
-                GenerateActiveTools();
-                GenerateActiveChange();
 
                 using (var writer = new StreamWriter(filePath))
                 {
@@ -201,11 +196,10 @@ namespace _Emulator
                             { "weapon_change", weaponChg.Contains(item) },
                             { "toolbar", shooterTools.Contains(item) },
                             { "toolslot", item.toolSlot },
-                            { "starrate", item.starRate},
                             { "is_upgraded", item.IsUpgradedItem() },
-                            { "is_amount", item.IsAmount },
                             { "amount", item.Amount },
-                            { "remain", item.Remain }
+                            { "remain", item.Remain },
+                            //{ "upgrade_props", new JsonArray(item.upgradeProps) },
                         };
                         items.Add(jsonItem);
                     }
@@ -220,68 +214,9 @@ namespace _Emulator
             }
         }
 
-        /*public void UpdateCSV()
+        // Do not call on server with default path
+        public void LoadInventoryFromDisk(string filePath = "Config\\Inventory.json")
         {
-            csv.Save("Config\\InventoryBackup.csv");
-            GenerateActiveSlots();
-            GenerateActiveTools();
-            GenerateActiveChange();
-
-            List<Item> nonEquippedItems = equipment.FindAll(x => x.Usage == Item.USAGE.UNEQUIP && x.toolSlot < 0);
-            int row = 0;
-            int slot = 0;
-            int count = activeSlots.Length;
-            for (; row < count; row++, slot++)
-            {
-                csv._rows[row][1] = activeSlots[slot] == null ? "" : activeSlots[slot].Code;
-            }
-
-            slot = 0;
-            count += shooterTools.Length;
-            for (; row < count; row++, slot++)
-            {
-                csv._rows[row][1] = shooterTools[slot] == null ? "" : shooterTools[slot].Code;
-            }
-
-            slot = 0;
-            count += weaponChg.Length;
-            for (; row < count; row++, slot++)
-            {
-                csv._rows[row][1] = weaponChg[slot] == null ? "" : weaponChg[slot].Code;
-            }
-            int remainCount = csv.Rows - 26;
-            csv._rows.RemoveRange(26, remainCount);
-
-            csv._rows.Add(new string[] { "Inventory", nonEquippedItems[0].Code });
-
-            for (int i = 1; i < nonEquippedItems.Count; i++)
-            {
-                csv._rows.Add(new string[] { "", nonEquippedItems[i].Code });
-            }
-
-            Apply();
-        }
-
-        public void Save()
-        {
-            csv.Save("Config\\Inventory.csv");
-        }
-
-        public void LoadInventoryFromDisk(string path = "Config\\Inventory.csv")
-        {
-            equipment.Clear();
-            csv = new CSVLoader();
-            csv.Load(path);
-            if (csv._rows.Count >= maxItems)
-                csv._rows.RemoveRange(maxItems, csv._rows.Count - maxItems);
-
-            LoadInventoryFromMemory();
-        }*/
-
-        public void LoadInventoryFromMemory()
-        {
-            string filePath = "Config\\Inventory.json";
-
             // Ensure the directory exists
             Directory.CreateDirectory(Path.GetDirectoryName(filePath));
 
@@ -313,8 +248,9 @@ namespace _Emulator
                         }
                     }
                 }
-                //Debug.Log($"Inventory file created at {filePath}.");
-            } else
+            }
+
+            else
             {
                 using (var reader = new StreamReader(filePath))
                 {
@@ -339,42 +275,13 @@ namespace _Emulator
                             {
                                 addedItem.Usage = usage;
                                 addedItem.toolSlot = Convert.ToSByte(toolslot);
-                                Debug.Log(equipment.Find(x => x.Code == addedItem.Code).toolSlot);
                             }
                         }
                     }
                 }
-                // Read data from the CSV file
-                /*foreach (string line in File.ReadAllLines(filePath))
-                {
-                    string[] parts = line.Split(';');
-                    if (parts.Length < 3)
-                        continue;
-
-                    string categoryName = parts[0];
-                    string code = parts[1];
-                    Item.USAGE usage = (Item.USAGE) Enum.Parse(typeof(Item.USAGE), parts[2], true);
-
-                    if (!string.IsNullOrEmpty(code))
-                    {
-                        TItem template = TItemManager.Instance.Get<TItem>(code);
-                        if (template == null)
-                            continue;
-
-                        Item item = AddItem(template);
-
-                        if (item != null)
-                        {
-                            item.Usage = usage;
-                        }
-                    }
-                }*/
             }
 
-
-            GenerateActiveSlots();
-            GenerateActiveTools();
-            GenerateActiveChange();
+            Update();
         }
 
         public static int SlotToIndex(TItem.SLOT slot)
