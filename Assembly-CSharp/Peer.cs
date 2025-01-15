@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Steamworks;
 using UnityEngine;
 
 public class Peer
@@ -34,6 +35,9 @@ public class Peer
 	private Dictionary<int, P2P_STATUS> dicLinked;
 
 	private float pingTime;
+
+	public CSteamID steamID;
+	public bool isSteam = false;
 
 	public int Seq => seq;
 
@@ -127,6 +131,7 @@ public class Peer
 
 	public Peer(int _seq, string _localIp, int _localPort, string _remoteIp, int _remotePort, byte _playerFlag)
 	{
+		isSteam = false;
 		seq = _seq;
 		deltaTime = 0f;
 		localIp = _localIp;
@@ -139,7 +144,19 @@ public class Peer
 		pingTime = 0f;
 	}
 
-	public bool IsWebPlayer()
+    public Peer(int _seq, CSteamID _steamID, byte _playerFlag)
+    {
+		isSteam = true;
+        seq = _seq;
+		steamID = _steamID;
+        deltaTime = 0f;
+        playerFlag = _playerFlag;
+        p2pStatus = P2P_STATUS.NONE;
+        dicLinked = new Dictionary<int, P2P_STATUS>();
+        pingTime = 0f;
+    }
+
+    public bool IsWebPlayer()
 	{
 		return (playerFlag & 1) != 0;
 	}

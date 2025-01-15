@@ -30,6 +30,8 @@ public class P2PMsg4Send
 
 	public ushort Meta => _meta;
 
+	public byte _id;
+
 	public P2PMsg4Send(byte id, ushort meta, byte src, byte dst, P2PMsgBody msgBody, byte sendKey)
 	{
 		ushort num = (ushort)msgBody.Offset;
@@ -49,6 +51,7 @@ public class P2PMsg4Send
 				msgBody.Buffer[j] ^= sendKey;
 			}
 		}
+		_id = id;
 		_meta = meta;
 		_io = 0;
 		_buffer = new byte[8 + num];

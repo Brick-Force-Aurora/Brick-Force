@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace _Emulator
 {
-    class Hook
+    class ManagedHook
     {
         private const uint HOOK_SIZE_X64 = 12;
         private const uint HOOK_SIZE_X86 = 7;
@@ -14,13 +14,13 @@ namespace _Emulator
         public MethodInfo HookMethod { get; private set; }
 
 
-        public Hook()
+        public ManagedHook()
         {
             original = null;
             OriginalMethod = HookMethod = null;
         }
 
-        public Hook(MethodInfo orig, MethodInfo hook)
+        public ManagedHook(MethodInfo orig, MethodInfo hook)
         {
             original = null;
             Init(orig, hook);

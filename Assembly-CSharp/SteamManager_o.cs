@@ -1,19 +1,19 @@
 using Infernum;
 using UnityEngine;
 
-public class SteamManager : MonoBehaviour
+public class SteamManager_o : MonoBehaviour
 {
 	private bool _loaded;
 
-	private static SteamManager _instance;
+	private static SteamManager_o _instance;
 
-	public static SteamManager Instance
+	public static SteamManager_o Instance
 	{
 		get
 		{
 			if (null == _instance)
 			{
-				_instance = (Object.FindObjectOfType(typeof(SteamManager)) as SteamManager);
+				_instance = (Object.FindObjectOfType(typeof(SteamManager_o)) as SteamManager_o);
 				if (null == _instance)
 				{
 					Debug.LogError("ERROR, Fail to get the SteamManager Instance");

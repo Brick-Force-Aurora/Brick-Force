@@ -24,6 +24,7 @@ namespace _Emulator
 
         private void OnGUI()
         {
+            return;
             if (!setupHidden)
                 setupGUIRect = GUILayout.Window(100, setupGUIRect, SetupGUIWindow, "Setup");
 
@@ -47,6 +48,13 @@ namespace _Emulator
             {
                 hostHidden = true;
                 ClientExtension.instance.LoadServer();
+            }
+
+            if (GUILayout.Button("Steam"))
+            {
+                SteamGUI.instance.hidden = false;
+                hostHidden = true;
+                setupHidden = true;
             }
         }
 

@@ -15,7 +15,7 @@ namespace _Emulator.JSON
             _data[key] = value;
         }
 
-        public T Get<T>(string key)
+        public T Get<T>(string key, T fallback = default)
         {
             if (_data.TryGetValue(key, out var value))
             {
@@ -23,10 +23,12 @@ namespace _Emulator.JSON
                 {
                     return typedValue;
                 }
+
                 throw new InvalidCastException($"Value for key '{key}' is not of type {typeof(T).Name}.");
             }
-            throw new KeyNotFoundException($"Key '{key}' not found in JsonObject.");
+            return fallback;
         }
+
 
         public Dictionary<string, object> ToDictionary()
         {

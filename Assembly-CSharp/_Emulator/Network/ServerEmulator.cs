@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Policy;
 using System.Text.RegularExpressions;
+using Steamworks;
 using UnityEngine;
 using static Room;
 using Debug = UnityEngine.Debug;
@@ -24,10 +26,11 @@ namespace _Emulator
         private Queue<MsgReference> readQueue = new Queue<MsgReference>();
         private Queue<MsgReference> writeQueue = new Queue<MsgReference>();
         private int curSeq = 0;
-        public bool debugHandle = false;
-        public bool debugSend = false;
+        public bool debugHandle = true;
+        public bool debugSend = true;
         public bool debugPing = false;
         public bool serverCreated = false;
+        public bool isSteam = false;
         //public MatchData matchData;
         //private Channel defaultChannel;
         public ChannelManager channelManager = new ChannelManager();
@@ -37,11 +40,11 @@ namespace _Emulator
 
         private void Start()
         {
-            //matchData = new MatchData();
         }
 
         public void SetupServer()
         {
+            isSteam = false;
             try
             {
                 if (serverSocket == null)
@@ -60,6 +63,16 @@ namespace _Emulator
             {
                 Debug.LogError("SetupServer: " + ex.Message);
             }
+
+            //Pulls all loaded RegMaps into the emulator
+            regMaps = RegMapManager.Instance.dicRegMap.ToList();
+        }
+
+        public void SetupServerSteam()
+        {
+            isSteam = true;
+            serverCreated = true;
+            Debug.Log("Server set to Steam");
 
             //Pulls all loaded RegMaps into the emulator
             regMaps = RegMapManager.Instance.dicRegMap.ToList();
@@ -134,74 +147,221 @@ namespace _Emulator
             clientSocket.EndSend(result);
         }
 
+        public void AcceptSteam(CSteamID steamID)
+        {
+            if (!isSteam || !SteamManager.Initialized)
+                return;
+
+            lock (SteamLobbyManager.instance.currentLobbyLock)
+            {
+                if (SteamLobbyManager.instance.currentLobby != null)
+                {
+                    string name = SteamLobbyManager.instance.currentLobby.GetMemberName(steamID);
+                    ClientReference client = new ClientReference(steamID, name);
+
+                    if (!Config.instance.blockConnections)
+                    {
+                        if (!HandleClientAccepted(client))
+                            SendDisconnect(client);
+                    }
+
+                    else
+                        SendDisconnect(client);
+                }
+            }
+        }
+
+        public void ReceiveSteam(CSteamID steamID, byte[] msg)
+        {
+            if (!isSteam)
+                return;
+
+            if (msg == null)
+            {
+                Debug.LogError("ReceiveSteam: msg was null");
+                return;
+            }
+
+            if (msg.Length < 15)
+            {
+                Debug.LogError("ReceiveSteam: msg length was " + msg.Length);
+                return;
+            }
+
+            try
+            {
+                ClientReference client = FindClientBySteamID(steamID);
+                if (client != null)
+                {
+                    Msg4Recv recv = new Msg4Recv(msg);
+                    recv._hdr.FromArray(recv.Buffer);
+                    MsgBody msgBody = recv.Flush();
+                    msgBody.Decrypt(recvKey);
+
+                    lock (dataLock)
+                    {
+                        readQueue.Enqueue(new MsgReference(new Msg2Handle(recv.GetId(), msgBody), client, _channelRef: client.channel, _matchData: client.matchData));
+                    }
+                }
+            }
+
+            catch (Exception ex)
+            {
+                Debug.LogError("ReceiveSteam: " + ex.Message);
+            }
+        }
+
         private void UnicastMessage(MsgReference msgRef)
         {
             Msg4Send data = new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey);
-            msgRef.client.socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.client.socket);
+            if (isSteam)
+                SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, msgRef.client.steamID, data);
+            else
+                msgRef.client.socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.client.socket);
         }
         private void BroadcastMessage(MsgReference msgRef)
         {
             Msg4Send data = new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey);
-            for (int i = 0; i < clientList.Count; i++)
+            if (isSteam)
             {
-                clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), clientList[i].socket);
+                for (int i = 0; i < clientList.Count; i++)
+                {
+                    SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, clientList[i].steamID, data);
+                }
+            }
+
+            else
+            {
+                for (int i = 0; i < clientList.Count; i++)
+                {
+                    clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), clientList[i].socket);
+                }
             }
         }
 
         private void BroadcastChannelMessage(MsgReference msgRef)
         {
             Msg4Send data = new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey);
-            for (int i = 0; i < msgRef.channelRef.clientList.Count; i++)
+            if (isSteam)
             {
-                msgRef.channelRef.clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.channelRef.clientList[i].socket);
+                for (int i = 0; i < msgRef.channelRef.clientList.Count; i++)
+                {
+                    SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, msgRef.channelRef.clientList[i].steamID, data);
+                }
+            }
+
+            else
+            {
+                for (int i = 0; i < msgRef.channelRef.clientList.Count; i++)
+                {
+                    msgRef.channelRef.clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.channelRef.clientList[i].socket);
+                }
             }
         }
 
         private void BroadcastRoomMessage(MsgReference msgRef)
         {
             Msg4Send data = new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey);
-            for (int i = 0; i < msgRef.matchData.clientList.Count; i++)
+            if (isSteam)
             {
-                if (msgRef.matchData.clientList[i].clientStatus < ClientReference.ClientStatus.Room)
-                    continue;
+                for (int i = 0; i < msgRef.matchData.clientList.Count; i++)
+                {
+                    if (msgRef.matchData.clientList[i].clientStatus < ClientReference.ClientStatus.Room)
+                        continue;
 
-                msgRef.matchData.clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.matchData.clientList[i].socket);
+                    SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, msgRef.matchData.clientList[i].steamID, data);
+                }
+            }
+
+            else
+            {
+                for (int i = 0; i < msgRef.matchData.clientList.Count; i++)
+                {
+                    if (msgRef.matchData.clientList[i].clientStatus < ClientReference.ClientStatus.Room)
+                        continue;
+
+                    msgRef.matchData.clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.matchData.clientList[i].socket);
+                }
             }
         }
 
         private void BroadcastRedTeamMessage(MsgReference msgRef)
         {
+            Debug.LogWarning("BroadcastRedTeamMessage");
             Msg4Send data = new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey);
-            for (int i = 0; i < clientList.Count; i++)
+            if (isSteam)
             {
-                if (clientList[i].clientStatus < ClientReference.ClientStatus.Room || !clientList[i].slot.isRed)
-                    continue;
+                for (int i = 0; i < clientList.Count; i++)
+                {
+                    if (clientList[i].clientStatus < ClientReference.ClientStatus.Room || !clientList[i].slot.isRed)
+                        continue;
 
-                clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), clientList[i].socket);
+                    SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, clientList[i].steamID, data);
+                }
+            }
+
+            else
+            {
+                for (int i = 0; i < clientList.Count; i++)
+                {
+                    if (clientList[i].clientStatus < ClientReference.ClientStatus.Room || !clientList[i].slot.isRed)
+                        continue;
+
+                    clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), clientList[i].socket);
+                }
             }
         }
 
         private void BroadcastBlueTeamMessage(MsgReference msgRef)
         {
+            Debug.LogWarning("BroadcastBlueTeamMessage");
             Msg4Send data = new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey);
-            for (int i = 0; i < clientList.Count; i++)
+            if (isSteam)
             {
-                if (clientList[i].clientStatus < ClientReference.ClientStatus.Room || clientList[i].slot.isRed)
-                    continue;
+                for (int i = 0; i < clientList.Count; i++)
+                {
+                    if (clientList[i].clientStatus < ClientReference.ClientStatus.Room || clientList[i].slot.isRed)
+                        continue;
 
-                clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), clientList[i].socket);
+                    SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, clientList[i].steamID, data);
+                }
+            }
+
+            else
+            {
+                for (int i = 0; i < clientList.Count; i++)
+                {
+                    if (clientList[i].clientStatus < ClientReference.ClientStatus.Room || clientList[i].slot.isRed)
+                        continue;
+
+                    clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), clientList[i].socket);
+                }
             }
         }
 
         private void BroadcastRoomMessageExclusive(MsgReference msgRef)
         {
             Msg4Send data = new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey);
-            for (int i = 0; i < msgRef.matchData.clientList.Count; i++)
+            if (isSteam)
             {
-                if (msgRef.matchData.clientList[i].socket == msgRef.client.socket || msgRef.matchData.clientList[i].clientStatus < ClientReference.ClientStatus.Room)
-                    continue;
+                for (int i = 0; i < msgRef.matchData.clientList.Count; i++)
+                {
+                    if (msgRef.matchData.clientList[i].steamID == msgRef.client.steamID || msgRef.matchData.clientList[i].clientStatus < ClientReference.ClientStatus.Room)
+                        continue;
 
-                msgRef.matchData.clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.matchData.clientList[i].socket);
+                    SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, msgRef.matchData.clientList[i].steamID, data);
+                }
+            }
+
+            else
+            {
+                for (int i = 0; i < msgRef.matchData.clientList.Count; i++)
+                {
+                    if (msgRef.matchData.clientList[i].socket == msgRef.client.socket || msgRef.matchData.clientList[i].clientStatus < ClientReference.ClientStatus.Room)
+                        continue;
+
+                    msgRef.matchData.clientList[i].socket.BeginSend(data.Buffer, 0, data.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.matchData.clientList[i].socket);
+                }
             }
         }
 
@@ -211,7 +371,14 @@ namespace _Emulator
             if (client == null)
                 Debug.LogError("FindClientBySocket: Could not find ClientReference for client: " + clientSocket.RemoteEndPoint.ToString());
             return client;
+        }
 
+        private ClientReference FindClientBySteamID(CSteamID steamID)
+        {
+            ClientReference client = clientList.Find(x => x.steamID == steamID);
+            if (client == null)
+                Debug.LogError("FindClientBySteamID: Could not find ClientReference for client: " + steamID);
+            return client;
         }
 
         public void ShutdownInit()
@@ -230,8 +397,11 @@ namespace _Emulator
             lock (dataLock)
             {
                 waitForShutDown = false;
-                serverSocket.Shutdown(SocketShutdown.Both);
-                serverSocket.Close();
+                if (!isSteam)
+                {
+                    serverSocket.Shutdown(SocketShutdown.Both);
+                    serverSocket.Close();
+                }
                 ClearBuffers();
                 clientList.Clear();
             }
@@ -251,7 +421,6 @@ namespace _Emulator
             lock (dataLock)
             {
                 writeQueue.Enqueue(msg);
-                //SendMessages();
             }
         }
 
@@ -309,6 +478,57 @@ namespace _Emulator
                     client.toleranceTime += Time.deltaTime;
                     if (client.toleranceTime >= 3f)
                         client.Disconnect(false);
+                }
+            }
+        }
+
+        public bool GetGamestateStrings(out string roomType, out string roomStatus, out string mapAlias)
+        {
+            if (channelManager != null && channelManager.channels != null)
+            {
+                foreach (var channel in channelManager.channels)
+                {
+                    if (channel != null && channel.matches != null)
+                    {
+                        foreach (var match in channel.matches)
+                        {
+                            if (match != null && match.room != null)
+                            {
+                                roomType = BfUtils.RoomTypeToString(match.room.Type);
+                                roomStatus = BfUtils.RoomStatusToString(match.room.Status);
+                                if (match.room.Type == ROOM_TYPE.MAP_EDITOR)
+                                    mapAlias = UserMapInfoManager.Instance.CurMapName;
+                                else
+                                    mapAlias = match.room.CurMapAlias;
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            roomType = "None";
+            roomStatus = "None";
+            mapAlias = "None";
+            return false;
+        }
+
+        public void EndAllMatches()
+        {
+            if (channelManager != null && channelManager.channels != null)
+            {
+                foreach (var channel in channelManager.channels)
+                {
+                    if (channel != null && channel.matches != null)
+                    {
+                        foreach (var match in channel.matches)
+                        {
+                            if (match != null)
+                            {
+                                match.EndMatch();
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -745,7 +965,13 @@ namespace _Emulator
         {
             lock (dataLock)
             {
-                if (!Config.instance.blockConnections && clientList.Count < Config.instance.maxConnections && !clientList.Exists(x => x.socket == client.socket) && (!Config.instance.oneClientPerIP || !clientList.Exists(x => x.ip == client.ip)))
+                bool nonExisting = false;
+                if (isSteam)
+                    nonExisting = !clientList.Exists(x => x.steamID == client.steamID);
+                else
+                    nonExisting = !clientList.Exists(x => x.socket == client.socket) && (!Config.instance.oneClientPerIP || !clientList.Exists(x => x.ip == client.ip));
+
+                if (!Config.instance.blockConnections && clientList.Count < Config.instance.maxConnections && nonExisting)
                 {
                     clientList.Add(client);
                     SendConnected(client);
@@ -956,13 +1182,25 @@ namespace _Emulator
                 matchData.AddClient(msgRef.client);
 
                 SendJoin(msgRef.client);
-                SendRendezvousInfo(msgRef.client);
+
+                if (isSteam)
+                    SendRendezvousInfoSteam(msgRef.client);
+                else
+                    SendRendezvousInfo(msgRef.client);
                 SendMaster(msgRef.client, matchData);
                 SendSlotLocks(msgRef.client);
                 SendRoomConfig(msgRef.client, matchData);
                 SendAddRoom(msgRef.client, matchData);
-                SendEnter(msgRef.client);
-                SendSlotData(matchData);
+
+                if (isSteam)
+                    SendEnterSteam(msgRef.client);
+                else
+                    SendEnter(msgRef.client);
+
+                if (isSteam)
+                    SendSlotDataSteam(matchData);
+                else
+                    SendSlotData(matchData);
 
                 if (matchData.room.Type == Room.ROOM_TYPE.MAP_EDITOR)
                     SendCopyright(msgRef.client);
@@ -1105,14 +1343,27 @@ namespace _Emulator
                 Debug.Log("HandleCreateRoom from: " + msgRef.client.GetIdentifier());
 
             matchData.AddClient(msgRef.client);
-            SendRendezvousInfo(msgRef.client);
+
+            if (isSteam)
+                SendRendezvousInfoSteam(msgRef.client);
+            else
+                SendRendezvousInfo(msgRef.client);
+
             SendMaster(msgRef.client, matchData);
             SendSlotLocks(msgRef.client);
             SendRoomConfig(msgRef.client, matchData);
             SendAddRoom(msgRef.client, matchData);
             SendCreateRoom(msgRef.client);
-            SendEnter(msgRef.client);
-            SendSlotData(matchData);
+
+            if (isSteam)
+                SendEnterSteam(msgRef.client);
+            else
+                SendEnter(msgRef.client);
+
+            if (isSteam)
+                SendSlotDataSteam(matchData);
+            else
+                SendSlotData(matchData);
 
             if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.MAP_EDITOR)
                 SendCopyright(msgRef.client);
@@ -3336,6 +3587,41 @@ namespace _Emulator
                 Debug.Log("Broadcasted SendEnter for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
         }
 
+        public void SendEnterSteam(ClientReference client)
+        {
+            MatchData matchData = client.matchData;
+
+            MsgBody body = new MsgBody();
+
+            body.Write(client.slot.slotIndex);
+            body.Write(client.seq);
+            body.Write(client.name);
+            body.Write(client.steamID.m_SteamID);
+            body.Write(client.inventory.equipmentString.Length);
+            for (int i = 0; i < client.inventory.equipmentString.Length; i++)
+            {
+                body.Write(client.inventory.equipmentString[i]);
+            }
+            body.Write((int)client.status);
+            body.Write(client.data.xp);
+            body.Write(client.data.clanSeq);
+            body.Write(client.data.clanName);
+            body.Write(client.data.clanMark);
+            body.Write(client.data.rank);
+            body.Write((byte)1); //playerflag
+            body.Write(client.inventory.weaponChgString.Length);
+            for (int i = 0; i < client.inventory.weaponChgString.Length; i++)
+            {
+                body.Write(client.inventory.weaponChgString[i]);
+            }
+            body.Write(0); //drpItem count
+
+            Say(new MsgReference(ExtensionOpcodes.opEnterSteamAck, body, client, SendType.BroadcastRoomExclusive, matchData.channel, matchData));
+
+            if (debugSend)
+                Debug.Log("Broadcasted SendEnterSteam for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
+        }
+
         public void SendLeave(ClientReference client)
         {
             MatchData matchData = client.matchData;
@@ -3390,6 +3676,45 @@ namespace _Emulator
 
             if (debugSend)
                 Debug.Log("Broadcasted SendSlotData for room no: " + matchData.room.No);
+        }
+
+        public void SendSlotDataSteam(MatchData matchData)
+        {
+            MsgBody body = new MsgBody();
+
+            body.Write(matchData.clientList.Count);
+            for (int i = 0; i < matchData.clientList.Count; i++)
+            {
+                ClientReference client = matchData.clientList[i];
+                body.Write(client.slot.slotIndex);
+                body.Write(client.seq);
+                body.Write(client.name);
+                body.Write(client.steamID.m_SteamID);
+                body.Write(client.inventory.equipmentString.Length);
+                for (int j = 0; j < client.inventory.equipmentString.Length; j++)
+                {
+                    body.Write(client.inventory.equipmentString[j]);
+                }
+                body.Write((int)client.status);
+                body.Write(client.data.xp);
+                body.Write(client.data.clanSeq);
+                body.Write(client.data.clanName);
+                body.Write(client.data.clanMark);
+                body.Write(client.data.rank);
+                body.Write((byte)1); //playerflag
+                body.Write(client.inventory.weaponChgString.Length);
+                for (int j = 0; j < client.inventory.weaponChgString.Length; j++)
+                {
+                    body.Write(client.inventory.weaponChgString[j]);
+                }
+                body.Write(0); //drpItem count
+            }
+
+            //Say(new MsgReference(ExtensionOpcodes.opSlotDataSteamAck, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
+            Say(new MsgReference(ExtensionOpcodes.opSlotDataSteamAck, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
+
+            if (debugSend)
+                Debug.Log("Broadcasted SendSlotDataSteam for room no: " + matchData.room.No);
         }
 
         public void SendTeamChange(ClientReference client)
@@ -3493,6 +3818,18 @@ namespace _Emulator
 
             if (debugSend)
                 Debug.Log("SendRendezvousInfo to: " + client.GetIdentifier());
+        }
+
+        public void SendRendezvousInfoSteam(ClientReference client)
+        {
+            MsgBody body = new MsgBody();
+
+            body.Write(client.steamID.m_SteamID);
+
+            Say(new MsgReference(ExtensionOpcodes.opRendezvousInfoSteamAck, body, client));
+
+            if (debugSend)
+                Debug.Log("SendRendezvousInfoSteam to: " + client.GetIdentifier());
         }
 
         public void SendPlayerInitInfo(ClientReference client)

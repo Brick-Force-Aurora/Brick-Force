@@ -1,4 +1,5 @@
 using System.Net;
+using Steamworks;
 
 public class P2PMsg2Handle
 {
@@ -7,6 +8,8 @@ public class P2PMsg2Handle
 	public P2PMsgBody _msg;
 
 	public IPEndPoint _recvFrom;
+
+	public CSteamID _steamIDFrom;
 
 	public ushort _meta;
 
@@ -23,4 +26,14 @@ public class P2PMsg2Handle
 		_src = src;
 		_dst = dst;
 	}
+
+    public P2PMsg2Handle(ushort id, P2PMsgBody msg, CSteamID steamIDFrom, ushort meta, byte src, byte dst)
+    {
+        _id = id;
+        _msg = msg;
+        _steamIDFrom = steamIDFrom;
+        _meta = meta;
+        _src = src;
+        _dst = dst;
+    }
 }

@@ -9,14 +9,19 @@ namespace _Emulator
 
         public void Initialize()
         {
-            Hooks.Initialize();
+            HooksManaged.Initialize();
             coreObject = new GameObject();
             MainGUI.instance = coreObject.AddComponent<MainGUI>();
             InventoryGUI.instance = coreObject.AddComponent<InventoryGUI>();
             ConfigGUI.instance = coreObject.AddComponent<ConfigGUI>();
             DebugConsole.instance = coreObject.AddComponent<DebugConsole>();
             ServerEmulator.instance = coreObject.AddComponent<ServerEmulator>();
-            UnityEngine.Object.DontDestroyOnLoad(coreObject);
+            SteamManager.Instance = coreObject.AddComponent<SteamManager>();
+            SteamLobbyManager.instance = coreObject.AddComponent<SteamLobbyManager>();
+            SteamNetworkingManager.instance = coreObject.AddComponent<SteamNetworkingManager>();
+            SteamGUI.instance = coreObject.AddComponent<SteamGUI>();
+            ImGuiBackend.instance = coreObject.AddComponent<ImGuiBackend>();
+            Object.DontDestroyOnLoad(coreObject);
             Config.instance = new Config();
             SetupBuildConfig();
         }

@@ -67,7 +67,7 @@ public class Login : MonoBehaviour
 
 	private Vector2 crdRegisterRequest = new Vector2(705f, 670f);
 
-	private LOGIN_STEP loginStep;
+	public LOGIN_STEP loginStep;
 
 	private bool guiOnce;
 

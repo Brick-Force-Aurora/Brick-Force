@@ -1,4 +1,5 @@
 ﻿using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -22,8 +23,11 @@ namespace _Emulator
 
         private void OnGUI()
         {
+            return;
             if (!hidden)
+            {
                 configGUIRect = GUILayout.Window(104, configGUIRect, ConfigGUIWindow, "Config");
+            }
         }
 
         private void ConfigGUIWindow(int winID)
@@ -48,6 +52,7 @@ namespace _Emulator
             ServerEmulator.instance.debugHandle = GUILayout.Toggle(ServerEmulator.instance.debugHandle, "Debug Handle");
             ServerEmulator.instance.debugSend = GUILayout.Toggle(ServerEmulator.instance.debugSend, "Debug Send");
             ServerEmulator.instance.debugPing = GUILayout.Toggle(ServerEmulator.instance.debugPing, "Debug Ping");
+            SteamManager.debug = GUILayout.Toggle(SteamManager.debug, "Debug Steam");
         }
     }
 }

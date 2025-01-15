@@ -79,7 +79,9 @@ namespace _Emulator
         public void OnGUI()
         {
             if (!hidden)
+            {
                 windowRect = GUILayout.Window(123456, windowRect, ConsoleWindow, "Console");
+            }
         }
 
         void ConsoleWindow(int windowID)

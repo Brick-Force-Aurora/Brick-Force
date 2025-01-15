@@ -75,7 +75,7 @@ public class CSNetManager : MonoBehaviour
 		}
 		set
 		{
-			sock = value;
+            sock = value;
 		}
 	}
 
