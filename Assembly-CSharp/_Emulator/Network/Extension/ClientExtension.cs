@@ -105,6 +105,13 @@ namespace _Emulator
             CSNetManager.Instance.Sock.Say(id, msgBody);
         }
 
+        public void UpdateLocalInventory()
+        {
+            inventory.UpdateActiveEquipment();
+            inventory.Apply();
+            SendInventoryData();
+        }
+
         public void HandleReliableKillLog()
         {
             if (lastKillLogId != -1)
@@ -175,6 +182,7 @@ namespace _Emulator
             {
                 gameObject.BroadcastMessage("OnSeed");
             }
+            Core.SetBalancedItemProperties();
         }
 
         private void HandleDisconnected(MsgBody msg)

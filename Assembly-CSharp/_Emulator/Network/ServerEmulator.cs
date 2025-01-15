@@ -1610,74 +1610,76 @@ namespace _Emulator
             //negative = permanent
             if (option > 30) remain = -1;
             sbyte premium = 0; // isPremium 0 || 1
-            int durability = int.MaxValue; //Durability int.MaxValue = Permanent
-            MsgBody body = new MsgBody();
+            int durability = 100; //Durability int.MaxValue = Permanent
 
             TItem template = TItemManager.Instance.dic.FirstOrDefault(x => x.Value.code == code).Value;
-
-            int seqSeed = msgRef.client.seq + 1;
-            byte[] baseSeq = new byte[8];
-            byte[] seed = System.Text.Encoding.UTF8.GetBytes(template.name);
-            byte[] codeSeed = System.Text.Encoding.UTF8.GetBytes(template.code);
-            for (int i = 0; i < seed.Length && i < 5; i++)
-                baseSeq[i] = (byte)(seed[i] ^ seed[seed.Length - 1 - i]);
-
-            for (int i = 0; i < 3; i++)
-                baseSeq[i] ^= codeSeed[i];
-
-            long itemSeq = BitConverter.ToInt64(baseSeq, 0) * seqSeed;
-
-            Good good = ShopManager.Instance.dic.FirstOrDefault(x => x.Value.code == code).Value;
-            int price = good.GetPriceByOpt(option, (Good.BUY_HOW)buyHow);
-            switch ((Good.BUY_HOW)buyHow)
+            if (template == null)
             {
-                case Good.BUY_HOW.BRICK_POINT:
-                    break;
-                case Good.BUY_HOW.CASH_POINT:
-                    if (msgRef.client.data.tokens >= price)
-                    {
-                        int tokens = msgRef.client.data.tokens = msgRef.client.data.tokens - price;
-                        MsgBody bodyUpdate = new MsgBody();
-                        bodyUpdate.Write(msgRef.client.data.forcePoints);
-                        bodyUpdate.Write(msgRef.client.data.brickPoints);
-                        bodyUpdate.Write(tokens);
-                        bodyUpdate.Write(msgRef.client.data.coins);
-                        bodyUpdate.Write(msgRef.client.data.starDust);
-                        Say(new MsgReference(102, bodyUpdate, msgRef.client, SendType.Unicast));
-                    }
-                    else
-                    {
-                        itemSeq = -3;
-                    }
-                    break;
-                case Good.BUY_HOW.GENERAL_POINT:
-                    if (msgRef.client.data.forcePoints >= price)
-                    {
-                        int point = msgRef.client.data.forcePoints = msgRef.client.data.forcePoints - price;
-                        MsgBody bodyUpdate = new MsgBody();
-                        bodyUpdate.Write(point);
-                        bodyUpdate.Write(msgRef.client.data.brickPoints);
-                        bodyUpdate.Write(msgRef.client.data.tokens);
-                        bodyUpdate.Write(msgRef.client.data.coins);
-                        bodyUpdate.Write(msgRef.client.data.starDust);
-                        Say(new MsgReference(102, bodyUpdate, msgRef.client, SendType.Unicast));
-                    }
-                    else
-                    {
-                        itemSeq = -3;
-                    }
-                    break;
-                default:
-                    break;
+                SendCustomMessage("Item doesn't exist.", msgRef.client, SendType.Unicast);
+                return;
             }
 
-            msgRef.client.inventory.AddItem(template);
-            body.Write(itemSeq);
-            body.Write(code);
-            body.Write(remain);
-            body.Write(premium);
-            body.Write(durability);
-            Say(new MsgReference(122, body, msgRef.client, SendType.Unicast));
+            var item = msgRef.client.inventory.CreateItem(template);
+            if (item != null)
+            {
+                bool canBuy = false;
+                Good good = ShopManager.Instance.dic.FirstOrDefault(x => x.Value.code == code).Value;
+                int price = good.GetPriceByOpt(option, (Good.BUY_HOW)buyHow);
+                switch ((Good.BUY_HOW)buyHow)
+                {
+                    case Good.BUY_HOW.BRICK_POINT:
+                        break;
+                    case Good.BUY_HOW.CASH_POINT:
+                        if (msgRef.client.data.tokens >= price)
+                        {
+                            int tokens = msgRef.client.data.tokens = msgRef.client.data.tokens - price;
+                            MsgBody bodyUpdate = new MsgBody();
+                            bodyUpdate.Write(msgRef.client.data.forcePoints);
+                            bodyUpdate.Write(msgRef.client.data.brickPoints);
+                            bodyUpdate.Write(tokens);
+                            bodyUpdate.Write(msgRef.client.data.coins);
+                            bodyUpdate.Write(msgRef.client.data.starDust);
+                            Say(new MsgReference(102, bodyUpdate, msgRef.client, SendType.Unicast));
+                            canBuy = true;
+                        }
+                        break;
+                    case Good.BUY_HOW.GENERAL_POINT:
+                        if (msgRef.client.data.forcePoints >= price)
+                        {
+                            int point = msgRef.client.data.forcePoints = msgRef.client.data.forcePoints - price;
+                            MsgBody bodyUpdate = new MsgBody();
+                            bodyUpdate.Write(point);
+                            bodyUpdate.Write(msgRef.client.data.brickPoints);
+                            bodyUpdate.Write(msgRef.client.data.tokens);
+                            bodyUpdate.Write(msgRef.client.data.coins);
+                            bodyUpdate.Write(msgRef.client.data.starDust);
+                            Say(new MsgReference(102, bodyUpdate, msgRef.client, SendType.Unicast));
+                            canBuy = true;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+
+                MsgBody body = new MsgBody();
+                body.Write(canBuy ? item.Seq : -3);
+                body.Write(item.Code);
+                body.Write(item.Remain);
+                body.Write(Convert.ToSByte(item.IsPremium));
+                body.Write(item.Durability);
+                Say(new MsgReference(122, body, msgRef.client, SendType.Unicast));
+
+                /*MsgBody body = new MsgBody();
+                body.Write(canBuy ? item.Seq : -3);
+                body.Write(code);
+                body.Write(remain);
+                body.Write(premium);
+                body.Write(durability);
+                Say(new MsgReference(122, body, msgRef.client, SendType.Unicast));*/
+
+            }
+            else
+                SendCustomMessage("Couldn't create item " + template.name);
         }
 
         private void HandleKillLogRequest(MsgReference msgRef)
@@ -1890,10 +1892,6 @@ namespace _Emulator
 
             if (debugHandle)
                 Debug.Log($"HandleInventoryCSV from: {msgRef.client.GetIdentifier()}");
-
-            msgRef.client.inventory.GenerateActiveSlots();
-            msgRef.client.inventory.GenerateActiveTools();
-            msgRef.client.inventory.GenerateActiveChange();
 
             // Notify the client about the updated inventory
             SendInventory(msgRef.client);
@@ -2777,10 +2775,11 @@ namespace _Emulator
         }
         public void SendInventory(ClientReference client)
         {
+            client.inventory.UpdateActiveEquipment();
             SendItemList(client);
             SendShooterToolList(client);
             SendWeaponSlotList(client);
-            SendItemProperties(client);
+            //SendItemProperties(client);
             SendItemPimps(client);
             SendPremiumItems(client);
         }
@@ -2985,7 +2984,7 @@ namespace _Emulator
                 SendItemPimp(client, weapons[i], PIMP.PROP_ATK_POW, 10);
                 SendItemPimp(client, weapons[i], PIMP.PROP_ACCURACY, 10);
                 SendItemPimp(client, weapons[i], PIMP.PROP_RECOIL, 10);
-                SendItemPimp(client, weapons[i], PIMP.PROP_RPM, weapons[i].Template.upgradeCategory == TItem.UPGRADE_CATEGORY.HAND_GUN ? 10 : 10);
+                SendItemPimp(client, weapons[i], PIMP.PROP_RPM, 10);
                 SendItemPimp(client, weapons[i], PIMP.PROP_AMMO_MAX, 10);
                 SendItemPimp(client, weapons[i], PIMP.PROP_ATTACK_SPEED, 10);
             }
@@ -2993,6 +2992,13 @@ namespace _Emulator
 
         public void SendItemPimp(ClientReference client, Item item, PIMP pimp, int grade)
         {
+            try
+            {
+                if (!item.CanUpgradeAble())
+                    return;
+            }
+            catch { return; }
+
             MsgBody body = new MsgBody();
 
             body.Write(item.Seq);

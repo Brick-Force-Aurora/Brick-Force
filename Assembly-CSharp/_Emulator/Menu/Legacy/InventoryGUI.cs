@@ -68,9 +68,7 @@ namespace _Emulator
 
                 if (GUI.Button(updateButtonRect, "Update Inventory"))
                 {
-                    ClientExtension.instance.inventory.Update();
-                    ClientExtension.instance.inventory.Apply();
-                    ClientExtension.instance.SendInventoryData();
+                    ClientExtension.instance.UpdateLocalInventory();
                 }
 
                 if (GUI.Button(saveButtonRect, "Save Inventory"))
@@ -93,6 +91,7 @@ namespace _Emulator
                 showNames = GUI.Toggle(showNamesButtonRect, showNames, "Show Names", "Button");
             }
         }
+
         private void IconGUIWindow(int winID)
         {
             Dictionary<string, TItem> activeDic = sortIcons ? sortedItems : TItemManager.Instance.dic;

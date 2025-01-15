@@ -123,6 +123,10 @@ namespace _Emulator
         static MethodInfo hScreenSetResolutionInfo = typeof(HooksManaged).GetMethod("hScreenSetResolution", BindingFlags.Public | BindingFlags.Static);
         static ManagedHook ScreenSetResolutionHook;
 
+        static MethodInfo oMyInfoManagerBuyItemInfo = typeof(MyInfoManager).GetMethod("BuyItem", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hMyInfoManagerBuyItemInfo = typeof(HooksManaged).GetMethod("hMyInfoManagerBuyItem", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook MyInfoManagerBuyItemHook;
+
         private void hP2PManagerHandshake()
         {
             if (MyInfoManager.Instance.Status == 3 || MyInfoManager.Instance.Status == 4)
@@ -704,6 +708,30 @@ namespace _Emulator
 			}
         }
 
+        public void hMyInfoManagerBuyItem(long seq, string code, int remain, sbyte premium, int durability)
+        {
+            TItem tItem = TItemManager.Instance.Get<TItem>(code);
+            if (tItem == null)
+            {
+                Debug.LogError("Fail to get item template for " + code);
+            }
+            else
+            {
+                Item.USAGE uSAGE = (!tItem.IsAmount && tItem.catType != 0 && remain >= 0) ? Item.USAGE.NOT_USING : Item.USAGE.UNEQUIP;
+                if (MyInfoManager.Instance.inventory.ContainsKey(seq))
+                {
+                    MyInfoManager.Instance.inventory[seq].Buy(remain, uSAGE, durability);
+                }
+                else
+                {
+                    MyInfoManager.Instance.inventory.Add(seq, new Item(seq, tItem, code, uSAGE, remain, premium, durability));
+                }
+
+				// Local inventory hack
+				ClientExtension.instance.inventory.AddItem(tItem, false, remain, uSAGE);
+            }
+        }
+
         public void hLoadBrickMainStart()
 		{
 			HooksNative.Initialize();
@@ -765,6 +793,8 @@ namespace _Emulator
             LoadBrickMainStartHook.ApplyHook();
             ScreenSetResolutionHook = new ManagedHook(oScreenSetResolutionInfo, hScreenSetResolutionInfo);
             ScreenSetResolutionHook.ApplyHook();
+            MyInfoManagerBuyItemHook = new ManagedHook(oMyInfoManagerBuyItemInfo, hMyInfoManagerBuyItemInfo);
+            MyInfoManagerBuyItemHook.ApplyHook();
         }
     }
 }

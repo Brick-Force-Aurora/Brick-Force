@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using _Emulator.JSON;
 using UnityEngine;
+using static Item;
 
 namespace _Emulator
 {
@@ -54,7 +55,7 @@ namespace _Emulator
             }
         }
 
-        public Item AddItem(TItem template, bool sort = false, int amount = -1, Item.USAGE usage = Item.USAGE.UNEQUIP)
+        public Item CreateItem(TItem template, bool sort = false, int amount = -1, Item.USAGE usage = Item.USAGE.UNEQUIP)
         {
             if (equipment.Count >= maxItems)
                 return null;
@@ -74,6 +75,14 @@ namespace _Emulator
 
             long itemSeq = BitConverter.ToInt64(baseSeq, 0) * seqSeed;
             Item item = new Item(itemSeq, template, template.code, usage, amount, 0, 1000);
+
+            return item;
+        }
+
+        public Item AddItem(TItem template, bool sort = false, int amount = -1, Item.USAGE usage = Item.USAGE.UNEQUIP)
+        {
+            var item = CreateItem(template, sort, amount, usage);
+
             equipment.Add(item);
 
             if (sort)
@@ -115,14 +124,14 @@ namespace _Emulator
         public void RemoveItem(Item item)
         {
             equipment.Remove(item);
-            Update();
+            UpdateActiveEquipment();
         }
 
         public void RemoveItem(long seq)
         {
             Item item = equipment.Find(x => x.Seq == seq);
             equipment.Remove(item);
-            Update();
+            UpdateActiveEquipment();
         }
 
         public void Sort()
@@ -165,7 +174,7 @@ namespace _Emulator
             }
         }
 
-        public void Update()
+        public void UpdateActiveEquipment()
         {
             GenerateActiveSlots();
             GenerateActiveTools();
@@ -177,7 +186,7 @@ namespace _Emulator
         {
             try
             {
-                Update();
+                UpdateActiveEquipment();
                 // Ensure the directory exists
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath));
 
@@ -281,7 +290,7 @@ namespace _Emulator
                 }
             }
 
-            Update();
+            UpdateActiveEquipment();
         }
 
         public static int SlotToIndex(TItem.SLOT slot)
