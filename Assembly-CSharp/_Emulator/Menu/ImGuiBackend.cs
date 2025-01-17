@@ -47,6 +47,7 @@ namespace _Emulator
                         Shutdown(false, false);
                         break;
                     }
+
                 // Temporarily shutdown ImGui on focus loss to prevent crashing when refocusing with fullscreen active.
                 case ImportTypes.WindowMessage.WM_ACTIVATE:
                     {
@@ -74,7 +75,9 @@ namespace _Emulator
                 return (IntPtr)1;
 
             if (Config.instance.menuBlocksInput && ImGuiMenu.instance.isVisible)
+            {
                 return (IntPtr)1;
+            }
 
             if (oWndProc != IntPtr.Zero)
                 return Import.CallWindowProc(oWndProc, hWnd, msg, wParam, lParam);
@@ -222,7 +225,8 @@ namespace _Emulator
             if (File.Exists("Font.ttf"))
             {
                 ImGui.GetIO().Fonts.Clear();
-                font = ImGui.GetIO().Fonts.AddFontFromFileTTF("Font.ttf", 15f * dpiScale);
+                //font = ImGui.GetIO().Fonts.AddFontFromFileTTF("Font.ttf", 15f * dpiScale, new ImFontConfigPtr(IntPtr.Zero), Import.igGetGlyphRanges());
+                font = ImGui.GetIO().Fonts.AddFontFromFileTTF("Font.ttf", 15f * dpiScale, new ImFontConfigPtr(IntPtr.Zero), ImGui.GetIO().Fonts.GetGlyphRangesJapanese());
                 ImGui.ImGui_ImplDX9_InvalidateDeviceObjects();
             }
             else

@@ -760,7 +760,9 @@
     <Compile Include="_Emulator\Network\DummyData.cs" />
     <Compile Include="_Emulator\Network\ServerEmulator.cs" />
     <Compile Include="_Emulator\Network\SlotData.cs" />
-    <Compile Include="_Emulator\Steam\SteamLobbyConstants.cs" />
+    <Compile Include="_Emulator\Steam\SteamFriend.cs" />
+    <Compile Include="_Emulator\Steam\SteamFriendsManager.cs" />
+    <Compile Include="_Emulator\Steam\SteamConstants.cs" />
     <Compile Include="_Emulator\Steam\SteamLobbyInfo.cs" />
     <Compile Include="_Emulator\Steam\SteamLobbyManager.cs" />
     <Compile Include="_Emulator\Steam\SteamLobbyMember.cs" />

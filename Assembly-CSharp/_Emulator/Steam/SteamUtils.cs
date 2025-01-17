@@ -29,5 +29,30 @@ namespace _Emulator
                     return "Ignored Friend";
             }
         }
+
+        public static string PersonaStateToString(EPersonaState state)
+        {
+            switch (state)
+            { 
+                case EPersonaState.k_EPersonaStateOffline:
+                    return "Offline";
+                case EPersonaState.k_EPersonaStateOnline:
+                    return "Online";
+                case EPersonaState.k_EPersonaStateBusy:
+                    return "Busy";
+                case EPersonaState.k_EPersonaStateAway:
+                    return "Away";
+                case EPersonaState.k_EPersonaStateSnooze:
+                    return "Snooze";
+                case EPersonaState.k_EPersonaStateLookingToTrade:
+                    return "Looking to trade";
+                case EPersonaState.k_EPersonaStateLookingToPlay:
+                    return "Looking to play";
+                case EPersonaState.k_EPersonaStateInvisible:
+                    return "Invisible";
+                default:
+                    return "Unknown";
+            }
+        }
     }
 }

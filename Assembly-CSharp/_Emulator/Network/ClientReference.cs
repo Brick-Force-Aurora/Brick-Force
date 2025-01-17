@@ -76,33 +76,63 @@ namespace _Emulator
             isSteam = true;
         }
 
-        public void Disconnect(bool send = true)
+        public bool Disconnect(bool send = true)
         {
+            if (send)
+            {
+                try
+                {
+                    ServerEmulator.instance.SendLeave(this);
+                }
+                catch { }
+
+                try
+                {
+                    if (isSteam)
+                        ServerEmulator.instance.SendSlotDataSteam(matchData);
+                    else
+                        ServerEmulator.instance.SendSlotData(matchData);
+                }
+
+                catch { }
+            }
+
             if (isSteam)
             {
             }
             else
             {
-                socket.Shutdown(SocketShutdown.Both);
-                socket.Close();
+                try
+                {
+                    socket.Shutdown(SocketShutdown.Both);
+                    socket.Close();
+                }
+                catch { }
             }
             lock (dataLock)
             {
-                if (matchData != null)
-                    matchData.RemoveClient(this);
-                if (channel != null)
-                    channel.RemoveClient(this);
-                //ServerEmulator.instance.matchData.RemoveClient(this);
-                ServerEmulator.instance.clientList.Remove(this);
+                try
+                {
+                    if (matchData != null)
+                        matchData.RemoveClient(this);
+                }
+                catch { }
+
+                try
+                {
+                    if (channel != null)
+                        channel.RemoveClient(this);
+                }
+                catch { }
+
+                try
+                {
+                    return ServerEmulator.instance.clientList.Remove(this);
+                }
+                catch { }
             }
-            if (send)
-            {
-                ServerEmulator.instance.SendLeave(this);
-                if (isSteam)
-                    ServerEmulator.instance.SendSlotDataSteam(matchData);
-                else
-                    ServerEmulator.instance.SendSlotData(matchData);
-            }
+
+            return false;
         }
 
         public bool AssignSlot(SlotData _slot)

@@ -18,8 +18,10 @@ namespace _Emulator
         public SteamLobbyInfo currentLobby = null;
         public string gamemodeName = "";
         public string mapName = "";
+        public string memberStatus = "";
 
         private string lobbyNameToCreate = "";
+        private CSteamID richPresenceLobbyID = CSteamID.Nil;
 
         public readonly object listLock = new object();
         public readonly object currentLobbyLock = new object();
@@ -34,6 +36,7 @@ namespace _Emulator
         private Callback<LobbyEnter_t> m_CallbackLobbyEnter;
         private Callback<LobbyDataUpdate_t> m_CallbackLobbyDataUpdate;
         private Callback<LobbyChatUpdate_t> m_CallbackLobbyChatUpdate;
+        private Callback<GameLobbyJoinRequested_t> m_CallbackGameLobbyJoinRequested;
 
         void OnEnable()
         {
@@ -45,6 +48,9 @@ namespace _Emulator
                 m_CallbackLobbyEnter = Callback<LobbyEnter_t>.Create(OnLobbyEnter);
                 m_CallbackLobbyDataUpdate = Callback<LobbyDataUpdate_t>.Create(OnLobbyDataUpdate);
                 m_CallbackLobbyChatUpdate = Callback<LobbyChatUpdate_t>.Create(OnLobbyChatUpdate);
+                m_CallbackGameLobbyJoinRequested = Callback<GameLobbyJoinRequested_t>.Create(OnGameLobbyJoinRequested);
+
+                SteamFriends.SetRichPresence(SteamConstants.richPresenceLobbyKey, CSteamID.Nil.ToString());
             }
         }
 
@@ -73,17 +79,56 @@ namespace _Emulator
                         var newMapName = mapAlias;
                         if (mode != gamemodeName)
                         {
-                            SteamMatchmaking.SetLobbyData(currentLobby.steamID, SteamLobbyConstants.gamemodeKey, mode);
+                            SteamMatchmaking.SetLobbyData(currentLobby.steamID, SteamConstants.gamemodeKey, mode);
                             gamemodeName = mode;
                         }
 
                         if (newMapName != mapName)
                         {
-                            SteamMatchmaking.SetLobbyData(currentLobby.steamID, SteamLobbyConstants.mapNameKey, newMapName);
+                            SteamMatchmaking.SetLobbyData(currentLobby.steamID, SteamConstants.mapNameKey, newMapName);
                             mapName = newMapName;
+                        }
+
+                        if (MyInfoManager.Instance != null)
+                        {
+                            var newStatus = BfUtils.BrickManStatusToString((BrickManDesc.STATUS)MyInfoManager.Instance.Status);
+                            if (newStatus != memberStatus)
+                            {
+                                SteamMatchmaking.SetLobbyMemberData(currentLobby.steamID, SteamConstants.memberStatusKey, newStatus);
+                                memberStatus = newStatus;
+                            }
+                        }
+
+                        if (Config.instance.announceLobbyToFriends)
+                        {
+                            if (richPresenceLobbyID != currentLobby.steamID)
+                            {
+                                SteamFriends.SetRichPresence(SteamConstants.richPresenceLobbyKey, currentLobby.steamID.ToString());
+                                richPresenceLobbyID = currentLobby.steamID;
+                            }
+                        }
+                    }
+
+                    else
+                    {
+                        if (Config.instance.announceLobbyToFriends)
+                        {
+                            if (richPresenceLobbyID != CSteamID.Nil)
+                            {
+                                SteamFriends.SetRichPresence(SteamConstants.richPresenceLobbyKey, CSteamID.Nil.ToString());
+                                richPresenceLobbyID = CSteamID.Nil;
+                            }
                         }
                     }
                 }
+            }
+        }
+
+        public bool HasSlots()
+        {
+            lock (currentLobbyLock)
+            {
+                return currentLobby != null && currentLobby.HasSlots();
             }
         }
 
@@ -128,7 +173,7 @@ namespace _Emulator
         {
             if (SteamManager.Initialized)
             {
-                LeaveCurrentLobby(); // Only one lobby at a time
+                LeaveCurrentLobbyAndShutdown(); // Only one lobby at a time
                 lobbyNameToCreate = lobbyName;
                 SteamAPICall_t handle = SteamMatchmaking.CreateLobby(lobbyType, maxNumMembers);
                 m_CallResultLobbyCreated.Set(handle);
@@ -137,11 +182,27 @@ namespace _Emulator
 
         public void JoinLobby(CSteamID steamIDlobby)
         {
-            if (SteamManager.Initialized)
+            if (SteamManager.Initialized && steamIDlobby.IsValid() && steamIDlobby.IsLobby())
             {
-                LeaveCurrentLobby(); // Only one lobby at a time
+                lock(currentLobbyLock)
+                {
+                    if (IsInLobby() && currentLobby.steamID == steamIDlobby)
+                        return; // Don't attempt to rejoin the same lobby
+                }
+                LeaveCurrentLobbyAndShutdown(); // Only one lobby at a time
                 SteamAPICall_t handle = SteamMatchmaking.JoinLobby(steamIDlobby);
                 m_CallResultLobbyEnter.Set(handle);
+            }
+        }
+
+        public void InviteUser(CSteamID steamID)
+        {
+            lock (currentLobbyLock)
+            {
+                if (SteamManager.Initialized && IsInLobby() && currentLobby != null)
+                {
+                    SteamMatchmaking.InviteUserToLobby(currentLobby.steamID, steamID);
+                }
             }
         }
 
@@ -149,8 +210,13 @@ namespace _Emulator
         {
             if (SteamManager.Initialized)
             {
-                MessageBoxMgr.Instance.AddMessage("Steam Lobby Disconnected.");
-                BuildOption.Instance.Exit();
+                ClientExtension.instance.clientConnected = false;
+
+                if (IsInLobby())
+                {
+                    MessageBoxMgr.Instance.AddMessage("Steam Lobby Disconnected.");
+                    BuildOption.Instance.Exit();
+                }
 
                 LeaveCurrentLobby();
             }
@@ -179,7 +245,7 @@ namespace _Emulator
             {
                 inFindLobbies = true;
                 SteamMatchmaking.AddRequestLobbyListDistanceFilter(ELobbyDistanceFilter.k_ELobbyDistanceFilterWorldwide);
-                SteamMatchmaking.AddRequestLobbyListStringFilter(SteamLobbyConstants.gameIDKey, SteamLobbyConstants.gameIDValue, ELobbyComparison.k_ELobbyComparisonEqual);
+                SteamMatchmaking.AddRequestLobbyListStringFilter(SteamConstants.gameIDKey, SteamConstants.gameIDValue, ELobbyComparison.k_ELobbyComparisonEqual);
                 SteamAPICall_t handle = SteamMatchmaking.RequestLobbyList();
                 m_CallResultLobbyMatchList.Set(handle);
             }
@@ -222,9 +288,14 @@ namespace _Emulator
                 CSNetManager.Instance.SwitchAfter.Init();
                 SteamNetworkingManager.instance.StartReceive();
 
-                SteamMatchmaking.SetLobbyMemberData(steamID, SteamLobbyConstants.memberNameKey, SteamFriends.GetPersonaName());
+                SteamMatchmaking.SetLobbyMemberData(steamID, SteamConstants.memberNameKey, SteamFriends.GetPersonaName());
                 lock (currentLobbyLock)
                 {
+                    mapName = string.Empty;
+                    gamemodeName = string.Empty;
+                    memberStatus = string.Empty;
+                    richPresenceLobbyID = CSteamID.Nil;
+
                     currentLobby = new SteamLobbyInfo(steamID);
                     if (currentLobby.ownerSteamID == SteamUser.GetSteamID())
                     {
@@ -278,14 +349,30 @@ namespace _Emulator
                     {
                         LeaveCurrentLobbyAndShutdown();
                     }
+
+                    if (steamIDChanged != SteamUser.GetSteamID())
+                        SteamNetworkingManager.instance.CloseSessionWithUser(steamIDChanged);
                 }
 
-                if ((state & (uint)EChatMemberStateChange.k_EChatMemberStateChangeEntered) == (uint)EChatMemberStateChange.k_EChatMemberStateChangeEntered)
-                    ServerEmulator.instance.AcceptSteam(steamIDChanged);
+                if (IsUserOwner())
+                {
+                    if ((state & (uint)EChatMemberStateChange.k_EChatMemberStateChangeEntered) == (uint)EChatMemberStateChange.k_EChatMemberStateChangeEntered
+                        || !ServerEmulator.instance.ClientExistsSteam(steamIDChanged))
+                        ServerEmulator.instance.AcceptSteam(steamIDChanged);
+                }
 
                 UpdateLobby(lobbyID);
             }
         }
+
+        void OnGameLobbyJoinRequested(GameLobbyJoinRequested_t gameLobbyJoinRequested)
+        {
+            if (SteamManager.debug)
+                Debug.Log("Steam - OnGameLobbyJoinRequested: " + gameLobbyJoinRequested.m_steamIDLobby + " | " + gameLobbyJoinRequested.m_steamIDFriend);
+
+            JoinLobby(gameLobbyJoinRequested.m_steamIDLobby);
+        }
+
         void OnLobbyCreated(LobbyCreated_t pLobbyCreated, bool bIOFailure)
         {
             if (SteamManager.Initialized)
@@ -296,9 +383,9 @@ namespace _Emulator
                 {
                     CSteamID steamID = new CSteamID();
                     steamID.m_SteamID = pLobbyCreated.m_ulSteamIDLobby;
-                    SteamMatchmaking.SetLobbyData(steamID, SteamLobbyConstants.gameIDKey, SteamLobbyConstants.gameIDValue);
-                    SteamMatchmaking.SetLobbyData(steamID, SteamLobbyConstants.lobbyNameKey, lobbyNameToCreate);
-                    SteamMatchmaking.SetLobbyData(steamID, SteamLobbyConstants.ownerNameKey, SteamFriends.GetPersonaName());
+                    SteamMatchmaking.SetLobbyData(steamID, SteamConstants.gameIDKey, SteamConstants.gameIDValue);
+                    SteamMatchmaking.SetLobbyData(steamID, SteamConstants.lobbyNameKey, lobbyNameToCreate);
+                    SteamMatchmaking.SetLobbyData(steamID, SteamConstants.ownerNameKey, SteamFriends.GetPersonaName());
                 }
             }
         }
@@ -318,7 +405,7 @@ namespace _Emulator
                     var steamID = SteamMatchmaking.GetLobbyByIndex(i);
                     var info = new SteamLobbyInfo(steamID);
 
-                    if (info.data.ContainsKey(SteamLobbyConstants.gameIDKey) && info.data[SteamLobbyConstants.gameIDKey] == SteamLobbyConstants.gameIDValue)
+                    if (info.data.ContainsKey(SteamConstants.gameIDKey) && info.data[SteamConstants.gameIDKey] == SteamConstants.gameIDValue)
                     {
                         if (SteamManager.debug)
                             Debug.Log("Steam - OnLobbyMatchList: Found matching lobby");

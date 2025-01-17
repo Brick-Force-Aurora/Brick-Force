@@ -124,5 +124,8 @@ namespace _Emulator
 
         [DllImport("cimgui", CallingConvention = CallingConvention.Cdecl)]
         public static extern void igScaleAllSizesReset(float scale);
+
+        [DllImport("cimgui", CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr igGetGlyphRanges();
     }
 }

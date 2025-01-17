@@ -197,6 +197,15 @@ namespace _Emulator
             }
         }
 
+        public void CloseSessionWithUser(CSteamID steamID)
+        {
+            if (SteamManager.debug)
+                Debug.Log("Steam - CloseSessionWithUser: " + steamID.ToString());
+            SteamNetworkingIdentity identity = new SteamNetworkingIdentity();
+            identity.SetSteamID(steamID);
+            SteamNetworkingMessages.CloseSessionWithUser(ref identity);
+        }
+
         void OnSessionRequest(SteamNetworkingMessagesSessionRequest_t sessionRequest)
         {
             if (SteamManager.Initialized)

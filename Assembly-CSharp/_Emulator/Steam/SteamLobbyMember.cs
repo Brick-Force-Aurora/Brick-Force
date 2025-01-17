@@ -11,6 +11,7 @@ namespace _Emulator
         public CSteamID steamID = CSteamID.Nil;
         public CSteamID lobbyID = CSteamID.Nil;
         public string name = "";
+        public string status = "";
 
         public SteamLobbyMember(CSteamID _steamID, CSteamID _lobbyID)
         {
@@ -18,7 +19,8 @@ namespace _Emulator
             lobbyID = _lobbyID;
             if (SteamManager.Initialized)
             {
-                name = SteamMatchmaking.GetLobbyMemberData(lobbyID, steamID, SteamLobbyConstants.memberNameKey);
+                name = SteamMatchmaking.GetLobbyMemberData(lobbyID, steamID, SteamConstants.memberNameKey);
+                status = SteamMatchmaking.GetLobbyMemberData(lobbyID, steamID, SteamConstants.memberStatusKey);
             }
         }
     }

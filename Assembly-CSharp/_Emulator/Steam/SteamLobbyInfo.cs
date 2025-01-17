@@ -43,23 +43,28 @@ namespace _Emulator
                     }
                 }
 
-                if (data.ContainsKey(SteamLobbyConstants.lobbyNameKey))
-                    lobbyName = data[SteamLobbyConstants.lobbyNameKey];
+                if (data.ContainsKey(SteamConstants.lobbyNameKey))
+                    lobbyName = data[SteamConstants.lobbyNameKey];
 
-                if (data.ContainsKey(SteamLobbyConstants.ownerNameKey))
-                    ownerName = data[SteamLobbyConstants.ownerNameKey];
+                if (data.ContainsKey(SteamConstants.ownerNameKey))
+                    ownerName = data[SteamConstants.ownerNameKey];
 
-                if (data.ContainsKey(SteamLobbyConstants.gamemodeKey))
-                    gamemodeName = data[SteamLobbyConstants.gamemodeKey];
+                if (data.ContainsKey(SteamConstants.gamemodeKey))
+                    gamemodeName = data[SteamConstants.gamemodeKey];
 
-                if (data.ContainsKey(SteamLobbyConstants.mapNameKey))
-                    mapName = data[SteamLobbyConstants.mapNameKey];
+                if (data.ContainsKey(SteamConstants.mapNameKey))
+                    mapName = data[SteamConstants.mapNameKey];
             }
         }
 
         public bool IsLobbyMember(CSteamID steamID)
         {
             return lobbyMembers.Find(x => x.steamID == steamID) != null;
+        }
+
+        public bool HasSlots()
+        {
+            return numMembers < maxNumMembers;
         }
 
         public string GetMemberName(CSteamID steamID)

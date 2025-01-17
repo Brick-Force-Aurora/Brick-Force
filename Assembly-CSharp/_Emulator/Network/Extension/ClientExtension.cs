@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Text.RegularExpressions;
 using Steamworks;
 using UnityEngine;
+using static Room;
 using Debug = UnityEngine.Debug;
 
 namespace _Emulator
@@ -43,7 +45,7 @@ namespace _Emulator
                     {
                         login.loginStep = Login.LOGIN_STEP.WAITING_SEED;
                         login.id = SteamFriends.GetPersonaName();
-                        SteamNetworkingManager.instance.SendInitMessageToHost();
+                        //SteamNetworkingManager.instance.SendInitMessageToHost();
                     }
                 }
 
@@ -110,6 +112,25 @@ namespace _Emulator
             inventory.UpdateActiveEquipment();
             inventory.Apply();
             SendInventoryData();
+        }
+
+        public void GetGamestateStrings(out string roomType, out string roomStatus, out string mapAlias, out string playerStatus)
+        {
+            roomType = BfUtils.RoomTypeToString(RoomManager.Instance.CurrentRoomType);
+            roomStatus = BfUtils.RoomStatusToString(RoomManager.Instance.CurrentRoomStatus);
+            if (RoomManager.Instance.CurrentRoomType == ROOM_TYPE.MAP_EDITOR)
+                mapAlias = UserMapInfoManager.Instance.CurMapName != null ? UserMapInfoManager.Instance.CurMapName : "None";
+            else
+            {
+                var map = RegMapManager.Instance.Get(RoomManager.Instance.CurMap);
+                if (map != null)
+                    mapAlias = map.Alias;
+                else
+                    mapAlias = "None";
+            }
+
+            var status = (BrickManDesc.STATUS)MyInfoManager.Instance.Status;
+            playerStatus = BfUtils.BrickManStatusToString(status);
         }
 
         public void HandleReliableKillLog()
@@ -187,6 +208,7 @@ namespace _Emulator
 
         private void HandleDisconnected(MsgBody msg)
         {
+            clientConnected = false;
             if (CSNetManager.Instance.Sock != null)
                 CSNetManager.Instance.Sock.Close();
             MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("NETWORK_BROKEN"));

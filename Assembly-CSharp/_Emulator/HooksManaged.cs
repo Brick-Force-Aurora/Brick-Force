@@ -440,6 +440,8 @@ namespace _Emulator
                 P2PManager.Instance.Shutdown();
 			}
 
+			SteamFriendsManager.instance.ClearRichPresence();
+
             HooksNative.Shutdown();
 
             var hProcess = Import.GetCurrentProcess();

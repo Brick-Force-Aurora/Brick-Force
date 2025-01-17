@@ -149,7 +149,7 @@ namespace _Emulator
 
         public void AcceptSteam(CSteamID steamID)
         {
-            if (!isSteam || !SteamManager.Initialized)
+            if (!serverCreated || !isSteam || !SteamManager.Initialized)
                 return;
 
             lock (SteamLobbyManager.instance.currentLobbyLock)
@@ -381,13 +381,20 @@ namespace _Emulator
             return client;
         }
 
+        public bool ClientExistsSteam(CSteamID steamID)
+        {
+            if (!serverCreated || !isSteam)
+                return false;
+
+            return clientList.Exists(x => x.steamID == steamID);
+        }
+
         public void ShutdownInit()
         {
             channelManager.Shutdown();
             channelManager = new ChannelManager();
             //matchData = new MatchData();
             curSeq = 0;
-            serverCreated = false;
             SendDisconnect(null, SendType.Broadcast);
             waitForShutDown = true;
         }
@@ -404,6 +411,7 @@ namespace _Emulator
                 }
                 ClearBuffers();
                 clientList.Clear();
+                serverCreated = false;
             }
         }
 
@@ -440,7 +448,7 @@ namespace _Emulator
 
             lock (dataLock)
             {
-                if (waitForShutDown && clientList.Count == 0)
+                if (waitForShutDown && (clientList.Count == 0 || isSteam))
                     ShutdownFinally();
 
                 killLogTimer += Time.deltaTime;
@@ -452,9 +460,32 @@ namespace _Emulator
 
         public void Reset()
         {
-            ClearBuffers();
-            channelManager.Shutdown();
-            channelManager = new ChannelManager();
+            try
+            {
+                ClearBuffers();
+                if (channelManager != null && channelManager.channels != null)
+                {
+                    foreach (var channel in channelManager.channels)
+                    {
+                        if (channel != null && channel.matches != null)
+                        {
+                            foreach (var match in channel.matches)
+                            {
+                                if (match != null)
+                                {
+                                    SendDeleteRoom(match, match.channel);
+                                    channel.RemoveMatch(match);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                channelManager.Shutdown();
+                channelManager = new ChannelManager();
+            }
+            catch { }
+
             //matchData.Reset();
             //matchData = new MatchData();
             foreach (ClientReference client in clientList)
@@ -477,7 +508,10 @@ namespace _Emulator
                 {
                     client.toleranceTime += Time.deltaTime;
                     if (client.toleranceTime >= 3f)
+                    {
                         client.Disconnect(false);
+                        break;
+                    }
                 }
             }
         }
@@ -990,7 +1024,14 @@ namespace _Emulator
             {
                 bool nonExisting = false;
                 if (isSteam)
-                    nonExisting = !clientList.Exists(x => x.steamID == client.steamID);
+                {
+                    var existingClient = clientList.Find(x => x.steamID == client.steamID);
+                    nonExisting = existingClient == null;
+                    if (!nonExisting)
+                        nonExisting = existingClient.Disconnect(true);
+
+                    //nonExisting = !clientList.Exists(x => x.steamID == client.steamID);
+                }
                 else
                     nonExisting = !clientList.Exists(x => x.socket == client.socket) && (!Config.instance.oneClientPerIP || !clientList.Exists(x => x.ip == client.ip));
 
@@ -1278,7 +1319,6 @@ namespace _Emulator
             {
                 SendDeleteRoom(matchData, matchData.channel);
                 msgRef.client.channel.RemoveMatch(matchData);
-                //matchData = new MatchData();
                 return;
             }
 

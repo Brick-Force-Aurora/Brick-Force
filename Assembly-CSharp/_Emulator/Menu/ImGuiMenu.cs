@@ -1,6 +1,11 @@
-﻿using ImGuiNET;
+﻿using System;
+using System.Collections.Generic;
+using System.Numerics;
+using ImGuiNET;
 using Steamworks;
+using UnityEngine;
 using Vector2 = System.Numerics.Vector2;
+using Vector4 = System.Numerics.Vector4;
 
 namespace _Emulator
 {
@@ -11,7 +16,12 @@ namespace _Emulator
         private bool initialized = false;
         public float dpiScale = 1f;
 
+        private float windowMinHeight = 50f;
+        private float windowMaxHeight = 500f;
+        private float windowWidth = 600f;
+
         private string hostIpInput = string.Empty;
+        private string lobbyIDInput = string.Empty;
         private string createLobbyInput = "Lobby Name";
         private string customMessageInput = string.Empty;
         private bool createFriendsOnly = false;
@@ -31,6 +41,11 @@ namespace _Emulator
             }
         }
 
+        private float GetTableHeight()
+        {
+            return Math.Max(0f, windowMaxHeight * dpiScale - ImGui.GetCursorPosY() - ImGui.GetCursorStartPos().Y);
+        }
+
         public void Render()
         {
             if (!initialized)
@@ -45,9 +60,9 @@ namespace _Emulator
             }
         }
 
-        private unsafe void RenderWindow()
+        private void RenderWindow()
         {
-            ImGui.SetNextWindowSizeConstraints(new Vector2(600.0f * dpiScale, 50.0f * dpiScale), new Vector2(600.0f * dpiScale, 500.0f * dpiScale));
+            ImGui.SetNextWindowSizeConstraints(new Vector2(windowWidth * dpiScale, windowMinHeight * dpiScale), new Vector2(windowWidth * dpiScale, windowMaxHeight * dpiScale));
             bool visible = isVisible;
             ImGui.Begin("Brick-Force Aurora", ref visible, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoBringToFrontOnFocus);
             {
@@ -62,6 +77,12 @@ namespace _Emulator
                     if (ImGui.BeginTabItem("Lobbies (Steam)"))
                     {
                         LobbiesSteamTab();
+                        ImGui.EndTabItem();
+                    }
+
+                    if (ImGui.BeginTabItem("Friends (Steam)"))
+                    {
+                        FriendsSteamTab();
                         ImGui.EndTabItem();
                     }
 
@@ -117,9 +138,27 @@ namespace _Emulator
                 ImGui.PushItemWidth(ImGuiUtils.SplitRemainingWidth(2f));
                 ImGui.InputTextWithHint("##LobbyNameInput", "Enter Lobby Name", ref createLobbyInput, 75);
                 ImGui.SliderInt("Slots", ref createMaxSlots, 1, 16);
-                ImGui.Checkbox("Friends Only", ref createFriendsOnly);
-                if (ImGui.Button("Create"))
+                if (ImGui.Button("Create Lobby"))
                     SteamLobbyManager.instance.CreateLobby(createLobbyInput, createFriendsOnly ? ELobbyType.k_ELobbyTypeFriendsOnly : ELobbyType.k_ELobbyTypePublic, createMaxSlots);
+                ImGui.SameLine();
+                ImGui.Checkbox("Friends Only", ref createFriendsOnly);
+
+                ImGui.Separator();
+
+                ImGui.InputTextWithHint("##LobbyIDInput", "Enter Lobby ID", ref lobbyIDInput, 32);
+                ImGui.SameLine();
+                if (ImGui.Button("Join Lobby"))
+                {
+                    CSteamID lobbyID = CSteamID.Nil;
+                    try
+                    {
+                        lobbyID.m_SteamID = Convert.ToUInt64(lobbyIDInput);
+                        if (lobbyID != null && lobbyID != CSteamID.Nil)
+                            SteamLobbyManager.instance.JoinLobby(lobbyID);
+                    }
+                    catch { }
+                }
+
                 ImGui.PopItemWidth();
             }
 
@@ -131,24 +170,22 @@ namespace _Emulator
                 {
                     var lobby = SteamLobbyManager.instance.currentLobby;
                     ImGui.Text("Name: " + lobby.lobbyName);
-                    ImGui.Text("Owner: " + lobby.ownerName + " | " + lobby.ownerSteamID);
-                    ImGui.Columns(3, "##ManageLobbyColumns1", false);
-                    {
-                        ImGui.Text("Slots: " + lobby.GetSlotsString());
-                        ImGui.NextColumn();
-                        ImGui.Text("Mode: " + SteamLobbyManager.instance.gamemodeName);
-                        ImGui.NextColumn();
-                        ImGui.Text("Map: " + SteamLobbyManager.instance.mapName);
-                        ImGui.EndColumns();
-                    }
-                    if (ImGui.Button(SteamLobbyManager.instance.IsUserOwner() ? "Close" : "Leave"))
+                    if (ImGui.Selectable("Owner: " + lobby.ownerName + " | " + lobby.ownerSteamID))
+                        ImGui.SetClipboardText(lobby.ownerSteamID.ToString());
+                    if (ImGui.Selectable("Lobby ID: " + lobby.steamID))
+                        ImGui.SetClipboardText(lobby.steamID.ToString());
+                    ImGui.Text("Slots: " + lobby.GetSlotsString());
+                    ImGui.Text("Mode: " + SteamLobbyManager.instance.gamemodeName);
+                    ImGui.Text("Map: " + SteamLobbyManager.instance.mapName);
+                    if (ImGui.Button(SteamLobbyManager.instance.IsUserOwner() ? "Close Lobby" : "Leave Lobby"))
                         SteamLobbyManager.instance.LeaveCurrentLobbyAndShutdown();
 
-                    if (ImGui.BeginTable("##SteamMemberList", 3, ImGuiTableFlags.BordersInner | ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.ScrollY, new Vector2(0.0f, 300.0f * dpiScale)))
+                    if (ImGui.BeginTable("##SteamMemberList", 4, ImGuiTableFlags.BordersInner | ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.ScrollY, new Vector2(0.0f, GetTableHeight())))
                     {
                         ImGui.TableSetupScrollFreeze(0, 1);
 
                         ImGui.TableSetupColumn("Name");
+                        ImGui.TableSetupColumn("Status");
                         ImGui.TableSetupColumn("Steam ID");
                         ImGui.TableSetupColumn("Relationship");
                         ImGui.TableHeadersRow();
@@ -161,6 +198,8 @@ namespace _Emulator
                             ImGui.PushID("steam_member" + i);
                             bool isSelected = false;
                             ImGui.Selectable(member.name, ref isSelected, ImGuiSelectableFlags.SpanAllColumns);
+                            ImGui.TableNextColumn();
+                            ImGui.Selectable(member.status, ref isSelected, ImGuiSelectableFlags.SpanAllColumns);
                             ImGui.TableNextColumn();
                             ImGui.Selectable(member.steamID.ToString(), ref isSelected, ImGuiSelectableFlags.SpanAllColumns);
                             ImGui.TableNextColumn();
@@ -196,7 +235,7 @@ namespace _Emulator
                 if (ImGui.Button("Clear"))
                     SteamLobbyManager.instance.ClearLobbies();
 
-                if (ImGui.BeginTable("##SteamLobbyList", 5, ImGuiTableFlags.BordersInner | ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.ScrollY, new Vector2(0.0f, 350.0f * dpiScale)))
+                if (ImGui.BeginTable("##SteamLobbyList", 5, ImGuiTableFlags.BordersInner | ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.ScrollY, new Vector2(0.0f, GetTableHeight())))
                 {
                     var list = SteamLobbyManager.instance.list;
                     ImGui.TableSetupScrollFreeze(0, 1);
@@ -239,6 +278,73 @@ namespace _Emulator
             }
         }
 
+        private unsafe void FriendsSteamTab()
+        {
+            if (!SteamManager.Initialized)
+                return;
+
+            lock (SteamFriendsManager.instance.friendsLock)
+            {
+                var steamFriends = SteamFriendsManager.instance.friends;
+
+                ImGui.Text("Num Friends: " + steamFriends.Count);
+                ImGui.SameLine();
+                if (ImGui.Button("Refresh"))
+                    SteamFriendsManager.instance.Refresh();
+
+                if (ImGui.BeginTable("##SteamFriendsList", 3, ImGuiTableFlags.BordersInner | ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.ScrollY, new Vector2(0.0f, GetTableHeight())))
+                {
+                    ImGui.TableSetupScrollFreeze(0, 1);
+
+                    ImGui.TableSetupColumn("Name");
+                    ImGui.TableSetupColumn("Steam ID");
+                    ImGui.TableSetupColumn("Status");
+                    ImGui.TableHeadersRow();
+
+                    for (int i = 0; i < steamFriends.Count; i++)
+                    {
+                        var friend = steamFriends[i];
+                        if (!friend.steamID.IsValid())
+                            continue;
+
+                        Vector4 statusColor = new Vector4();
+                        if (friend.playingBrickForce)
+                            statusColor = new Vector4(0f, 1f, 0f, 1f); // green
+                        else if (friend.isOnline)
+                            statusColor = new Vector4(0f, 1f, 1f, 1f); // cyan
+                        else
+                        {
+                            var ptr = ImGui.GetStyleColorVec4(ImGuiCol.TextDisabled);
+                            if ((IntPtr)ptr != IntPtr.Zero)
+                                statusColor = *ptr;
+                        }
+
+                        ImGui.TableNextColumn();
+
+                        ImGui.PushID("steam_friend" + i);
+                        bool isSelected = false;
+                        ImGui.Selectable(friend.name, ref isSelected, ImGuiSelectableFlags.SpanAllColumns);
+                        ImGui.TableNextColumn();
+                        ImGui.Selectable(friend.steamID.ToString(), ref isSelected, ImGuiSelectableFlags.SpanAllColumns);
+                        ImGui.TableNextColumn();
+                        ImGui.PushStyleColor(ImGuiCol.Text, statusColor);
+                        ImGui.Selectable(friend.statusString, ref isSelected, ImGuiSelectableFlags.SpanAllColumns);
+                        ImGui.PopStyleColor();
+
+                        if (ImGui.BeginPopupContextItem())
+                        {
+                            SteamFriendPopup(friend);
+                            ImGui.EndPopup();
+                        }
+
+                        ImGui.PopID();
+                    }
+
+                    ImGui.EndTable();
+                }
+            }
+        }
+
         private void HostTab()
         {
             if (ImGui.Button("Shutdown"))
@@ -262,7 +368,7 @@ namespace _Emulator
             }
 
             ImGui.TextDisabled("Clients");
-            if (ImGui.BeginTable("##HostClientsList", 4, ImGuiTableFlags.BordersInner | ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.ScrollY, new Vector2(0.0f, 350.0f * dpiScale)))
+            if (ImGui.BeginTable("##HostClientsList", 4, ImGuiTableFlags.BordersInner | ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.ScrollY, new Vector2(0.0f, GetTableHeight())))
             {
                 ImGui.TableSetupScrollFreeze(0, 1);
 
@@ -317,6 +423,11 @@ namespace _Emulator
                 Config.instance.themeColor = Config.themeColorDefault;
             ImGui.Checkbox("DPI Aware", ref Config.instance.dpiAware);
             ImGui.Checkbox("Menu Blocks Input", ref Config.instance.menuBlocksInput);
+
+            ImGui.Separator();
+
+            ImGui.TextDisabled("Steam");
+            ImGui.Checkbox("Announce Lobby To Friends", ref Config.instance.announceLobbyToFriends);
 
             ImGui.Separator();
 
@@ -399,12 +510,12 @@ namespace _Emulator
             {
                 if (lobby.IsLobbyMember(SteamUser.GetSteamID()))
                 {
-                    if (ImGui.MenuItem(SteamLobbyManager.instance.IsUserOwner() ? "Close" : "Leave"))
+                    if (ImGui.MenuItem(SteamLobbyManager.instance.IsUserOwner() ? "Close Lobby" : "Leave Lobby"))
                         SteamLobbyManager.instance.LeaveCurrentLobbyAndShutdown();
                 }
                 else
                 {
-                    if (ImGui.MenuItem("Join"))
+                    if (ImGui.MenuItem("Join Lobby"))
                         SteamLobbyManager.instance.JoinLobby(lobby.steamID);
                 }
             }
@@ -434,18 +545,72 @@ namespace _Emulator
             ImGui.SameLine();
             ImGui.TextDisabled("(Lobby Name)");
 
+            if (ImGui.MenuItem(lobby.steamID.ToString()))
+                ImGui.SetClipboardText(lobby.steamID.ToString());
+            ImGui.SameLine();
+            ImGui.TextDisabled("(Lobby ID)");
+
+            ImGui.Separator();
+
             if (ImGui.MenuItem(lobby.ownerName))
                 ImGui.SetClipboardText(lobby.ownerName);
             ImGui.SameLine();
             ImGui.TextDisabled("(Owner Name)");
 
-            if (ImGui.MenuItem(lobby.ownerSteamID.ToString()))
-                ImGui.SetClipboardText(lobby.ownerSteamID.ToString());
-            ImGui.SameLine();
-            ImGui.TextDisabled("(Owner ID)");
+            if (lobby.ownerSteamID.IsValid())
+            {
+                if (ImGui.MenuItem(lobby.ownerSteamID.ToString()))
+                    ImGui.SetClipboardText(lobby.ownerSteamID.ToString());
+                ImGui.SameLine();
+                ImGui.TextDisabled("(Owner ID)");
+
+                if (ImGui.MenuItem("Open Owner Steam Profile"))
+                    SteamFriends.ActivateGameOverlayToUser("steamid", lobby.ownerSteamID);
+            }
+
+            ImGui.PopID();
+        }
+
+        private void SteamFriendPopup(SteamFriend friend)
+        {
+            ImGui.PushID("SteamFriendPopup");
 
             if (ImGui.MenuItem("Open Steam Profile"))
-                SteamFriends.ActivateGameOverlayToUser("steamid", lobby.ownerSteamID);
+                SteamFriends.ActivateGameOverlayToUser("steamid", friend.steamID);
+
+            if (ImGui.MenuItem(friend.steamID.ToString()))
+                ImGui.SetClipboardText(friend.steamID.ToString());
+            ImGui.SameLine();
+            ImGui.TextDisabled("(Steam ID)");
+
+            if (ImGui.MenuItem(friend.name))
+                ImGui.SetClipboardText(friend.name);
+            ImGui.SameLine();
+            ImGui.TextDisabled("(Steam Name)");
+
+            if (ImGui.MenuItem(friend.statusString))
+                ImGui.SetClipboardText(friend.statusString);
+            ImGui.SameLine();
+            ImGui.TextDisabled("(Status)");
+
+            if (friend.playingBrickForce && friend.lobbyID.IsValid() && friend.lobbyID.IsLobby() && !SteamLobbyManager.instance.IsCurrentMember(friend.steamID))
+            {
+                ImGui.Separator();
+                if (ImGui.MenuItem(friend.lobbyID.ToString()))
+                    ImGui.SetClipboardText(friend.lobbyID.ToString());
+                ImGui.SameLine();
+                ImGui.TextDisabled("(Lobby ID)");
+
+                if (ImGui.MenuItem("Join Lobby"))
+                    SteamLobbyManager.instance.JoinLobby(friend.lobbyID);
+            }
+
+            if (SteamLobbyManager.instance.IsInLobby() && !SteamLobbyManager.instance.IsCurrentMember(friend.steamID) && SteamLobbyManager.instance.HasSlots())
+            {
+                ImGui.Separator();
+                if (ImGui.MenuItem("Invite"))
+                    SteamLobbyManager.instance.InviteUser(friend.steamID);
+            }
 
             ImGui.PopID();
         }

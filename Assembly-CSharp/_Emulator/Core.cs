@@ -19,6 +19,7 @@ namespace _Emulator
             SteamManager.Instance = coreObject.AddComponent<SteamManager>();
             SteamLobbyManager.instance = coreObject.AddComponent<SteamLobbyManager>();
             SteamNetworkingManager.instance = coreObject.AddComponent<SteamNetworkingManager>();
+            SteamFriendsManager.instance = coreObject.AddComponent<SteamFriendsManager>();
             SteamGUI.instance = coreObject.AddComponent<SteamGUI>();
             ImGuiBackend.instance = coreObject.AddComponent<ImGuiBackend>();
             Object.DontDestroyOnLoad(coreObject);

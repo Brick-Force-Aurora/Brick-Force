@@ -26,10 +26,11 @@ namespace _Emulator
         private float oldAxisRatio = 0f;
         public bool oneClientPerIP = true;
         public bool blockConnections = false;
-        public bool autoClearDeadClients = false;
+        public bool autoClearDeadClients = true;
         public int maxConnections = 16;
         public int maxNumRooms = 1;
         public bool onlyHostRooms = true;
+        public bool announceLobbyToFriends = true;
 
         public Config()
         {
@@ -63,6 +64,7 @@ namespace _Emulator
                     { "max_connections", maxConnections },
                     { "max_num_rooms", maxNumRooms },
                     { "only_host_rooms", onlyHostRooms },
+                    { "announce_lobby_to_friends", announceLobbyToFriends },
                 };
                 jsonWriter.WriteObject(configData);
             }
@@ -103,10 +105,11 @@ namespace _Emulator
             axisRatio = configData.Get<float>("axis_ratio", 2.25f);
             oneClientPerIP = configData.Get<bool>("one_client_per_ip", true);
             blockConnections = configData.Get<bool>("block_connections", false);
-            autoClearDeadClients = configData.Get<bool>("auto_clear_dead_clients", false);
+            autoClearDeadClients = configData.Get<bool>("auto_clear_dead_clients", true);
             maxConnections = configData.Get<int>("max_connections", 16);
             maxNumRooms = configData.Get<int>("max_num_rooms", 1);
             onlyHostRooms = configData.Get<bool>("only_host_rooms", true);
+            announceLobbyToFriends = configData.Get<bool>("announce_lobby_to_friends", true);
             ApplyUskTextures();
             ApplyAxisRatio();
             ApplyCrosshairHue();
