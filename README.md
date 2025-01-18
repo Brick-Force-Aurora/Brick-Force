@@ -148,10 +148,11 @@
 - Open the solution file Brick-Force.sln in Visual Studio.
 - Install the launcher and the game into the same folder where the Brick-Force repository folder is to resolve all dependencies.
 - Change Build output path to Brick-Force_Data/Managed in project properties to match original game folder.
-- If necessary reimport ICSharpCode.SharpZipLib.dll and EasyHook.dll as references.
+- If necessary, reimport any missing assembly references.
 - ~To Debug select the Brick-Force.exe as the external program.~ Regular debugging will crash due to Themida protection on BrickForce.exe by the original developer.
 
 ## Dependencies
+- [Brick-Force Base (Install with BfLauncher)](https://github.com/Brick-Force-Aurora/Launcher) (Root)
 - [Steamworks.NET.dll](https://github.com/rlabrecque/Steamworks.NET) (BrickForce_Data\Managed)
 - [steam_api.dll](https://partner.steamgames.com/downloads/list) (Root)
 - [ImGui.NET.dll](https://github.com/Brick-Force-Aurora/ImGui.NET) (BrickForce_Data\Managed)
@@ -159,6 +160,7 @@
 - [EasyHook.dll](https://github.com/EasyHook/EasyHook) (BrickForce_Data\Managed)
 - [EasyHook32.dll](https://github.com/EasyHook/EasyHook) (Root)
 - [ICSharpCode.SharpZipLib.dll](https://github.com/icsharpcode/SharpZipLib) (BrickForce_Data\Managed)
+- [LitJSON.dll](https://github.com/LitJSON/litjson) (BrickForce_Data\Managed)
 - [d3d9helper.dll](https://github.com/Brick-Force-Aurora/d3d9helper) (Root)
 - Font.ttf (Any font to use in the menu, release uses [Noto Sans JP Semi Bold](https://fonts.google.com/noto/specimen/Noto+Sans+JP). (Root)
 
