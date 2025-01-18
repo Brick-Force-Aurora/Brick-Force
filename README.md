@@ -5,7 +5,6 @@
   <a href="https://github.com/Brick-Force-Aurora/Brick-Force/releases/latest">Latest Release</a> |
   <a href="https://brick-force-aurora.github.io/Website/">Website</a> |
   <a href="https://www.youtube.com/watch?v=mslPRyCIKgo">Gameplay Video</a> |
-  <a href="https://www.youtube.com/watch?v=OuJ-qxDsTrA">German Tutorial by Amorph (IP Setup)</a>
 </div>
 
 <p align="center">Open source Brick-Force server emulator project for everyone.</p>
@@ -13,18 +12,19 @@
 ## Features
 - Play multiplayer over Steam (New!) or IP (VPN or LAN).
 - Host matches from within the game.
+- Invite and join Steam friends.
 - Load any original map file.
 - Customize your inventory with the newly added ingame inventory editor.
-- Use any item you want, synced with players in your network.
+- Use any item you want, synced with players in your lobby.
 - Tracks team score, kills, assists, deaths and score during matches.
 - Tracks usable and destroyable bricks like glass, crates, cannons and trains.
 - Configure rooms and switch teams for easy match setup.
 - Players sync movement, hits, shots, deaths, respawns and playerstates.
 - Various bug fixes over the original game.
 
-## How To Play (Steam) (Recommended)
-<img width="962" alt="Steam_Setup_2" src="https://github.com/user-attachments/assets/bbd9c65f-6976-4d44-b69b-55d567fc2bb3" />
-<img width="962" alt="SteamLobbies" src="https://github.com/user-attachments/assets/cb7e5722-86f5-4c14-bad1-4d7e40d073e0" />
+# How To Play (Steam) (Recommended)
+<img width="962" alt="setup_steam" src="https://github.com/user-attachments/assets/5f67e42d-1a19-4bd8-97d8-03305cbf52e1" />
+<img width="962" alt="lobbies_steam" src="https://github.com/user-attachments/assets/e14aaba1-b1d3-4584-83ba-cf1ce469762e" />
 
 - Download the newest [BfLauncher](https://github.com/Brick-Force-Aurora/Launcher/releases).
 - Start it to install the game and receive the newest updates (can be disabled in launcher settings).
@@ -34,7 +34,7 @@
 - Steam should show you as playing 'Spacewar'.
 - To create a new lobby, enter a lobby name and hit 'Create' in the 'Setup (Steam)' menu.
 - Lobby owner acts as the host for the game.
-- Existing lobbies by others will appear in the 'Lobbies (Steam)' window, auto refreshes by default.
+- Existing lobbies by others will appear in the 'Lobbies (Steam)' menu, auto refreshes by default.
 - To join an existing lobby with at least one open slot, right click a lobby entry and click 'Join'.
 - If the host disconnects or leaves, the server and lobby get closed.
 - Ingame player names are determined by the Steam names.
@@ -45,9 +45,16 @@
 - Room master can start the match once every player is ready (you can also start alone).
 
 ![](https://i.imgur.com/6ncbt4O.png)
-  
+
+## Playing With Steam Friends
+- The 'Friends (Steam)' menu shows a list of all your Steam friends and sorts them by online status.
+- Friends who are currently playing Brick-Force are at the top with green status text.
+- You can invite friends to your current lobby or join their lobby by right-clicking their entry in the menu.
+- Invites will trigger a clickable invite button in the Steam chat with the friend.
+- To accept an invite, you need to be in-game already. Otherwise the regular Spacewar will be launched.
+
 ## How To Play (IP)
-<img width="962" alt="IP" src="https://github.com/user-attachments/assets/51be5d18-ded1-44f2-972d-5e912131cf2e" />
+<img width="962" alt="setup_ip" src="https://github.com/user-attachments/assets/35aaab53-d0cd-4e8d-a934-403a512040af" />
 
 - Download the newest [BfLauncher](https://github.com/Brick-Force-Aurora/Launcher/releases).
 - Start it to install the game and receive the newest updates (can be disabled in launcher settings).
@@ -60,9 +67,20 @@
 - After connecting, click Play to proceed to the main menu and create a room (others may need to refresh the room list in order to join).
 - Make sure everyone has the files for the current map in their BrickForce_Data\Resources\Cache folder.
 - Room master can start the match once every player is ready (you can also start alone).
+- [German Tutorial by Amorph (IP Setup)](https://www.youtube.com/watch?v=OuJ-qxDsTrA)
+
+## Inventory Editing
+<img width="962" alt="inventory" src="https://github.com/user-attachments/assets/6f33a60b-2ebd-45e2-86e1-aacfa2043cf8" />
+
+- Inventory can be filled either with the Inventory Editor (F5) or the Shop (easier).
+- Click an item in the list on the left in the Inventory Editor or purchase it in the shop to add it your inventory.
+- You need to explicitly click 'Update Inventory' or 'Save Inventory' at the top of the Inventory Editor before you can equip an item.
+- 'Save Inventory' is required to make the inventory persist. After equipping an item or setting up your action panel, you need to explicitly save if you want your equipment to persist across game restarts.
+- You can equip itmes in the Inventory Editor by holding CTRL while clicking their icon. Clicking without CTRL will remove an item.
 
 ## Host Menu
-<img width="962" alt="HostMenu" src="https://github.com/user-attachments/assets/74ec6773-115c-4a75-a83d-62888a9d6eb1" />
+<img width="962" alt="host" src="https://github.com/user-attachments/assets/fcbaf262-518d-4328-9e61-6d476054d6fa" />
+
 
 - Shutdown: Kills the current session and disconnects everyone back to the login screen.
 - Reset: Sends everyone back to the main menu.
@@ -71,18 +89,23 @@
 - Clients: All connected clients, right click on a client that that isn't host to disconnect them.
 
 ## Config Menu
-<img width="962" alt="Config" src="https://github.com/user-attachments/assets/3a7505f0-96fa-41ff-9761-e6ac855b4ca8" />
+<img width="962" alt="config" src="https://github.com/user-attachments/assets/cddbc806-7428-4e1a-93e4-e63e4a72eca2" />
+
 
 - Save/Load: Save and load the config file.
 - Theme Colour: Changes the primary menu colour. Click revert to reset it to default.
 - DPI Aware: Scales the menu by your Windows scaling factor. Recommended for high resolution screens.
+- Menu Blocks Input: When the menu is open, no input will reach the game.
+- Announce Lobby To Friends: Sets your current lobby info as rich presence and enables friends to join you directly.
 - Axis Ratio: Ratio of your vertical and horizontal mouse sensitivity while in-game. The original Brick-Force setting is 2.25.
 - Crosshair Hue: Changes the colour of your in-game crosshair. Default is 120 (green).
-- Max Connections: How many connections the server will accept.
+- USK Textures: Activates censored paintball gun textures from the later versions of the game.
+- Only Host Can Create Rooms: Limits room creation to the frist connected client.
+- Max Num Rooms: How many rooms can active at a time.
+- Max Num Connections: How many connections the server will accept.
 - Auto Clear Dead Clients: Bandaid fix if clients somehow remain in the client list after disconnecting.
 - One Client Per IP: Prevents duplicate clients from the same IP or Steam ID.
 - Block All Connections: Server accepts no new clients.
-- USK Textures: Activates censored paintball gun textures from the later versions of the game.
 - Debug Handle: Log received server messages.
 - Debug Send: Log sent server messages.
 - Debug Ping: Log recurring server messages.
@@ -137,7 +160,7 @@
 - [EasyHook32.dll](https://github.com/EasyHook/EasyHook) (Root)
 - [ICSharpCode.SharpZipLib.dll](https://github.com/icsharpcode/SharpZipLib) (BrickForce_Data\Managed)
 - [d3d9helper.dll](https://github.com/Brick-Force-Aurora/d3d9helper) (Root)
-- [Nunito-SemiBold.ttf](https://fonts.google.com/specimen/Nunito) (Root)
+- Font.ttf (Any font to use in the menu, release uses [Noto Sans JP Semi Bold](https://fonts.google.com/noto/specimen/Noto+Sans+JP). (Root)
 
 ## Notes
 - This is a non-commercial fan project and not associated with any of the companies originally involved in the development and publishing of the game.
