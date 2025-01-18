@@ -13,6 +13,7 @@ namespace _Emulator
     {
         public static ImGuiMenu instance = new ImGuiMenu();
         public bool isVisible = true;
+        public bool inSteamLobbiesTab = false;
         private bool initialized = false;
         public float dpiScale = 1f;
 
@@ -76,9 +77,13 @@ namespace _Emulator
 
                     if (ImGui.BeginTabItem("Lobbies (Steam)"))
                     {
+                        inSteamLobbiesTab = true;
                         LobbiesSteamTab();
                         ImGui.EndTabItem();
                     }
+
+                    else
+                        inSteamLobbiesTab = false;
 
                     if (ImGui.BeginTabItem("Friends (Steam)"))
                     {

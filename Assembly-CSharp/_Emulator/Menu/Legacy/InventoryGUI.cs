@@ -83,7 +83,7 @@ namespace _Emulator
                     ClientExtension.instance.inventory.LoadInventoryFromDisk();
                     if (sortInventory)
                         ClientExtension.instance.inventory.Sort();
-                    ClientExtension.instance.SendInventoryData();
+                    ClientExtension.instance.UpdateLocalInventory();
                 }
 
                 sortInventory = GUI.Toggle(sortButtonRect, sortInventory, "Sort Inventory", "Button");

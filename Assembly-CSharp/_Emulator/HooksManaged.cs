@@ -743,7 +743,7 @@ namespace _Emulator
 
         public static void Initialize()
         {
-			P2PManagerHandshakeHook = new ManagedHook(oP2PManagerHandshakeInfo, hP2PManagerHandshakeInfo);
+            P2PManagerHandshakeHook = new ManagedHook(oP2PManagerHandshakeInfo, hP2PManagerHandshakeInfo);
 			P2PManagerHandshakeHook.ApplyHook();
 			SockTcpGetSendKeyHook = new ManagedHook(oSockTcpGetSendKeyInfo, hSockTcpGetSendKeyInfo);
 			SockTcpGetSendKeyHook.ApplyHook();

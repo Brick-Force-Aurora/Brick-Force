@@ -74,10 +74,10 @@ namespace _Emulator
             if (ImGui.ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam) != 0)
                 return (IntPtr)1;
 
-            if (Config.instance.menuBlocksInput && ImGuiMenu.instance.isVisible)
+            /*if (Config.instance.menuBlocksInput && ImGuiMenu.instance.isVisible)
             {
                 return (IntPtr)1;
-            }
+            }*/
 
             if (oWndProc != IntPtr.Zero)
                 return Import.CallWindowProc(oWndProc, hWnd, msg, wParam, lParam);

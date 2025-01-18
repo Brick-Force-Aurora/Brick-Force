@@ -57,7 +57,7 @@ namespace _Emulator
         void Update()
         {
             findUpdateTimer += Time.deltaTime;
-            if (findLobbies && !inFindLobbies && findUpdateTimer >= findUpdateInterval)
+            if (findLobbies && !inFindLobbies && findUpdateTimer >= findUpdateInterval && ImGuiMenu.instance.inSteamLobbiesTab)
             {
                 findUpdateTimer = 0f;
                 FindLobbies();

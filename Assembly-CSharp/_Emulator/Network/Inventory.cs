@@ -82,6 +82,8 @@ namespace _Emulator
         public Item AddItem(TItem template, bool sort = false, int amount = -1, Item.USAGE usage = Item.USAGE.UNEQUIP)
         {
             var item = CreateItem(template, sort, amount, usage);
+            if (item == null)
+                return null;
 
             equipment.Add(item);
 
@@ -263,6 +265,7 @@ namespace _Emulator
             {
                 using (var reader = new StreamReader(filePath))
                 {
+                    equipment.Clear();
                     var jsonReader = new JsonReader(reader);
                     JsonArray items = jsonReader.ReadObject<JsonArray>();
                     foreach (JsonObject item in items)
@@ -277,12 +280,12 @@ namespace _Emulator
                             if (template == null)
                                 continue;
 
-                            Item addedItem = AddItem(template);
-                            addedItem = equipment.Find(x => x.Code == addedItem.Code);
+                            Item addedItem = AddItem(template, false, -1, usage);
+                            //addedItem = equipment.Find(x => x.Code == addedItem.Code);
 
                             if (addedItem != null)
                             {
-                                addedItem.Usage = usage;
+                                //addedItem.Usage = usage;
                                 addedItem.toolSlot = Convert.ToSByte(toolslot);
                             }
                         }
