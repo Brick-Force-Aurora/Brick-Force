@@ -1947,15 +1947,24 @@ namespace _Emulator
             for (int i = 0; i < itemCount; i++)
             {
                 msgRef.msg._msg.Read(out string code);
-                msgRef.msg._msg.Read(out string usage);
+                msgRef.msg._msg.Read(out int usage);
                 msgRef.msg._msg.Read(out sbyte toolSlot);
 
                 // Fetch the item template
                 TItem template = TItemManager.Instance.Get<TItem>(code);
                 if (template != null)
                 {
-                    var item = msgRef.client.inventory.AddItem(template, false, -1, (Item.USAGE) Enum.Parse(typeof(Item.USAGE), usage, true));
-                    item.toolSlot = toolSlot;
+                    try
+                    {
+                        var item = msgRef.client.inventory.AddItem(template, false, -1, (Item.USAGE)usage);
+                        //var item = msgRef.client.inventory.AddItem(template, false, -1, (Item.USAGE)Enum.Parse(typeof(Item.USAGE), usage, true));
+                        item.toolSlot = toolSlot;
+                    }
+
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning("HandleInventoryData: Couldn't add item " + template.name + " (" + template.code + ") | " + ex.Message);
+                    }
                 }
                 else
                 {
@@ -1964,7 +1973,7 @@ namespace _Emulator
             }
 
             if (debugHandle)
-                Debug.Log($"HandleInventoryCSV from: {msgRef.client.GetIdentifier()}");
+                Debug.Log($"HandleInventoryData from: {msgRef.client.GetIdentifier()}");
 
             // Notify the client about the updated inventory
             SendInventory(msgRef.client);

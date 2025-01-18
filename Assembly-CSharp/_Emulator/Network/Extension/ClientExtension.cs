@@ -209,10 +209,15 @@ namespace _Emulator
         private void HandleDisconnected(MsgBody msg)
         {
             clientConnected = false;
-            if (CSNetManager.Instance.Sock != null)
-                CSNetManager.Instance.Sock.Close();
-            MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("NETWORK_BROKEN"));
-            BuildOption.Instance.Exit();
+            if (!isSteam)
+            {
+                if (CSNetManager.Instance.Sock != null)
+                    CSNetManager.Instance.Sock.Close();
+                MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("NETWORK_BROKEN"));
+                BuildOption.Instance.Exit();
+            }
+            else
+                SteamLobbyManager.instance.LeaveCurrentLobbyAndShutdown();
         }
 
         private void HandleRendezvousInfoSteam(MsgBody msg)
@@ -397,7 +402,7 @@ namespace _Emulator
             foreach (var item in inventory.equipment)
             {
                 body.Write(item.Code);                     // Write the item code
-                body.Write(item.Usage.ToString());         // Write the item Usage
+                body.Write((int)item.Usage);         // Write the item Usage
                 body.Write(item.toolSlot);
             }
 

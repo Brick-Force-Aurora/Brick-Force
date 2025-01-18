@@ -119,6 +119,7 @@ namespace _Emulator
         private void SetupIPTab()
         {
             ImGui.InputTextWithHint("##HostIPInput", "Enter Host IP", ref hostIpInput, 16);
+            ClientExtension.instance.hostIP = hostIpInput;
             ImGui.SameLine();
             if (ImGui.Button("Host"))
             {
@@ -135,7 +136,10 @@ namespace _Emulator
         private void SetupSteamTab()
         {
             if (!SteamManager.Initialized)
+            {
+                ImGui.TextDisabled("Steam not initialized.");
                 return;
+            }
 
             if (!SteamLobbyManager.instance.IsInLobby())
             {
@@ -228,7 +232,10 @@ namespace _Emulator
         private void LobbiesSteamTab()
         {
             if (!SteamManager.Initialized)
+            {
+                ImGui.TextDisabled("Steam not initialized.");
                 return;
+            }
 
             lock (SteamLobbyManager.instance.listLock)
             {
@@ -286,7 +293,10 @@ namespace _Emulator
         private unsafe void FriendsSteamTab()
         {
             if (!SteamManager.Initialized)
+            {
+                ImGui.TextDisabled("Steam not initialized.");
                 return;
+            }
 
             lock (SteamFriendsManager.instance.friendsLock)
             {
