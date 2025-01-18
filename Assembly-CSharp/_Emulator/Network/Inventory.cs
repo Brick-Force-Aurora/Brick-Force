@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using _Emulator.JSON;
+using LitJson;
 using UnityEngine;
-using static Item;
 
 namespace _Emulator
 {
@@ -192,30 +191,32 @@ namespace _Emulator
                 // Ensure the directory exists
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath));
 
-                using (var writer = new StreamWriter(filePath))
+                var data = new JsonData();
+                foreach (var item in equipment)
                 {
-                    var jsonWriter = new JsonWriter(writer);
-                    JsonArray items = new JsonArray();
-                    foreach (var item in equipment)
-                    {
-                        JsonObject jsonItem = new JsonObject
-                        {
-                            { "name", item.Template.Name },
-                            { "code", item.Code },
-                            { "usage", item.Usage },
-                            { "slot", item.Template.slot },
-                            { "weapon_change", weaponChg.Contains(item) },
-                            { "toolbar", shooterTools.Contains(item) },
-                            { "toolslot", item.toolSlot },
-                            { "is_upgraded", item.IsUpgradedItem() },
-                            { "amount", item.Amount },
-                            { "remain", item.Remain },
-                            //{ "upgrade_props", new JsonArray(item.upgradeProps) },
-                        };
-                        items.Add(jsonItem);
-                    }
-                    jsonWriter.WriteObject(items);
+                    var itemData = new JsonData();
+                    itemData["name"] = item.Template.Name;
+                    itemData["code"] = item.Code;
+                    itemData["usage"] = item.Usage.ToString();
+                    itemData["slot"] = item.Template.slot.ToString();
+                    itemData["weapon_change"] = weaponChg.Contains(item);
+                    itemData["toolbar"] = shooterTools.Contains(item);
+                    itemData["toolslot"] = item.toolSlot;
+                    itemData["is_upgraded"] = item.IsUpgradedItem();
+                    itemData["amount"] = item.Amount;
+                    itemData["remain"] = item.Remain;
+                    data.Add(itemData);
                 }
+
+                StringBuilder stringBuilder = new StringBuilder();
+                JsonWriter writer = new JsonWriter(stringBuilder)
+                {
+                    PrettyPrint = true,
+                    IndentValue = 2
+                };
+
+                JsonMapper.ToJson(data, writer);
+                File.WriteAllText(filePath, stringBuilder.ToString());
 
                 Debug.Log($"Equipment successfully saved to {filePath}.");
             }
@@ -263,17 +264,17 @@ namespace _Emulator
 
             else
             {
-                using (var reader = new StreamReader(filePath))
+                try
                 {
                     equipment.Clear();
-                    var jsonReader = new JsonReader(reader);
-                    JsonArray items = jsonReader.ReadObject<JsonArray>();
-                    foreach (JsonObject item in items)
+                    var json = File.ReadAllText(filePath);
+                    var data = JsonMapper.ToObject(json);
+                    foreach (JsonData item in data)
                     {
-                        string categoryName = item.Get<string>("slot");
-                        string code = item.Get<string>("code");
-                        int toolslot = item.Get<int>("toolslot");
-                        Item.USAGE usage = (Item.USAGE)Enum.Parse(typeof(Item.USAGE), item.Get<string>("usage"), true);
+                        string categoryName = (string)item["slot"];
+                        string code = (string)item["code"];
+                        int toolslot = (int)item["toolslot"];
+                        Item.USAGE usage = (Item.USAGE)Enum.Parse(typeof(Item.USAGE), (string)item["usage"], true);
                         if (!string.IsNullOrEmpty(code))
                         {
                             TItem template = TItemManager.Instance.Get<TItem>(code);
@@ -281,15 +282,18 @@ namespace _Emulator
                                 continue;
 
                             Item addedItem = AddItem(template, false, -1, usage);
-                            //addedItem = equipment.Find(x => x.Code == addedItem.Code);
 
                             if (addedItem != null)
                             {
-                                //addedItem.Usage = usage;
                                 addedItem.toolSlot = Convert.ToSByte(toolslot);
                             }
                         }
                     }
+                }
+
+                catch (Exception ex)
+                {
+                    Debug.LogError("LoadInventoryFromDisk: " + ex.Message);
                 }
             }
 

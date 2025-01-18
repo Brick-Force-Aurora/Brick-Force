@@ -739,10 +739,6 @@
     <Compile Include="_Emulator\Core.cs" />
     <Compile Include="_Emulator\Menu\Legacy\MainGUI.cs" />
     <Compile Include="_Emulator\Menu\Legacy\DebugConsole.cs" />
-    <Compile Include="_Emulator\JSON\JsonArray.cs" />
-    <Compile Include="_Emulator\JSON\JsonObject.cs" />
-    <Compile Include="_Emulator\JSON\JsonReader.cs" />
-    <Compile Include="_Emulator\JSON\JsonWriter.cs" />
     <Compile Include="_Emulator\Maps\MapGenerator.cs" />
     <Compile Include="_Emulator\Network\ChannelManager.cs" />
     <Compile Include="_Emulator\Network\ChannelReference.cs" />
@@ -795,6 +791,10 @@
     <Reference Include="ImGui.NET, Version=1.91.6.1, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\BfLauncher\BrickForce_Data\Managed\ImGui.NET.dll</HintPath>
+    </Reference>
+    <Reference Include="LitJSON, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\BfLauncher\BrickForce_Data\Managed\LitJSON.dll</HintPath>
     </Reference>
     <Reference Include="Mono.Security">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\Mono.Security.dll</HintPath>

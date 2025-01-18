@@ -1,8 +1,9 @@
-﻿using _Emulator.JSON;
+﻿using LitJson;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using System.Text;
 using UnityEngine;
 using Vector4 = System.Numerics.Vector4;
 
@@ -11,7 +12,7 @@ namespace _Emulator
     class Config
     {
         public static Config instance;
-        public JsonObject configData;
+        //public JsonObject configData;
 
         public Color crosshairColor = Color.green;
         public static readonly Vector4 themeColorDefault = new Vector4(1f, 0f, 0.39f, 1f);
@@ -38,35 +39,46 @@ namespace _Emulator
         }
         public void SaveConfigToDisk(string path = "Config\\Config.json")
         {
-            using (var writer = new StreamWriter(path))
+            try
             {
-                var jsonWriter = new JsonWriter(writer); 
-                configData = new JsonObject
+                var data = new JsonData();
+                data["host_ip"] = ClientExtension.instance.hostIP;
+                data["debug_handle"] = ServerEmulator.instance.debugHandle;
+                data["debug_send"] = ServerEmulator.instance.debugSend;
+                data["debug_ping"] = ServerEmulator.instance.debugPing;
+                data["debug_steam"] = SteamManager.debug;
+                data["crosshair_r"] = crosshairColor.r;
+                data["crosshair_g"] = crosshairColor.g;
+                data["crosshair_b"] = crosshairColor.b;
+                data["usk_textures"] = uskTextures;
+                data["axis_ratio"] = axisRatio;
+                data["dpi_aware"] = dpiAware;
+                data["menu_blocks_input"] = menuBlocksInput;
+                data["theme_r"] = themeColor.X;
+                data["theme_g"] = themeColor.Y;
+                data["theme_b"] = themeColor.Z;
+                data["one_client_per_ip"] = oneClientPerIP;
+                data["block_connections"] = blockConnections;
+                data["auto_clear_dead_clients"] = autoClearDeadClients;
+                data["max_connections"] = maxConnections;
+                data["max_num_rooms"] = maxNumRooms;
+                data["only_host_rooms"] = onlyHostRooms;
+                data["announce_lobby_to_friends"] = announceLobbyToFriends;
+
+                StringBuilder stringBuilder = new StringBuilder();
+                JsonWriter writer = new JsonWriter(stringBuilder)
                 {
-                    { "host_ip", ClientExtension.instance.hostIP },
-                    { "debug_handle", ServerEmulator.instance.debugHandle },
-                    { "debug_send", ServerEmulator.instance.debugSend },
-                    { "debug_ping", ServerEmulator.instance.debugPing },
-                    { "debug_steam", SteamManager.debug },
-                    { "crosshair_r", crosshairColor.r },
-                    { "crosshair_g", crosshairColor.g },
-                    { "crosshair_b", crosshairColor.b },
-                    { "usk_textures", uskTextures },
-                    { "axis_ratio", axisRatio },
-                    { "dpi_aware", dpiAware },
-                    { "menu_blocks_input", menuBlocksInput },
-                    { "theme_r", themeColor.X },
-                    { "theme_g", themeColor.Y },
-                    { "theme_b", themeColor.Z },
-                    { "one_client_per_ip", oneClientPerIP },
-                    { "block_connections", blockConnections },
-                    { "auto_clear_dead_clients", autoClearDeadClients },
-                    { "max_connections", maxConnections },
-                    { "max_num_rooms", maxNumRooms },
-                    { "only_host_rooms", onlyHostRooms },
-                    { "announce_lobby_to_friends", announceLobbyToFriends },
+                    PrettyPrint = true,
+                    IndentValue = 2
                 };
-                jsonWriter.WriteObject(configData);
+
+                JsonMapper.ToJson(data, writer);
+                File.WriteAllText(path, stringBuilder.ToString());
+            }
+
+            catch (Exception ex)
+            {
+                Debug.LogError("SaveConfigToDisk: " + ex.Message);
             }
         }
 
@@ -79,37 +91,44 @@ namespace _Emulator
                 return;
             }
 
-            using (var reader = new StreamReader(path))
+            try
             {
-                var jsonReader = new JsonReader(reader);
-                configData = jsonReader.ReadObject<JsonObject>();
+                var json = File.ReadAllText(path);
+                var data = JsonMapper.ToObject(json);
+
+                try { ClientExtension.instance.hostIP = (string)data["host_ip"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { ServerEmulator.instance.debugHandle = (bool)data["debug_handle"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { ServerEmulator.instance.debugSend = (bool)data["debug_send"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { ServerEmulator.instance.debugPing = (bool)data["debug_ping"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { SteamManager.debug = (bool)data["debug_steam"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { crosshairColor.r = (float)(double)data["crosshair_r"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { crosshairColor.g = (float)(double)data["crosshair_g"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { crosshairColor.b = (float)(double)data["crosshair_b"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { dpiAware = (bool)data["dpi_aware"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { menuBlocksInput = (bool)data["menu_blocks_input"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { themeColor.X = (float)(double)data["theme_r"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { themeColor.Y = (float)(double)data["theme_g"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { themeColor.Z = (float)(double)data["theme_b"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { uskTextures = (bool)data["usk_textures"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { axisRatio = (float)(double)data["axis_ratio"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { oneClientPerIP = (bool)data["one_client_per_ip"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { blockConnections = (bool)data["block_connections"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { autoClearDeadClients = (bool)data["auto_clear_dead_clients"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { maxConnections = (int)data["max_connections"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { maxNumRooms = (int)data["max_num_rooms"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { onlyHostRooms = (bool)data["only_host_rooms"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { announceLobbyToFriends = (bool)data["announce_lobby_to_friends"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
             }
 
-            ClientExtension.instance.hostIP = configData.Get<string>("host_ip", "");
-            ServerEmulator.instance.debugHandle = configData.Get<bool>("debug_handle", false);
-            ServerEmulator.instance.debugSend = configData.Get<bool>("debug_send", false);
-            ServerEmulator.instance.debugPing = configData.Get<bool>("debug_ping", false);
-            SteamManager.debug = configData.Get<bool>("debug_steam", false);
-            crosshairColor.r = configData.Get<float>("crosshair_r", 0.0f);
-            crosshairColor.g = configData.Get<float>("crosshair_g", 1.0f);
-            crosshairColor.b = configData.Get<float>("crosshair_b", 0.0f);
+            catch (Exception ex)
+            {
+                Debug.LogError("LoadConfigFromDisk: " + ex.Message);
+            }
+
             Utils.RGBToHSV(crosshairColor, out float H, out float S, out float V);
             crosshairHue = H * 360f;
-            dpiAware = configData.Get<bool>("dpi_aware", false);
-            menuBlocksInput = configData.Get<bool>("menu_blocks_input", false);
-            themeColor.X = configData.Get<float>("theme_r", themeColorDefault.X);
-            themeColor.Y = configData.Get<float>("theme_g", themeColorDefault.Y);
-            themeColor.Z = configData.Get<float>("theme_b", themeColorDefault.Z);
-            uskTextures = configData.Get<bool>("usk_textures", false);
             oldUskTextures = !uskTextures;
-            axisRatio = configData.Get<float>("axis_ratio", 2.25f);
-            oneClientPerIP = configData.Get<bool>("one_client_per_ip", true);
-            blockConnections = configData.Get<bool>("block_connections", false);
-            autoClearDeadClients = configData.Get<bool>("auto_clear_dead_clients", true);
-            maxConnections = configData.Get<int>("max_connections", 16);
-            maxNumRooms = configData.Get<int>("max_num_rooms", 1);
-            onlyHostRooms = configData.Get<bool>("only_host_rooms", true);
-            announceLobbyToFriends = configData.Get<bool>("announce_lobby_to_friends", true);
+
             ApplyUskTextures();
             ApplyAxisRatio();
             ApplyCrosshairHue();

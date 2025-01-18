@@ -26,13 +26,11 @@ namespace _Emulator
         private Queue<MsgReference> readQueue = new Queue<MsgReference>();
         private Queue<MsgReference> writeQueue = new Queue<MsgReference>();
         private int curSeq = 0;
-        public bool debugHandle = true;
-        public bool debugSend = true;
+        public bool debugHandle = false;
+        public bool debugSend = false;
         public bool debugPing = false;
         public bool serverCreated = false;
         public bool isSteam = false;
-        //public MatchData matchData;
-        //private Channel defaultChannel;
         public ChannelManager channelManager = new ChannelManager();
         private float killLogTimer = 0f;
         public List<KeyValuePair<int, RegMap>> regMaps = new List<KeyValuePair<int, RegMap>>();
