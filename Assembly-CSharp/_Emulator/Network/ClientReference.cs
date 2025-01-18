@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Net.Sockets;
+using Steamworks;
 
 namespace _Emulator
 {
@@ -14,9 +15,11 @@ namespace _Emulator
         }
 
         public Socket socket;
-        public byte[] buffer;
         public string ip;
         public int port;
+        public byte[] buffer;
+        public CSteamID steamID = CSteamID.Nil;
+        public bool isSteam = false;
         public float lastHeartBeatTime;
         public string name;
         public int seq;
@@ -54,26 +57,82 @@ namespace _Emulator
             isHost = ServerEmulator.instance.clientList.Count == 0;
             buffer = new byte[8192];
             toleranceTime = 0f;
+            isSteam = false;
         }
 
-        public void Disconnect(bool send = true)
+        public ClientReference(CSteamID _steamID, string _name = "", int _seq = -1)
         {
-            socket.Shutdown(SocketShutdown.Both);
-            socket.Close();
-            lock (dataLock)
-            {
-                if (matchData != null)
-                    matchData.RemoveClient(this);
-                if (channel != null)
-                    channel.RemoveClient(this);
-                //ServerEmulator.instance.matchData.RemoveClient(this);
-                ServerEmulator.instance.clientList.Remove(this);
-            }
+            lastHeartBeatTime = float.MaxValue;
+            steamID = _steamID;
+            name = _name;
+            seq = _seq;
+            clientStatus = ClientStatus.Invalid;
+            status = BrickManDesc.STATUS.PLAYER_WAITING;
+            data = new DummyData();
+            isLoaded = false;
+            isHost = ServerEmulator.instance.clientList.Count == 0;
+            buffer = new byte[8192];
+            toleranceTime = 0f;
+            isSteam = true;
+        }
+
+        public bool Disconnect(bool send = true)
+        {
             if (send)
             {
-                ServerEmulator.instance.SendLeave(this);
-                ServerEmulator.instance.SendSlotData(matchData);
+                try
+                {
+                    ServerEmulator.instance.SendLeave(this);
+                }
+                catch { }
+
+                try
+                {
+                    if (isSteam)
+                        ServerEmulator.instance.SendSlotDataSteam(matchData);
+                    else
+                        ServerEmulator.instance.SendSlotData(matchData);
+                }
+
+                catch { }
             }
+
+            if (isSteam)
+            {
+            }
+            else
+            {
+                try
+                {
+                    socket.Shutdown(SocketShutdown.Both);
+                    socket.Close();
+                }
+                catch { }
+            }
+            lock (dataLock)
+            {
+                try
+                {
+                    if (matchData != null)
+                        matchData.RemoveClient(this);
+                }
+                catch { }
+
+                try
+                {
+                    if (channel != null)
+                        channel.RemoveClient(this);
+                }
+                catch { }
+
+                try
+                {
+                    return ServerEmulator.instance.clientList.Remove(this);
+                }
+                catch { }
+            }
+
+            return false;
         }
 
         public bool AssignSlot(SlotData _slot)
@@ -101,7 +160,10 @@ namespace _Emulator
 
         public string GetIdentifier()
         {
-            return name + "-" + seq + "-" + ip;
+            if (isSteam)
+                return name + "-" + seq + "-" + steamID;
+            else
+                return name + "-" + seq + "-" + ip;
         }
     }
 }

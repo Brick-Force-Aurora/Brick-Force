@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using _Emulator;
 using UnityEngine;
 
 public class DialogManager : MonoBehaviour
@@ -274,7 +275,7 @@ public class DialogManager : MonoBehaviour
 
 	public SelfRespawnDialog selfRespawnDialog;
 
-	private Stack<Dialog> popup;
+	public Stack<Dialog> popup;
 
 	private Dialog[] silo;
 
@@ -286,7 +287,7 @@ public class DialogManager : MonoBehaviour
 
 	private string param1 = string.Empty;
 
-	public bool IsModal => popup.Count > 0;
+	public bool IsModal => popup.Count > 0 || (ImGuiMenu.instance != null && ImGuiMenu.instance.isVisible && Config.instance != null && Config.instance.menuBlocksInput);
 
 	public static DialogManager Instance
 	{

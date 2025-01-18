@@ -1275,11 +1275,11 @@ public class SockTcp
 
 	public Socket _sock;
 
-	private Queue _writeQueue;
+	public Queue _writeQueue;
 
-	private Queue _readQueue;
+	public Queue _readQueue;
 
-	private Msg4Recv _recv;
+	public Msg4Recv _recv;
 
 	private float _onceASecond;
 
@@ -1293,7 +1293,7 @@ public class SockTcp
 
 	private string macAddress = string.Empty;
 
-	private byte recvKey = byte.MaxValue;
+	public byte recvKey = byte.MaxValue;
 
 	private byte[] sendKeys;
 
@@ -1315,7 +1315,7 @@ public class SockTcp
 		return (int)(((holdrand = holdrand * 214013 + 2531011) >> 16) & 0x7FFF);
 	}
 
-	private void Init()
+	public void Init()
 	{
 		if (_writeQueue == null)
 		{
@@ -2510,7 +2510,7 @@ public class SockTcp
 		}
 	}
 
-	private void SendCallback(IAsyncResult ar)
+	public void SendCallback(IAsyncResult ar)
 	{
 		if (_sock != null)
 		{
@@ -9543,7 +9543,7 @@ public class SockTcp
 		((ClanDialog)DialogManager.Instance.GetDialog(DialogManager.DIALOG_INDEX.CLAN))?.UpdateCurClanIntro(val, val2);
 	}
 
-	private byte GetSendKey()
+	public byte GetSendKey()
 	{
 		byte result = byte.MaxValue;
 		if (sendKeys != null && sendKeys.Length > 0)
