@@ -5,4 +5,7 @@
     <StartAction>Program</StartAction>
     <StartProgram>..\BfLauncher\BrickForce.exe</StartProgram>
   </PropertyGroup>
+  <PropertyGroup>
+    <ProjectView>ShowAllFiles</ProjectView>
+  </PropertyGroup>
 </Project>

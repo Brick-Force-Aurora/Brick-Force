@@ -1,4 +1,5 @@
-﻿using System;
+﻿using _Emulator.Network.Gamemodes;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -60,6 +61,10 @@ namespace _Emulator
         public double zombieDeltaTimer;
         public ZombieMatch.STEP zombieStatus;
 
+        //Defusion
+        public List<int> deadRedPlayers = new List<int>();
+        public List<int> deadBluePlayers = new List<int>();
+
         public MatchData()
         {
             countdownTime = 0;
@@ -90,6 +95,8 @@ namespace _Emulator
             currentRound = 1;
             buildPhaseTime = 0;
             battlePhaseTime = 0;
+            deadRedPlayers.Clear();
+            deadBluePlayers.Clear();
 
             for (int i = 0; i < redSlots.Count; i++)
                 redSlots[i].isRed = true;
@@ -149,6 +156,8 @@ namespace _Emulator
             zombieRoundsLeft = 0;
             zombieDeltaTimer = 0;
             zombieCurrentRound = 1;
+            deadRedPlayers.Clear();
+            deadBluePlayers.Clear();
         }
 
         // Method to reset data for a new round
@@ -173,6 +182,8 @@ namespace _Emulator
             {
                 client.isZombie = false;
             }
+            deadRedPlayers.Clear();
+            deadBluePlayers.Clear();
         }
 
         public void Shutdown()
@@ -279,7 +290,7 @@ namespace _Emulator
                     break;
 
                 case Room.ROOM_TYPE.CAPTURE_THE_FLAG:
-                    ServerEmulator.instance.HandleCTFMatchEnd(this);
+                    CTF.HandleCTFMatchEnd(this);
                     break;
 
                 case Room.ROOM_TYPE.BND:
@@ -288,12 +299,24 @@ namespace _Emulator
                     {
                         ServerEmulator.instance.HandleBNDMatchEnd(this);
                     }*/
-                    ServerEmulator.instance.HandleBNDMatchEnd(this);
+                    BND.HandleBNDMatchEnd(this);
                     break;
 
                 case Room.ROOM_TYPE.ZOMBIE:
                     Debug.LogWarning("ZombieMatchend");
-                    ServerEmulator.instance.HandleZombieMatchEnd(this);
+                    Zombie.HandleZombieMatchEnd(this);
+                    break;
+
+                case Room.ROOM_TYPE.EXPLOSION:
+                    Defusion.HandleMatchEnd(this);
+                    break;
+
+                case Room.ROOM_TYPE.ESCAPE:
+                    DefenseGamemode.HandleMatchEnd(this);
+                    break;
+
+                case Room.ROOM_TYPE.BUNGEE:
+                    Freefall.HandleMatchEnd(this);
                     break;
 
                 default:

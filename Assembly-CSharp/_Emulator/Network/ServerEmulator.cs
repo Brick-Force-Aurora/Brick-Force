@@ -8,6 +8,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Policy;
 using System.Text.RegularExpressions;
+using _Emulator.Network;
+using _Emulator.Network.Gamemodes;
 using Steamworks;
 using UnityEngine;
 using static Room;
@@ -42,6 +44,7 @@ namespace _Emulator
 
         public void SetupServer()
         {
+            RegisterHandlers();
             isSteam = false;
             try
             {
@@ -588,6 +591,101 @@ namespace _Emulator
             return result;
         }
 
+        private readonly Dictionary<int, Action<MsgReference>> _handlers = new Dictionary<int, Action<MsgReference>>();
+
+        private void RegisterHandlers()
+        {
+            _handlers[(int)MessageId.CS_LOGIN_REQ] = HandleLoginRequest;
+            _handlers[(int)MessageId.CS_HEARTBEAT_REQ] = HandleHeartbeat;
+            _handlers[(int)MessageId.CS_ROOM_LIST_REQ] = HandleRoomListRequest;
+            _handlers[(int)MessageId.CS_CREATE_ROOM_REQ] = HandleCreateRoomRequest;
+            _handlers[(int)MessageId.CS_ADD_BRICK_REQ] = HandleAddBrickRequest;
+            _handlers[(int)MessageId.CS_DEL_BRICK_REQ] = HandleDelBrickRequest;
+            _handlers[(int)MessageId.CS_SAVE_PALETTE_REQ] = msgRef => Debug.LogWarning("PaletteManagerRequest");
+            _handlers[(int)MessageId.CS_CACHE_BRICK_ACK] = HandleCacheBrickRequest;
+            _handlers[(int)MessageId.CS_LEAVE_REQ] = HandleLeave;
+            _handlers[(int)MessageId.CS_CHAT_REQ] = HandleChatRequest;
+            _handlers[(int)MessageId.CS_JOIN_REQ] = HandleJoinRequest;
+            _handlers[(int)MessageId.CS_RESUME_ROOM_REQ] = HandleResumeRoomRequest;
+            _handlers[(int)MessageId.CS_EQUIP_REQ] = HandleEquipRequest;
+            _handlers[(int)MessageId.CS_UNEQUIP_REQ] = HandleUnequipRequest;
+            _handlers[(int)MessageId.CS_SAVE_REQ] = HandleSaveMap;
+            _handlers[(int)MessageId.CS_LOAD_COMPLETE_REQ] = HandleLoadComplete;
+            _handlers[(int)MessageId.CS_KILL_LOG_REQ] = HandleKillLogRequest;
+            _handlers[(int)MessageId.CS_SET_STATUS_REQ] = HandleSetStatusRequest;
+            _handlers[(int)MessageId.CS_START_REQ] = HandleStartRequest;
+            _handlers[(int)MessageId.CS_REGISTER_REQ] = HandleRegisterMapRequest;
+            _handlers[(int)MessageId.CS_RESPAWN_TICKET_REQ] = HandleRespawnTicketRequest;
+            _handlers[(int)MessageId.CS_TIMER_REQ] = HandleTimer;
+            _handlers[(int)MessageId.CS_MATCH_COUNTDOWN_REQ] = HandleMatchCountdown;
+            _handlers[(int)MessageId.CS_BREAK_INTO_REQ] = HandleBreakIntoRequest;
+            _handlers[(int)MessageId.CS_TEAM_SCORE_REQ] = HandleTeamScoreRequest;
+            _handlers[(int)MessageId.CS_DESTROY_BRICK_REQ] = HandleDestroyBrickRequest;
+            _handlers[(int)MessageId.CS_TEAM_CHANGE_REQ] = HandleTeamChangeRequest;
+            _handlers[(int)MessageId.CS_SLOT_LOCK_REQ] = HandleSlotLockRequest;
+            _handlers[(int)MessageId.CS_ROOM_CONFIG_REQ] = HandleRoomConfig;
+            _handlers[(int)MessageId.CS_TEAM_CHAT_REQ] = HandleTeamChatRequest;
+            _handlers[(int)MessageId.CS_RADIO_MSG_REQ] = HandleRadioMsgRequest;
+            _handlers[(int)MessageId.CS_BUY_ITEM_REQ] = HandleBuyRequest;
+            _handlers[(int)MessageId.CS_P2P_COMPLETE_REQ] = HandleP2PComplete;
+            _handlers[(int)MessageId.CS_RESULT_DONE_REQ] = HandleResultDoneRequest;
+            _handlers[(int)MessageId.CS_ROAMOUT_REQ] = HandleRoamout;
+            _handlers[(int)MessageId.CS_ROAMIN_REQ] = HandleRoamin;
+            _handlers[(int)MessageId.CS_GET_CANNON_REQ] = HandleGetCannonRequest;
+            _handlers[(int)MessageId.CS_EMPTY_CANNON_REQ] = HandleEmptyCannonRequest;
+            _handlers[(int)MessageId.CS_GET_BACK2SPAWNER_REQ] = HandleGetBack2SpawnerRequest;
+            _handlers[(int)MessageId.CS_MATCH_RESTART_COUNT_REQ] = HandleMatchRestartCountRequest;
+            _handlers[(int)MessageId.CS_MATCH_RESTARTED_REQ] = HandleMatchRestartRequest;
+            _handlers[(int)MessageId.CS_BM_INSTALL_BOMB_REQ] = Defusion.HandleBombInstallRequest;
+            _handlers[(int)MessageId.CS_BM_UNINSTALL_BOMB_REQ] = Defusion.HandleBombUninstallRequest;
+            _handlers[(int)MessageId.CS_BM_BLAST_REQ] = Defusion.HandleBombBlastRequest;
+            _handlers[(int)MessageId.CS_CTF_PICK_FLAG_REQ] = CTF.HandlePickFlagRequest;
+            _handlers[(int)MessageId.CS_CTF_CAPTURE_FLAG_REQ] = CTF.HandleCaptureFlagRequest;
+            _handlers[(int)MessageId.CS_CTF_DROP_FLAG_REQ] = CTF.HandleDropFlagRequest;
+            _handlers[(int)MessageId.CS_BLAST_MODE_SCORE_REQ] = Defusion.HandleScoreRequest;
+            _handlers[(int)MessageId.CS_CTF_SCORE_REQ] = CTF.HandleCTFScoreRequest;
+            _handlers[(int)MessageId.CS_ME_CHG_EDITOR_REQ] = HandleChangeEditorPermissionRequest;
+            _handlers[(int)MessageId.CS_INIT_TERM_ITEM_REQ] = HandleInitItemTermRequest;
+            _handlers[(int)MessageId.CS_BND_SCORE_REQ] = BND.HandleBNDScoreRequest;
+            _handlers[(int)MessageId.CS_LINE_BRICK_REQ] = HandleLineBrickRequest;
+            _handlers[(int)MessageId.CS_REPLACE_BRICK_REQ] = HandleReplaceBrickRequest;
+            _handlers[(int)MessageId.CS_USE_SHOOTER_CONSUMABLE_REQ] = msgRef => Debug.LogWarning("UseConsumable Item");
+            _handlers[(int)MessageId.CS_SET_SHOOTER_TOOL_REQ] = HandleSetShooterToolRequest;
+            _handlers[(int)MessageId.CS_CLEAR_SHOOTER_TOOLS_REQ] = HandleClearShooterTools;
+            _handlers[(int)MessageId.CS_REG_MAP_INFO_REQ] = HandleRegMapInfoRequest;
+            _handlers[(int)MessageId.CS_STACK_POINT_REQ] = msgRef => Debug.LogWarning("StackPointRequest");
+            _handlers[(int)MessageId.CS_BND_SHIFT_PHASE_REQ] = BND.HandleBNDShiftPhaseRequest;
+            _handlers[(int)MessageId.CS_CTF_FLAG_RETURN_REQ] = CTF.HandleFlagReturnRequest;
+            _handlers[(int)MessageId.CS_WEAPON_HELD_RATIO_REQ] = HandleWeaponHeldRatioRequest;
+            _handlers[(int)MessageId.CS_DELEGATE_MASTER_REQ] = HandleDelegateMasterRequest;
+            _handlers[(int)MessageId.CS_INFLICTED_DAMAGE_REQ] = msgRef => Debug.LogWarning("InflictedDamageRequest");
+            _handlers[(int)MessageId.CS_WEAPON_CHANGE_REQ] = HandleWeaponChangeRequest;
+            _handlers[(int)MessageId.CS_SET_WEAPON_SLOT_REQ] = HandleSetWeaponSlotRequest;
+            _handlers[(int)MessageId.CS_CLEAR_WEAPON_SLOTS_REQ] = HandleClearWeaponSlots;
+            _handlers[(int)MessageId.CS_MY_DOWNLOAD_MAP_REQ] = HandleRequestDownloadedMaps;
+            _handlers[(int)MessageId.CS_MY_REGISTER_MAP_REQ] = HandleRequestRegisteredMaps;
+            _handlers[(int)MessageId.CS_USER_MAP_REQ] = HandleRequestUserMaps;
+            _handlers[(int)MessageId.CS_ALL_MAP_REQ] = msgRef => Debug.LogWarning("AllMapRequest from: " + msgRef.client.GetIdentifier());
+            _handlers[(int)MessageId.CS_OPEN_DOOR_REQ] = HandleOpenDoorRequest;
+            _handlers[(int)MessageId.CS_CLOSE_DOOR_REQ] = HandleCloseDoorRequest;
+            _handlers[(int)MessageId.CS_SAVE_PLAYER_COMMON_OPT_REQ] = HandleCommonOpt;
+            _handlers[(int)MessageId.CS_ROOM_REQ] = HandleRoomRequest;
+            _handlers[(int)MessageId.CS_CHARGE_FORCE_POINT_REQ] = HandleChargeForcePoint;
+            _handlers[(int)MessageId.CS_CHANNEL_PLAYER_LIST_REQ] = HandleRequestUserList;
+            _handlers[(int)MessageId.CS_ZOMBIE_INFECTION_REQ] = Zombie.HandleZombieInfectionRequest;
+            _handlers[(int)MessageId.CS_ZOMBIE_INFECT_REQ] = Zombie.HandleZombieInfectRequest;
+            _handlers[(int)MessageId.CS_ZOMBIE_MODE_SCORE_REQ] = Zombie.HandleZombieScoreRequest;
+            _handlers[(int)MessageId.CS_ZOMBIE_STATUS_REQ] = Zombie.HandleZombieStatusRequest;
+            _handlers[(int)MessageId.CS_ZOMBIE_OBSERVER_REQ] = Zombie.HandleZombieObserverRequest;
+            _handlers[(int)MessageId.CS_GET_TRAIN_REQ] = HandleGetTrainRequest;
+            _handlers[(int)MessageId.CS_EMPTY_TRAIN_REQ] = HandleEmptyTrainRequest;
+            _handlers[ExtensionOpcodes.opInventoryAck] = HandleInventoryData;
+            _handlers[ExtensionOpcodes.opDisconnectReq] = HandleDisconnect;
+            _handlers[ExtensionOpcodes.opBeginChunkedBufferReq] = HandleBeginChunkedBuffer;
+            _handlers[ExtensionOpcodes.opChunkedBufferReq] = HandleChunkedBuffer;
+            _handlers[ExtensionOpcodes.opEndChunkedBufferReq] = HandleEndChunkedBuffer;
+        }
+
         private void HandleMessages()
         {
             if (readQueue.Count < 1)
@@ -599,354 +697,14 @@ namespace _Emulator
             {   
                 if (debugSend)
                     Debug.Log($"[Verbose] Processing message ID: {msgRef.msg._id} from client: {msgRef.client.GetIdentifier()}");
-                switch (msgRef.msg._id)
+                Action<MsgReference> handler;
+                if (_handlers.TryGetValue(msgRef.msg._id, out handler))
                 {
-                    case 1:
-                        HandleLoginRequest(msgRef);
-                        break;
-
-                    case 3:
-                        HandleHeartbeat(msgRef);
-                        break;
-
-                    case 4:
-                        HandleRoomListRequest(msgRef);
-                        break;
-
-                    case 7:
-                        HandleCreateRoomRequest(msgRef);
-                        break;
-
-                    case 13:
-                        HandleAddBrickRequest(msgRef);
-                        break;
-
-                    case 15:
-                        HandleDelBrickRequest(msgRef);
-                        break;
-
-                    case 19:
-                        Debug.LogWarning("PaletteManagerRequest");
-                        break;
-
-                    case 20:
-                        HandleCacheBrickRequest(msgRef);
-                        break;
-
-                    case 23:
-                        HandleLeave(msgRef);
-                        break;
-
-                    case 24:
-                        HandleChatRequest(msgRef);
-                        break;
-
-                    case 28:
-                        HandleJoinRequest(msgRef);
-                        break;
-
-                    case 32:
-                        HandleResumeRoomRequest(msgRef);
-                        break;
-
-                    case 35:
-                        HandleEquipRequest(msgRef);
-                        break;
-
-                    case 37:
-                        HandleUnequipRequest(msgRef);
-                        break;
-
-                    case 39:
-                        HandleSaveMap(msgRef);
-                        break;
-
-                    case 42:
-                        HandleLoadComplete(msgRef);
-                        break;
-
-                    case 44:
-                        HandleKillLogRequest(msgRef);
-                        break;
-
-                    case 47:
-                        HandleSetStatusRequest(msgRef);
-                        break;
-
-                    case 49:
-                        HandleStartRequest(msgRef);
-                        break;
-
-                    case 51:
-                        HandleRegisterMapRequest(msgRef);
-                        break;
-
-                    case 63:
-                        HandleRespawnTicketRequest(msgRef);
-                        break;
-
-                    case 65:
-                        HandleTimer(msgRef);
-                        break;
-
-                    case 71:
-                        HandleMatchCountdown(msgRef);
-                        break;
-
-                    case 73:
-                        HandleBreakIntoRequest(msgRef);
-                        break;
-
-                    case 75:
-                        HandleTeamScoreRequest(msgRef);
-                        break;
-
-                    case 76:
-                        HandleDestroyBrickRequest(msgRef);
-                        break;
-
-                    case 80:
-                        HandleTeamChangeRequest(msgRef);
-                        break;
-
-                    case 85:
-                        HandleSlotLockRequest(msgRef);
-                        break;
-
-                    case 91:
-                        HandleRoomConfig(msgRef);
-                        break;
-
-                    case 93:
-                        HandleTeamChatRequest(msgRef);
-                        break;
-
-                    case 95:
-                        HandleRadioMsgRequest(msgRef);
-                        break;
-
-                    case 121:
-                        HandleBuyRequest(msgRef);
-                        break;
-
-                    case 135:
-                        HandleP2PComplete(msgRef);
-                        break;
-
-                    case 137:
-                        HandleResultDoneRequest(msgRef);
-                        break;
-
-                    case 143:
-                        HandleRoamout(msgRef);
-                        break;
-
-                    case 145:
-                        HandleRoamin(msgRef);
-                        break;
-
-                    case 158:
-                        HandleGetCannonRequest(msgRef);
-                        break;
-
-                    case 160:
-                        HandleEmptyCannonRequest(msgRef);
-                        break;
-
-                    case 262:
-                        HandleGetBack2SpawnerRequest(msgRef);
-                        break;
-
-                    case 264:
-                        HandleMatchRestartCountRequest(msgRef);
-                        break;
-
-                    case 266:
-                        HandleMatchRestartRequest(msgRef);
-                        break;
-
-                    case 285:
-                        HandlePickFlagRequest(msgRef);
-                        break;
-
-                    case 287:
-                        HandleCaptureFlagRequest(msgRef);
-                        break;
-
-                    case 289:
-                        HandleDropFlagRequest(msgRef);
-                        break;
-
-                    case 295:
-                        HandleCTFScoreRequest(msgRef);
-                        break;
-
-                    case 304:
-                        HandleChangeEditorPermissionRequest(msgRef);
-                        break;
-
-                    case 307:
-                        HandleInitItemTermRequest(msgRef);
-                        break;
-
-                    case 324:
-                        HandleBNDScoreRequest(msgRef);
-                        break;
-
-                    case 325:
-                        HandleLineBrickRequest(msgRef);
-                        break;
-
-                    case 327:
-                        HandleReplaceBrickRequest(msgRef);
-                        break;
-
-                    case 329:
-                        msgRef.msg._msg.Read(out long item);
-                        msgRef.msg._msg.Read(out string code);
-                        Debug.LogWarning("UseConsumable Item: " + item + " code: " + code);
-                        break;
-
-                    case 333:
-                        HandleSetShooterToolRequest(msgRef);
-                        break;
-
-                    case 334:
-                        HandleClearShooterTools(msgRef);
-                        break;
-
-                    case 337:
-                        HandleRegMapInfoRequest(msgRef);
-                        break;
-
-                    case 345:
-                        Debug.LogWarning("StackPointRequest");
-                        break;
-
-                    case 349:
-                        HandleBNDShiftPhaseRequest(msgRef);
-                        break;
-
-                    case 366:
-                        HandleFlagReturnRequest(msgRef);
-                        break;
-
-                    case 368:
-                        HandleWeaponHeldRatioRequest(msgRef);
-                        break;
-
-                    case 389:
-                        HandleDelegateMasterRequest(msgRef);
-                        break;
-
-                    case 399:
-                        Debug.LogWarning("InflictedDamageRequest");
-                        break;
-
-                    case 414:
-                        HandleWeaponChangeRequest(msgRef);
-                        break;
-
-                    case 419:
-                        HandleSetWeaponSlotRequest(msgRef);
-                        break;
-
-                    case 420:
-                        HandleClearWeaponSlots(msgRef);
-                        break;
-
-                    case 425:
-                        HandleRequestDownloadedMaps(msgRef);
-                        break;
-
-                    case 427:
-                        HandleRequestRegisteredMaps(msgRef);
-                        break;
-
-                    case 429:
-                        HandleRequestUserMaps(msgRef);
-                        break;
-
-                    case 431:
-                        Debug.LogWarning("AllMapRequest from: " + msgRef.client.GetIdentifier());
-                        break;
-
-                    case 447:
-                        HandleOpenDoorRequest(msgRef);
-                        break;
-
-                    case 448:
-                        HandleCloseDoorRequest(msgRef);
-                        break;
-
-                    case 460:
-                        HandleCommonOpt(msgRef);
-                        break;
-
-                    case 469:
-                        HandleRoomRequest(msgRef);
-                        break;
-
-                    case 471:
-                        HandleChargeForcePoint(msgRef);
-                        break;
-
-                    case 478:
-                        HandleRequestUserList(msgRef);
-                        break;
-
-                    case 538:
-                        HandleZombieInfectionRequest(msgRef);
-                        break;
-
-                    case 540:
-                        HandleZombieInfectRequest(msgRef);
-                        break;
-
-                    case 545:
-                        HandleZombieScoreRequest(msgRef);
-                        break;
-
-                    case 547:
-                        HandleZombieStatusRequest(msgRef);
-                        break;
-
-                    case 549:
-                        HandleZombieObserverRequest(msgRef);
-                        break;
-
-                    case 551:
-                        HandleGetTrainRequest(msgRef);
-                        break;
-
-                    case 553:
-                        HandleEmptyTrainRequest(msgRef);
-                        break;
-
-                    case ExtensionOpcodes.opInventoryAck:
-                        HandleInventoryData(msgRef);
-                        break;
-
-                    case ExtensionOpcodes.opDisconnectReq:
-                        HandleDisconnect(msgRef);
-                        break;
-
-                    case ExtensionOpcodes.opBeginChunkedBufferReq:
-                        HandleBeginChunkedBuffer(msgRef);
-                        break;
-
-                    case ExtensionOpcodes.opChunkedBufferReq:
-                        HandleChunkedBuffer(msgRef);
-                        break;
-
-                    case ExtensionOpcodes.opEndChunkedBufferReq:
-                        HandleEndChunkedBuffer(msgRef);
-                        break;
-
-                    default:
-                        if (debugHandle)
-                            Debug.LogWarning("Received unhandled message ID " + msgRef.msg._id + " from: " + msgRef.client.GetIdentifier());
-                        break;
+                    handler(msgRef);
+                }
+                else
+                {
+                    Debug.LogWarning("No handler for message ID: " + msgRef.msg._id);
                 }
             }
 
@@ -1400,7 +1158,7 @@ namespace _Emulator
             {
                 // Unpack the timer configuration for Build and Destroy phases
                 int buildTime, destroyTime, repeat;
-                UnpackTimerOption(param2, out buildTime, out destroyTime, out repeat);
+                BND.UnpackTimerOption(param2, out buildTime, out destroyTime, out repeat);
 
                 matchData.buildPhaseTime = buildTime;
                 matchData.battlePhaseTime = destroyTime;
@@ -1803,6 +1561,16 @@ namespace _Emulator
 
             ClientReference victimClient = matchData.clientList.Find(x => x.seq == victim);
             victimClient.deaths++;
+            if (victimClient.slot.slotIndex < 8) // Blue team
+            {
+                if (!matchData.deadBluePlayers.Contains(victimClient.seq))
+                    matchData.deadBluePlayers.Add(victimClient.seq);
+            }
+            else // Red team
+            {
+                if (!matchData.deadRedPlayers.Contains(victimClient.seq))
+                    matchData.deadRedPlayers.Add(victimClient.seq);
+            }
             SendDeathCount(victimClient);
 
             if (killer == victim)
@@ -1877,11 +1645,11 @@ namespace _Emulator
                             else
                                 matchData.blueScore++;
 
-                            SendBnDScore(matchData);
+                            BND.SendBnDScore(matchData);
 
                             if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
                             {
-                                HandleBNDMatchEnd(matchData);
+                                BND.HandleBNDMatchEnd(matchData);
                             }
                         }
                         break;
@@ -1894,7 +1662,29 @@ namespace _Emulator
                         SendTeamScore(matchData);
                         if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
                         {
-                            HandleCTFMatchEnd(matchData);
+                            CTF.HandleCTFMatchEnd(matchData);
+                        }
+                        break;
+
+                    case Room.ROOM_TYPE.EXPLOSION:
+                        int totalRed = matchData.redSlots.Count(x => x.isUsed);
+                        int totalBlue = matchData.blueSlots.Count(x => x.isUsed);
+
+                        int deadRed = matchData.deadRedPlayers.Count;
+                        int deadBlue = matchData.deadBluePlayers.Count;
+
+                        // DEBUG:
+                        Debug.Log($"Explosion check wipe - Red: {deadRed}/{totalRed}, Blue: {deadBlue}/{totalBlue}");
+
+                        if (deadBlue >= totalBlue)
+                        {
+                            matchData.blueScore++;
+                            Defusion.HandleRoundEnd(msgRef, 1);
+                        }
+                        else if (deadRed >= totalRed)
+                        {
+                            matchData.redScore++;
+                            Defusion.HandleRoundEnd(msgRef, 0); 
                         }
                         break;
                 }
@@ -2309,30 +2099,6 @@ namespace _Emulator
             SendRoom(null, matchData, SendType.BroadcastRoom);
         }
 
-        public void HandleCTFMatchEnd(MatchData matchData)
-        {
-            matchData.room.Status = Room.ROOM_STATUS.WAITING;
-            SendCTFMatchEnd(matchData);
-            matchData.Reset();
-            SendRoom(null, matchData, SendType.BroadcastRoom);
-        }
-
-        public void HandleBNDMatchEnd(MatchData matchData)
-        {
-            matchData.room.Status = Room.ROOM_STATUS.WAITING;
-            SendBNDMatchEnd(matchData);
-            matchData.Reset();
-            SendRoom(null, matchData, SendType.BroadcastRoom);
-        }
-
-        public void HandleZombieMatchEnd(MatchData matchData)
-        {
-            matchData.room.Status = Room.ROOM_STATUS.WAITING;
-            SendZombieMatchEnd(matchData);
-            matchData.Reset();
-            SendRoom(null, matchData, SendType.BroadcastRoom);
-        }
-
         private void HandleWeaponChangeRequest(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out int slot);
@@ -2543,50 +2309,6 @@ namespace _Emulator
 
             msgRef.client.chunkedBuffer = null;
         }
-
-        public void HandleBNDScoreRequest(MsgReference msgRef)
-        {
-            MatchData data = msgRef.matchData;
-            MsgBody msg = new MsgBody();
-            msg.Write(data.redScore); // red score
-            msg.Write(data.blueScore); // blue score
-            if (debugHandle)
-                Debug.Log("HandleBNDScoreReq from: " + msgRef.client.GetIdentifier() + " RedScore: " + data.redScore + " BluScore: " + data.blueScore);
-
-            Say(new MsgReference(339, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
-        }
-
-        public void HandleBNDShiftPhaseRequest(MsgReference msgRef)
-        {
-            Debug.LogWarning("recieved Shift Phase Req");
-            msgRef.msg._msg.Read(out int repeat);
-            MatchData matchData = msgRef.client.matchData;
-            Debug.LogWarning("matchData old repeat: " + matchData.repeat + " msg repeat: " + repeat);
-            matchData.repeat = repeat;
-            if (repeat <= 0)
-            {
-                matchData.EndMatch();
-            }
-
-            msgRef.msg._msg.Read(out bool isBuildPhase);
-            Debug.LogWarning("matchData old isBuildPhase: " + matchData.isBuildPhase + " msg isBuild: " + isBuildPhase);
-            matchData.isBuildPhase = isBuildPhase;
-            SendShiftPhase(msgRef.client, repeat, isBuildPhase);
-        }
-
-        public void SendShiftPhase(ClientReference client, int repeat, bool isBuildPhase)
-        {
-            MatchData matchData = client.matchData;
-            matchData.ResetForNewRound();
-
-            MsgBody body = new MsgBody();
-
-            body.Write(repeat);
-            body.Write(isBuildPhase);
-
-            Say(new MsgReference(344, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
-        }
-
 
         public void SendDelBrick(ClientReference client, int brickSeq)
         {
@@ -2927,108 +2649,6 @@ namespace _Emulator
                 Debug.Log("Broadcasted SendTeamMatchEnd for room no: " + matchData.room.No);
         }
 
-        public void SendCTFMatchEnd(MatchData matchData)
-        {
-            for (int team = 0; team < 2; team++)
-            {
-                MsgBody body = new MsgBody();
-
-                body.Write(team == 0 ? matchData.GetWinningTeam() : (sbyte)-matchData.GetWinningTeam());
-                body.Write(matchData.redScore); //RedScore
-                body.Write(matchData.blueScore); //BlueScore
-                body.Write(matchData.ctfRedKillCount); //RedTotalKill
-                body.Write(matchData.ctfBlueKillCount); //BluTotalKill
-                body.Write(matchData.ctfBlueKillCount); //RedTotalDeath
-                body.Write(matchData.ctfRedKillCount); //BlueTotalDeath
-                body.Write(matchData.clientList.Count);
-                for (int i = 0; i < matchData.clientList.Count; i++)
-                {
-                    body.Write(matchData.clientList[i].slot.isRed);
-                    body.Write(matchData.clientList[i].seq);
-                    body.Write(matchData.clientList[i].name);
-                    body.Write(matchData.clientList[i].kills);
-                    body.Write(matchData.clientList[i].deaths);
-                    body.Write(matchData.clientList[i].assists);
-                    body.Write(matchData.clientList[i].score);
-                    body.Write(0); //points
-                    body.Write(0); //xp
-                    body.Write(0); //mission
-                    body.Write(matchData.clientList[i].data.xp);
-                    body.Write(matchData.clientList[i].data.xp);
-                    body.Write((long)0); //buff
-                }
-                Say(new MsgReference(292, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam));
-            }
-
-            if (debugSend)
-                Debug.Log("Broadcasted SendCTFMatchEnd for room no: " + matchData.room.No);
-        }
-
-        public void SendBNDMatchEnd(MatchData matchData)
-        {
-            for (int team = 0; team < 2; team++)
-            {
-                MsgBody body = new MsgBody();
-
-                body.Write(team == 0 ? matchData.GetWinningTeam() : (sbyte)-matchData.GetWinningTeam());
-                body.Write(matchData.redScore); //RedScore
-                body.Write(matchData.blueScore); //BlueScore
-                body.Write(matchData.blueScore); //RedTotalKill
-                body.Write(matchData.redScore); //BluTotalKill
-                body.Write(matchData.clientList.Count);
-                for (int i = 0; i < matchData.clientList.Count; i++)
-                {
-                    body.Write(matchData.clientList[i].slot.isRed);
-                    body.Write(matchData.clientList[i].seq);
-                    body.Write(matchData.clientList[i].name);
-                    body.Write(matchData.clientList[i].kills);
-                    body.Write(matchData.clientList[i].deaths);
-                    body.Write(matchData.clientList[i].assists);
-                    body.Write(matchData.clientList[i].score);
-                    body.Write(0); //points
-                    body.Write(0); //xp
-                    body.Write(0); //mission
-                    body.Write(matchData.clientList[i].data.xp);
-                    body.Write(matchData.clientList[i].data.xp);
-                    body.Write((long)0); //buff
-                }
-                Say(new MsgReference(338, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam));
-            }
-
-            if (debugSend)
-                Debug.Log("Broadcasted SendBNDMatchEnd for room no: " + matchData.room.No);
-        }
-
-        public void SendZombieMatchEnd(MatchData matchData)
-        {
-            MsgBody body = new MsgBody();
-
-            body.Write(matchData.clientList.Count);
-            for (int i = 0; i < matchData.clientList.Count; i++)
-            {
-                int points = (int) (matchData.clientList[i].score * 0.4);
-                int xp = (int)(matchData.clientList[i].score * 0.5);
-                body.Write(matchData.clientList[i].slot.isRed);
-                body.Write(matchData.clientList[i].seq);
-                body.Write(matchData.clientList[i].name);
-                body.Write(0); // survival ensured
-                body.Write(0); // zombie victory
-                body.Write(matchData.clientList[i].assists);
-                body.Write(matchData.clientList[i].score);
-                body.Write(points); //points
-                body.Write(xp); //xp
-                body.Write(0); //mission
-                body.Write(matchData.clientList[i].data.xp);
-                body.Write(matchData.clientList[i].data.xp + xp);
-                body.Write((long)0); //buff
-            }
-
-            Say(new MsgReference(537, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
-
-            if (debugSend)
-                Debug.Log($"Broadcasted SendZombieMatchEnd for room no: {matchData.room.No}");
-        }
-
         public void SendChat(ClientReference client, ChatText.CHAT_TYPE type, string text)
         {
             MsgBody body = new MsgBody();
@@ -3356,18 +2976,6 @@ namespace _Emulator
             body.Write(matchData.blueScore);
 
             Say(new MsgReference(67, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
-
-            if (debugSend)
-                Debug.Log("Broadcasted SendTeamScore for room no: " + matchData.room.No);
-        }
-
-        public void SendBnDScore(MatchData matchData)
-        {
-            MsgBody body = new MsgBody();
-            body.Write(matchData.redScore);
-            body.Write(matchData.blueScore);
-
-            Say(new MsgReference(339, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
                 Debug.Log("Broadcasted SendTeamScore for room no: " + matchData.room.No);
@@ -4405,86 +4013,6 @@ namespace _Emulator
             }
         }
 
-        private void HandlePickFlagRequest(MsgReference msgRef)
-        {
-            MatchData data = msgRef.matchData;
-            msgRef.msg._msg.Read(out int flag);
-            if (debugHandle)
-                Debug.Log("HandlePickFlag from: " + msgRef.client.GetIdentifier() + " FlagId: " + flag);
-            MsgBody msg = new MsgBody();
-            // i think the response needs to be the plaxer seq which picked up the flag
-
-            msg.Write(msgRef.client.seq);
-            Say(new MsgReference(286, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
-        }
-
-        private void HandleDropFlagRequest(MsgReference msgRef)
-        {
-            MatchData data = msgRef.matchData;
-            msgRef.msg._msg.Read(out int x);
-            msgRef.msg._msg.Read(out int y);
-            msgRef.msg._msg.Read(out int z);
-            if (debugHandle)
-                Debug.Log("HandleFlagDrop from: " + msgRef.client.GetIdentifier() + " Flag: x: " + x + " y: " + y + " z: " + z);
-            MsgBody msg = new MsgBody();
-            msg.Write(0); //unused
-            msg.Write(0); // unused
-            msg.Write(x);
-            msg.Write(y);
-            msg.Write(z);
-
-            Say(new MsgReference(290, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
-        }
-
-        private void HandleCaptureFlagRequest(MsgReference msgRef)
-        {
-            MatchData data = msgRef.matchData;
-            msgRef.msg._msg.Read(out int flag);
-            msgRef.msg._msg.Read(out bool opponent);
-            if (msgRef.client.slot.slotIndex > 7)
-            {
-                data.blueScore++;
-            }
-            else
-            {
-                data.redScore++;
-            }
-            SendTeamScore(data);
-            data.ResetForNewRound();
-            if (debugHandle)
-                Debug.Log("HandleCaptureFlag from: " + msgRef.client.GetIdentifier() + " FlagId: " + flag + " IsOpponent: " + opponent);
-            MsgBody msg = new MsgBody();
-            msg.Write(msgRef.client.seq); // Player sequence
-            //Round only starts for one player (oponent?)
-
-            Say(new MsgReference(288, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
-        }
-
-        private void HandleCTFScoreRequest(MsgReference msgRef)
-        {
-            MatchData data = msgRef.matchData;
-            MsgBody msg = new MsgBody();
-            msg.Write(data.redScore); // red score
-            msg.Write(data.blueScore); // blue score
-            if (debugHandle)
-                Debug.Log("HandleCTFScoreReq from: " + msgRef.client.GetIdentifier() + " RedScore: " + data.redScore + " BluScore: " + data.blueScore);
-
-            Say(new MsgReference(296, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
-        }
-
-        private void HandleFlagReturnRequest(MsgReference msgRef)
-        {
-            MatchData data = msgRef.matchData;
-            msgRef.msg._msg.Read(out float x);
-            msgRef.msg._msg.Read(out float y);
-            msgRef.msg._msg.Read(out float z);
-            if (debugHandle)
-                Debug.Log("HandleFlagReturn from: " + msgRef.client.GetIdentifier() + " Flag: x: " + x + " y: " + y + " z: " + z);
-            MsgBody msg = new MsgBody();
-
-            Say(new MsgReference(367, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
-        }
-
         private void HandleGetBack2SpawnerRequest(MsgReference msgRef)
         {
             MatchData data = msgRef.matchData;
@@ -4561,292 +4089,6 @@ namespace _Emulator
             /*msg.Read(out int val);
             ShowBuildErrorMessage(val);
             ((ReplaceToolDialog)DialogManager.Instance.GetDialog(DialogManager.DIALOG_INDEX.REPLACE_TOOL))?.MoveNext(success: false);*/
-        }
-
-        private void HandleZombieInfectionRequest(MsgReference msgRef)
-        {
-            MatchData data = msgRef.matchData;
-            //Debug.LogWarning("InfectionRequest current status: " + data.zombieStatus);
-
-            if (data.roundInit)
-            {
-                int numPlayers = data.clientList.Count;
-                int numZombies;
-
-                if (numPlayers <= 4)
-                {
-                    numZombies = 1;
-                }
-                else if (numPlayers <= 10)
-                {
-                    numZombies = 2;
-                }
-                else if (numPlayers <= 15)
-                {
-                    numZombies = 3;
-                }
-                else
-                {
-                    numZombies = 4;
-                }
-
-                // Clone the client list to select randomly
-                List<ClientReference> shuffledClients = new List<ClientReference>(data.clientList);
-
-                // Shuffle the list to ensure randomness
-                for (int i = 0; i < shuffledClients.Count; i++)
-                {
-                    int randomIndex = UnityEngine.Random.Range(i, shuffledClients.Count);
-
-                    // Manually swap elements
-                    var temp = shuffledClients[i];
-                    shuffledClients[i] = shuffledClients[randomIndex];
-                    shuffledClients[randomIndex] = temp;
-                }
-
-                // Select the first `numZombies` clients as zombies
-                data.zombiePlayers.Clear();
-                for (int i = 0; i < numZombies; i++)
-                {
-                    data.clientList.Find(x => x.seq == shuffledClients[i].seq).isZombie = true;
-                    data.zombiePlayers.Add(shuffledClients[i].seq);
-                }
-
-                // Add the remaining clients to the human players list
-                data.humanPlayers.Clear();
-                for (int i = numZombies; i < shuffledClients.Count; i++)
-                {
-                    data.humanPlayers.Add(shuffledClients[i].seq);
-                }
-
-                // Mark the round as initialized
-                data.roundInit = false;
-
-                if (debugSend)
-                {
-                    Debug.Log($"Initialized round: {numZombies} zombies and {data.humanPlayers.Count} humans.");
-                }
-            }
-
-            // Create a new message body for the response
-            MsgBody msg = new MsgBody();
-
-            // Add human IDs
-            msg.Write(data.humanPlayers.Count); // Write the count of humans
-            foreach (int humanId in data.humanPlayers)
-            {
-                msg.Write(humanId); // Write each human player ID
-            }
-
-            // Add zombie IDs
-            msg.Write(data.zombiePlayers.Count); // Write the count of zombies
-            foreach (int zombieId in data.zombiePlayers)
-            {
-                msg.Write(zombieId); // Write each zombie player ID
-            }
-
-            // Add IDs of players who died (killed)
-            msg.Write(data.killedPlayers.Count); // Write the count of killed players
-            foreach (int killedId in data.killedPlayers)
-            {
-                msg.Write(killedId); // Write each killed player ID
-            }
-
-            // Add IDs of players who became infected (turned into zombies)
-            msg.Write(data.infectedPlayers.Count); // Write the count of infected players
-            foreach (int infectedId in data.infectedPlayers)
-            {
-                msg.Write(infectedId); // Write each infected player ID
-            }
-
-            // Broadcast the response to all players in the room
-            Say(new MsgReference(539, msg, null, SendType.BroadcastRoom, data.channel, data));
-
-            if (debugSend)
-            {
-                Debug.Log("Zombie infection state updated and broadcasted.");
-            }
-        }
-
-        private void HandleZombieInfectRequest(MsgReference msgRef)
-        {
-            msgRef.msg._msg.Read(out int brickMan);
-            msgRef.msg._msg.Read(out int zombie);
-
-            MatchData data = msgRef.matchData;
-            // Update human and zombie player lists
-            if (data.humanPlayers.Contains(brickMan))
-            {
-                data.humanPlayers.Remove(brickMan);
-                data.zombiePlayers.Add(brickMan);
-                ClientReference client = data.clientList[zombie];
-                client.kills += 1;
-            }
-
-            if (data.humanPlayers.Count == 0)
-            {
-                SendRoundEnd(msgRef, data);
-            }
-
-            MsgBody msg = new MsgBody();
-            msg.Write(brickMan); // Infected player
-            msg.Write(zombie);   // Infecting player
-            Say(new MsgReference(541, msg, null, SendType.BroadcastRoom, data.channel, data));
-
-            if (debugSend)
-            {
-                Debug.Log($"Zombie Infection: {zombie} infected {brickMan}. Remaining humans: {data.humanPlayers.Count}, Remaining Zombies: {data.zombiePlayers.Count}");
-            }
-        }
-
-        private void HandleZombieScoreRequest(MsgReference msgRef)
-        {
-            // Ensure debug logging is only performed if debugSend is enabled
-            if (debugSend)
-            {
-                Debug.Log($"Zombie Score Request: Total Rounds: {msgRef.matchData.room.goal}, " +
-                          $"Current Round: {msgRef.matchData.zombieCurrentRound}");
-            }
-
-            // Prepare the message body with total rounds and current round
-            MsgBody msg = new MsgBody();
-            msg.Write(msgRef.matchData.room.goal); // Total rounds
-            msg.Write(msgRef.matchData.zombieCurrentRound); // Current round
-
-            // Send the message as a broadcast
-            Say(new MsgReference(536, msg, null, SendType.BroadcastRoom, msgRef.matchData.channel, msgRef.matchData));
-        }
-
-        private void SendRoundEnd(MsgReference msgRef, MatchData data)
-        {
-            Debug.LogWarning($"Send RoundEnd client {msgRef.client.GetIdentifier()} data: {data.ToString()}");
-
-            if (data.zombieCurrentRound >= data.room.goal)
-            {
-                data.EndMatch();
-                return;
-            }
-
-            MsgBody msg = new MsgBody();
-            msg.Write(msgRef.client.seq);
-            if (data.humanPlayers.Count == 0)
-            {
-                //Zombies win
-                msg.Write((sbyte)-1);
-                msg.Write((sbyte)1);
-            }
-            else
-            {
-                //Humans win
-                msg.Write((sbyte)1);
-                msg.Write((sbyte)-1);
-            }
-            msg.Write((sbyte)data.zombieCurrentRound);
-            data.ResetForNewRound();
-            data.zombieCurrentRound += 1;
-            data.zombieRoundsLeft -= 1;
-
-            HandleZombieScoreRequest(msgRef);
-
-            Say(new MsgReference(205, msg, null, SendType.BroadcastRoom, data.channel, data));
-        }
-
-        private void HandleZombieStatusRequest(MsgReference msgRef)
-        {
-            if (msgRef.client.seq != msgRef.matchData.masterSeq)
-            {
-                return;
-            }
-            msgRef.msg._msg.Read(out int status);
-            msgRef.msg._msg.Read(out int time);
-            msgRef.msg._msg.Read(out int countDown);
-
-            MatchData data = msgRef.matchData;
-            MsgBody msg = new MsgBody();
-            data.zombieStatus = (ZombieMatch.STEP)status;
-
-            if (debugPing)
-            {
-                Debug.Log($"ZombieStatus: {status} Time: {time} Countdown: {countDown}");
-            }
-
-            switch ((ZombieMatch.STEP)status)
-            {
-                case ZombieMatch.STEP.WAITING:
-                    Debug.Log("Waiting");
-                    data.zombieCountdown = 0;
-                    //status = 1;
-                    break;
-                case ZombieMatch.STEP.SET_POSITION:
-                    // Countdown for setting positions
-                    Debug.Log("SetPosition");
-                    if (countDown > 0)
-                    {
-                        data.zombieCountdown = countDown - 1;
-                    }
-                    else
-                    {
-                        data.zombieCountdown = 10;
-                        //status = 2;
-                    }
-                    break;
-                case ZombieMatch.STEP.ZOMBIE:
-                    Debug.Log("Zombie");
-                    break;
-                case ZombieMatch.STEP.ZOMBIE_PLAY:
-                    Debug.Log("Zombie Play");
-                    /*if (data.humanPlayers.Count == 0 || data.zombiePlayers.Count == 0)
-                    {
-                        if (!data.roundInit)
-                        {
-                            SendRoundEnd(msgRef.client, data);
-                        }
-                    }
-                    if (data.remainTime <= 0 && data.zombieRoundsLeft < 0)
-                    {
-                        data.EndMatch();
-                        return;
-                    }*/
-                    //time = 0;\
-                    if (data.zombieCountdown != 10)
-                    {
-                        data.zombieCountdown = 10;
-                    }
-                    break;
-                default:
-                    Debug.LogWarning("Unknown ZombieMatch.STEP received.");
-                    break;
-            }
-
-            msg.Write(status);
-            msg.Write(data.playTime);
-            msg.Write(data.zombieCountdown);
-
-            Say(new MsgReference(548, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
-        }
-
-        private void HandleZombieObserverRequest(MsgReference msgRef)
-        {
-            msgRef.msg._msg.Read(out int seq); //MyInfoManager.Instance.Seq
-            /*MatchData data = msgRef.client.matchData;
-            data.zombiePlayers.Remove(seq);
-            data.killedPlayers.Add(seq);
-            if (debugSend)
-            {
-                Debug.LogWarning("ZombieObserver: Zombies:" + data.zombiePlayers.Count + " Humans: " + data.humanPlayers.Count);
-            }
-            if (data.zombiePlayers.Count == 0)
-            {
-                if (data.zombieRoundsLeft > 0)
-                {
-                    SendRoundEnd(msgRef.client, data);
-                }
-                else
-                {
-                    data.EndMatch();
-                }
-            }*/
-            // No Response
         }
 
         private void HandleSaveMap(MsgReference msgRef)
@@ -4994,22 +4236,6 @@ namespace _Emulator
             }
 
             return modeMask;
-        }
-
-        public static void UnpackTimerOption(int packed, out int build, out int battle, out int rpt)
-        {
-            // Extract `rpt` (last 8 bits)
-            rpt = packed & 0xFF;
-
-            // Extract `battle` (middle 8 bits)
-            battle = (packed >> 8) & 0xFF;
-
-            // Extract `build` (first 8 bits)
-            build = (packed >> 16) & 0xFF;
-
-            // Convert back to seconds
-            build *= 60;
-            battle *= 60;
         }
     }
 }
