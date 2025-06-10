@@ -1510,7 +1510,7 @@ namespace _Emulator
 
             }
             else
-                SendCustomMessage("Couldn't create item " + template.name);
+                SendCustomMessage("Couldn't create item " + template.name, msgRef.client, SendType.Unicast);
         }
 
         private void HandleKillLogRequest(MsgReference msgRef)
