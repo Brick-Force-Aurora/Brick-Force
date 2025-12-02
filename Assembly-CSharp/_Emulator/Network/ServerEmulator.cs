@@ -674,6 +674,7 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_ROOM_REQ] = HandleRoomRequest;
             _handlers[(int)MessageId.CS_CHARGE_FORCE_POINT_REQ] = HandleChargeForcePoint;
             _handlers[(int)MessageId.CS_CHANNEL_PLAYER_LIST_REQ] = HandleRequestUserList;
+            _handlers[(int)MessageId.CS_BATCH_DEL_BRICK_REQ] = HandleBrickBatchDeleteRequest;
             _handlers[(int)MessageId.CS_ZOMBIE_INFECTION_REQ] = Zombie.HandleZombieInfectionRequest;
             _handlers[(int)MessageId.CS_ZOMBIE_INFECT_REQ] = Zombie.HandleZombieInfectRequest;
             _handlers[(int)MessageId.CS_ZOMBIE_MODE_SCORE_REQ] = Zombie.HandleZombieScoreRequest;
@@ -1143,7 +1144,6 @@ namespace _Emulator
                     matchData.CacheMapGenerate(param3, param4, alias);
                 }
             }
-
             else
             {
                 matchData.room.goal = param1;
@@ -1154,6 +1154,11 @@ namespace _Emulator
                 matchData.room.isWanted = Convert.ToBoolean(param7);
                 matchData.room.isDropItem = false;//Convert.ToBoolean(param8);
                 matchData.isBalance = Convert.ToBoolean(param6);
+            }
+
+            if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.BUNGEE)
+            {
+                matchData.CacheMap(regMaps.Find(x => x.Value.Map == param4).Value, new UserMapInfo(0, 0));
             }
 
             if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.BND)
@@ -4316,6 +4321,44 @@ namespace _Emulator
             msg.Write(4);
 
             Say(new MsgReference(381, msg, msgRef.client, SendType.Unicast));
+        }
+
+        private void HandleBrickBatchDeleteRequest(MsgReference msgRef)
+        {
+            MatchData matchData = msgRef.matchData;
+
+            if (debugHandle)
+                Debug.Log("HandleDelBrickRequest from: " + msgRef.client.GetIdentifier());
+
+            msgRef.msg._msg.Read(out int length);
+            List<int> morphes = new List<int>();
+            int[] sequences = new int[length];
+            for (int i = 0; i < length; i++)
+            {
+                msgRef.msg._msg.Read(out int seq);
+                sequences[i] = seq;
+                matchData.cachedMap.DelBrickInst(seq, ref morphes);
+            }
+            SendBatchBrick(msgRef.client, sequences);
+        }
+
+        public void SendBatchBrick(ClientReference client, int[] sequences)
+        {
+            MatchData matchData = client.matchData;
+
+            MsgBody body = new MsgBody();
+
+            body.Write(client.seq);
+            body.Write(sequences.Length);
+            for (int i = 0; i < sequences.Length; i++)
+            {
+                body.Write(sequences[i]);
+            }
+
+            Say(new MsgReference(480, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
+
+            if (debugSend)
+                Debug.Log("SendBatchDeleteBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
         }
 
     }

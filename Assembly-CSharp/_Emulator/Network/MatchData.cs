@@ -213,7 +213,7 @@ namespace _Emulator
                 cachedMap.Load(regMap.Map);
                 cachedUMI = umi;
                 cachedUMI.AssignRegMap(regMap);
-                cachedUMI.Alias = cachedUMI.regMap.Alias;
+                cachedUMI.Alias = cachedUMI.regMap.Alias;   
             }
 
             else
