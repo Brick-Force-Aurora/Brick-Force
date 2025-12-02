@@ -659,8 +659,6 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_WEAPON_HELD_RATIO_REQ] = HandleWeaponHeldRatioRequest;
             _handlers[(int)MessageId.CS_TC_OPEN_REQ] = HandleTCOpenRequest;
             _handlers[(int)MessageId.CS_ACCEPT_DAILY_MISSION_REQ] = Handle_CS_ACCEPT_DAILY_MISSION_REQ;
-            _handlers[(int)MessageId.CS_GIVEUP_DAILY_MISSION_REQ] = Handle_CS_GIVEUP_DAILY_MISSION_REQ;
-            _handlers[(int)MessageId.CS_COMPLETE_DAILY_MISSION_REQ] = Handle_CS_COMPLETE_DAILY_MISSION_REQ;
             _handlers[(int)MessageId.CS_DELEGATE_MASTER_REQ] = HandleDelegateMasterRequest;
             _handlers[(int)MessageId.CS_INFLICTED_DAMAGE_REQ] = msgRef => Debug.LogWarning("InflictedDamageRequest");
             _handlers[(int)MessageId.CS_WEAPON_CHANGE_REQ] = HandleWeaponChangeRequest;
