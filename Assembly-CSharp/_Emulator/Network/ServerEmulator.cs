@@ -602,7 +602,7 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_ADD_BRICK_REQ] = HandleAddBrickRequest;
             _handlers[(int)MessageId.CS_DEL_BRICK_REQ] = HandleDelBrickRequest;
             _handlers[(int)MessageId.CS_SAVE_PALETTE_REQ] = msgRef => Debug.LogWarning("PaletteManagerRequest");
-            _handlers[(int)MessageId.CS_CACHE_BRICK_ACK] = HandleCacheBrickRequest;
+            _handlers[(int)MessageId.CS_CACHE_BRICK_REQ] = HandleCacheBrickRequest;
             _handlers[(int)MessageId.CS_LEAVE_REQ] = HandleLeave;
             _handlers[(int)MessageId.CS_CHAT_REQ] = HandleChatRequest;
             _handlers[(int)MessageId.CS_JOIN_REQ] = HandleJoinRequest;
@@ -657,6 +657,10 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_BND_SHIFT_PHASE_REQ] = BND.HandleBNDShiftPhaseRequest;
             _handlers[(int)MessageId.CS_CTF_FLAG_RETURN_REQ] = CTF.HandleFlagReturnRequest;
             _handlers[(int)MessageId.CS_WEAPON_HELD_RATIO_REQ] = HandleWeaponHeldRatioRequest;
+            _handlers[(int)MessageId.CS_TC_OPEN_REQ] = HandleTCOpenRequest;
+            _handlers[(int)MessageId.CS_ACCEPT_DAILY_MISSION_REQ] = Handle_CS_ACCEPT_DAILY_MISSION_REQ;
+            _handlers[(int)MessageId.CS_GIVEUP_DAILY_MISSION_REQ] = Handle_CS_GIVEUP_DAILY_MISSION_REQ;
+            _handlers[(int)MessageId.CS_COMPLETE_DAILY_MISSION_REQ] = Handle_CS_COMPLETE_DAILY_MISSION_REQ;
             _handlers[(int)MessageId.CS_DELEGATE_MASTER_REQ] = HandleDelegateMasterRequest;
             _handlers[(int)MessageId.CS_INFLICTED_DAMAGE_REQ] = msgRef => Debug.LogWarning("InflictedDamageRequest");
             _handlers[(int)MessageId.CS_WEAPON_CHANGE_REQ] = HandleWeaponChangeRequest;
@@ -3790,7 +3794,7 @@ namespace _Emulator
                     body.Write((sbyte)entry.Value.RegisteredDate.Hour);
                     body.Write((sbyte)entry.Value.RegisteredDate.Minute);
                     body.Write((sbyte)entry.Value.RegisteredDate.Second);
-                    body.Write((sbyte)0);
+                    body.Write((sbyte)0); //premium
                 }
                 Say(new MsgReference(430, body, client));
             }
@@ -4237,5 +4241,84 @@ namespace _Emulator
 
             return modeMask;
         }
+
+        private void HandleTCOpenRequest(MsgReference msgRef)
+        {
+            var chests = TreasureChestManager.Instance.ToArray();
+
+            MsgBody msg = new MsgBody();
+
+            msg.Write(0);
+
+            foreach (TcStatus tc in chests)
+            {
+                msg.Write(tc.Seq);
+                msg.Write(tc.Index);
+                msg.Write(tc.Max);
+                msg.Write(tc.Cur);
+                msg.Write(tc.Key);
+                msg.Write(tc.MaxKey);
+                msg.Write(tc.CoinPrice);
+                msg.Write(tc.TokenPrice);
+                msg.Write(tc.Alias);
+
+                // expectation groups
+                msg.Write(tc.TcTItemToArray().Count());
+
+                foreach (TcTItem item in tc.TcTItemToArray())
+                {
+                    msg.Write(item.code);       // string
+                    msg.Write(1);    // int count
+                    msg.Write(item.opt);
+                    msg.Write((sbyte)(item.isKey ? 1 : 0));
+                }
+            }
+            Say(new MsgReference(370, msg, msgRef.client, SendType.Unicast));
+        }
+
+        public void Handle_CS_ACCEPT_DAILY_MISSION_REQ(MsgReference msgRef)
+        {
+            MsgBody msg = new MsgBody();
+            msg.Write(0);
+
+            Say(new MsgReference(384, msg, msgRef.client, SendType.Unicast));
+            Send_MISSION_ACK(msgRef);
+        }
+
+        public void Send_MISSION_ACK(MsgReference msgRef)
+        {
+
+            MsgBody msg = new MsgBody();
+
+            msg.Write(1);
+            msg.Write("MSSN_KILL_MELEE");
+            msg.Write(50);
+            msg.Write(0);
+            msg.Write(false);
+            msg.Write(4);
+
+            Say(new MsgReference(381, msg, msgRef.client, SendType.Unicast));
+
+            msg = new MsgBody();
+            msg.Write(2);
+            msg.Write("MSSN_WIN_TM");
+            msg.Write(5);
+            msg.Write(0);
+            msg.Write(false);
+            msg.Write(4);
+
+            Say(new MsgReference(381, msg, msgRef.client, SendType.Unicast));
+
+            msg = new MsgBody();
+            msg.Write(5);
+            msg.Write("MSSN_WIN_CTF");
+            msg.Write(5);
+            msg.Write(0);
+            msg.Write(false);
+            msg.Write(4);
+
+            Say(new MsgReference(381, msg, msgRef.client, SendType.Unicast));
+        }
+
     }
 }

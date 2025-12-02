@@ -10,7 +10,7 @@
         public int starDust = 100000000;
         public int gm = 0;
         public int clanSeq = 0;
-        public string clanName = "";
+        public string clanName = "Clan";
         public int clanMark = 0;
         public int clanLv = 0;
         public int rank = 60;
