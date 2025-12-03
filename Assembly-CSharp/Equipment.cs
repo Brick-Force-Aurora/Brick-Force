@@ -1,3 +1,4 @@
+using _Emulator;
 using System;
 using UnityEngine;
 
@@ -383,7 +384,10 @@ public class Equipment
 
 	public void Default()
 	{
-		mainTab = 0;
+        ClientExtension.instance.inventory.Apply();
+        ClientExtension.instance.inventory.Save();
+        ClientExtension.instance.SendInventoryData();
+        mainTab = 0;
 		subTab[mainTab] = 0;
 		for (int i = 0; i < GlobalVars.Instance.equipParentDirNames.Length; i++)
 		{
