@@ -312,11 +312,15 @@ namespace _Emulator
                     break;
 
                 case Room.ROOM_TYPE.ESCAPE:
-                    DefenseGamemode.HandleMatchEnd(this);
+                    //DefenseGamemode.HandleMatchEnd(this);
                     break;
 
                 case Room.ROOM_TYPE.BUNGEE:
                     Freefall.HandleMatchEnd(this);
+                    break;
+
+                case Room.ROOM_TYPE.MISSION:
+                    DefenseGamemode.HandleMatchEnd(this);
                     break;
 
                 default:
@@ -348,22 +352,47 @@ namespace _Emulator
             room.CurPlayer = clientList.Count;
         }
 
-        public void LockSlotsByMaxPlayers(int maxPlayers)
+        public void LockSlotsByMaxPlayers(int maxPlayers, Room.ROOM_TYPE roomType)
         {
-            int blueIndex = 15;
-            int redIndex = 7;
-            for (int i = slots.Count - 1; i >= maxPlayers; i--)
+            int totalSlots;
+            bool isTeamMode;
+            bool is8SlotLayout;
+
+            // Determine mode rules
+            is8SlotLayout = (roomType == Room.ROOM_TYPE.BUNGEE || roomType == Room.ROOM_TYPE.MISSION);
+            totalSlots = is8SlotLayout ? 8 : 16;
+
+            // DM/Zombie = NO TEAMS
+            isTeamMode = !(roomType == Room.ROOM_TYPE.INDIVIDUAL || roomType == Room.ROOM_TYPE.ZOMBIE);
+
+            // SPECIAL CASE: Deathmatch / Zombie → lock bottom-up
+            if (!isTeamMode)
             {
-                bool odd = i % 2 != 0;
-                if (odd)
+                for (int i = totalSlots - 1; i >= maxPlayers; i--)
+                    slots[i].ToggleLock(true);
+
+                return;
+            }
+
+            // TEAM MODE (8-slot or 16-slot)
+            int redIndex = is8SlotLayout ? 3 : 7;
+            int blueIndex = is8SlotLayout ? 7 : 15;
+
+            // Normal team-mode locking (alternating)
+            for (int i = totalSlots - 1; i >= maxPlayers; i--)
+            {
+                bool odd = (i % 2 != 0);
+
+                if (odd) // RED slot
                 {
-                    slots[redIndex].ToggleLock(true);
+                    if (redIndex >= 0)
+                        slots[redIndex].ToggleLock(true);
                     redIndex--;
                 }
-
-                else
+                else // BLUE slot
                 {
-                    slots[blueIndex].ToggleLock(true);
+                    if (blueIndex >= 0)
+                        slots[blueIndex].ToggleLock(true);
                     blueIndex--;
                 }
             }
@@ -371,14 +400,40 @@ namespace _Emulator
 
         public SlotData GetNextFreeSlot()
         {
-            int redCount = blueSlots.FindAll(x => x.isUsed).Count;
-            int blueCount = redSlots.FindAll(x => x.isUsed).Count;
+            // 1) Deathmatch-style modes: no teams, just fill from top
+            if (room.Type == Room.ROOM_TYPE.INDIVIDUAL || room.Type == Room.ROOM_TYPE.ZOMBIE)
+            {
+                // First free + unlocked slot starting from index 0
+                return slots.Find(s => !s.isUsed && !s.isLocked);
+            }
 
+            // 2) Team modes (includes normal 16-slot and 8-slot modes like BUNGEE/MISSION)
+
+            int redCount = redSlots.FindAll(x => x.isUsed).Count;
+            int blueCount = blueSlots.FindAll(x => x.isUsed).Count;
+
+            // Choose the team with fewer players
+            // If blue has more or equal, give next slot to RED
             if (blueCount >= redCount)
+            {
+                SlotData redFree = redSlots.Find(x => !x.isUsed && !x.isLocked);
+                if (redFree != null)
+                    return redFree;
+
+                // Fallback if red full
                 return blueSlots.Find(x => !x.isUsed && !x.isLocked);
+            }
             else
+            {
+                SlotData blueFree = blueSlots.Find(x => !x.isUsed && !x.isLocked);
+                if (blueFree != null)
+                    return blueFree;
+
+                // Fallback if blue full
                 return redSlots.Find(x => !x.isUsed && !x.isLocked);
+            }
         }
+
 
         public SlotData GetNextFreeSlotOnOtherTeam(SlotData slot)
         {

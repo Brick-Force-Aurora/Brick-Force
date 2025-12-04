@@ -653,6 +653,7 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_SET_SHOOTER_TOOL_REQ] = HandleSetShooterToolRequest;
             _handlers[(int)MessageId.CS_CLEAR_SHOOTER_TOOLS_REQ] = HandleClearShooterTools;
             _handlers[(int)MessageId.CS_REG_MAP_INFO_REQ] = HandleRegMapInfoRequest;
+            _handlers[(int)MessageId.CS_CORE_HP_REQ] = HandleCoreHPReq;
             _handlers[(int)MessageId.CS_STACK_POINT_REQ] = msgRef => Debug.LogWarning("StackPointRequest");
             _handlers[(int)MessageId.CS_BND_SHIFT_PHASE_REQ] = BND.HandleBNDShiftPhaseRequest;
             _handlers[(int)MessageId.CS_CTF_FLAG_RETURN_REQ] = CTF.HandleFlagReturnRequest;
@@ -675,6 +676,7 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_CHARGE_FORCE_POINT_REQ] = HandleChargeForcePoint;
             _handlers[(int)MessageId.CS_CHANNEL_PLAYER_LIST_REQ] = HandleRequestUserList;
             _handlers[(int)MessageId.CS_BATCH_DEL_BRICK_REQ] = HandleBrickBatchDeleteRequest;
+            _handlers[(int)MessageId.CS_MISSION_POINT_REQ] = HandleMissionPointRequest;
             _handlers[(int)MessageId.CS_ZOMBIE_INFECTION_REQ] = Zombie.HandleZombieInfectionRequest;
             _handlers[(int)MessageId.CS_ZOMBIE_INFECT_REQ] = Zombie.HandleZombieInfectRequest;
             _handlers[(int)MessageId.CS_ZOMBIE_MODE_SCORE_REQ] = Zombie.HandleZombieScoreRequest;
@@ -1126,7 +1128,7 @@ namespace _Emulator
             matchData.room.MaxPlayer = maxPlayer;
             matchData.room.CurMapAlias = alias;
             matchData.masterSeq = msgRef.client.seq;
-            matchData.LockSlotsByMaxPlayers(matchData.room.MaxPlayer);
+            matchData.LockSlotsByMaxPlayers(matchData.room.MaxPlayer, (ROOM_TYPE)type);
             matchData.roomCreated = true;
 
             if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.MAP_EDITOR)
@@ -3046,7 +3048,13 @@ namespace _Emulator
 
             body.Write(matchData.room.map);
             body.Write(matchData.room.CurMapAlias);
-            body.Write(matchData.room.weaponOption);
+            if ((ROOM_TYPE) matchData.room.type == ROOM_TYPE.MISSION)
+            {
+                body.Write(matchData.room.goal); // core HP
+            } else
+            {
+                body.Write(matchData.room.weaponOption);
+            }
             body.Write(matchData.room.timelimit);
             body.Write(matchData.room.goal);
             body.Write(matchData.room.isBreakInto);
@@ -4359,6 +4367,46 @@ namespace _Emulator
 
             if (debugSend)
                 Debug.Log("SendBatchDeleteBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
+        }
+
+        public void HandleMissionPointRequest(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out int redPoint);
+            msgRef.msg._msg.Read(out int bluePoint);
+            MatchData matchData = msgRef.client.matchData;
+            //Missing Server Logic Here
+            MsgBody body = new MsgBody();
+            Debug.Log("RedPoint: " + redPoint + " BluePoint: " + bluePoint);
+
+            body.Write(redPoint);
+            body.Write(bluePoint);
+
+            Say(new MsgReference(509, body, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));
+
+            if (debugSend)
+                Debug.Log("HandleMissionPointRequest for room no " + matchData.room.No + " " + msgRef.client.GetIdentifier());
+        }
+
+        public void HandleCoreHPReq(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out int redHp);
+            msgRef.msg._msg.Read(out int blueHp);
+            MatchData matchData = msgRef.client.matchData;
+            MsgBody body = new MsgBody();
+            Debug.Log("RedHp: " + redHp + " BlueHp: " + blueHp);
+            //if hp <= 0 end match
+            if (redHp <= 0 || blueHp <= 0)
+            {
+                matchData.EndMatch();
+            }
+
+            body.Write(redHp);
+            body.Write(blueHp);
+
+            Say(new MsgReference(181, body, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));
+
+            if (debugSend)
+                Debug.Log("HandleCoreHPReq for room no " + matchData.room.No + " " + msgRef.client.GetIdentifier());
         }
 
     }
