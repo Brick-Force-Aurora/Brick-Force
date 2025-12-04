@@ -661,7 +661,7 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_TC_OPEN_REQ] = HandleTCOpenRequest;
             _handlers[(int)MessageId.CS_ACCEPT_DAILY_MISSION_REQ] = Handle_CS_ACCEPT_DAILY_MISSION_REQ;
             _handlers[(int)MessageId.CS_DELEGATE_MASTER_REQ] = HandleDelegateMasterRequest;
-            _handlers[(int)MessageId.CS_INFLICTED_DAMAGE_REQ] = msgRef => Debug.LogWarning("InflictedDamageRequest");
+            _handlers[(int)MessageId.CS_INFLICTED_DAMAGE_REQ] = HandleInflictedDamage;
             _handlers[(int)MessageId.CS_WEAPON_CHANGE_REQ] = HandleWeaponChangeRequest;
             _handlers[(int)MessageId.CS_SET_WEAPON_SLOT_REQ] = HandleSetWeaponSlotRequest;
             _handlers[(int)MessageId.CS_CLEAR_WEAPON_SLOTS_REQ] = HandleClearWeaponSlots;
@@ -1563,6 +1563,14 @@ namespace _Emulator
                     damageLog.Add(key, value);
                 else
                     damageLog[key] += value;
+            }
+
+            // MOB kill = victimType == 1
+            if (victimType == 1)
+            {
+                // We do NOT process mob kills here.
+                // No kill feed, no score change, nothing.
+                return;
             }
 
             if (debugHandle)
@@ -4407,6 +4415,67 @@ namespace _Emulator
 
             if (debugSend)
                 Debug.Log("HandleCoreHPReq for room no " + matchData.room.No + " " + msgRef.client.GetIdentifier());
+        }
+
+        private void HandleInflictedDamage(MsgReference msgRef)
+        {
+            ClientReference client = msgRef.client;
+            MatchData matchData = msgRef.matchData;
+
+            // How many entries the client sends
+            msgRef.msg._msg.Read(out int count);
+
+            if (count <= 0)
+                return;
+
+            int totalDamage = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                msgRef.msg._msg.Read(out int targetSeq);
+                msgRef.msg._msg.Read(out int damage);
+
+                // Ignore invalid data
+                if (damage <= 0)
+                    continue;
+
+                // Damage must be applied to someone inside the same match
+                ClientReference target = matchData.clientList.Find(x => x.seq == targetSeq);
+                if (target == null)
+                    continue;
+
+                // Prevent cheating (client should never send huge values)
+                if (damage > 200)
+                    damage = 200;
+
+                totalDamage += damage;
+            }
+
+            if (totalDamage <= 0)
+                return;
+
+            // -----------------------------------------
+            //  REWARD CALCULATION (DAMAGE ONLY)
+            // -----------------------------------------
+            // Brick-Force rewarded small score per damage point.
+            // Recommended balanced value:
+            //
+            // 1 score per ~7 damage.
+            //
+            // Damage reward formula:
+            int reward = Mathf.Max(1, totalDamage / 7);
+
+            // Add to overall player score
+            client.score += reward;
+
+            // Optionally: Debug log
+            // Debug.Log($"[InflictedDamage] {client.name} inflicted {totalDamage} → +{reward} score");
+
+            MsgBody msg = new MsgBody();
+            msg.Write(client.seq);      // val  → player sequence ID
+            msg.Write(client.score);    // val2 → updated score
+
+            Say(new MsgReference(300, msg, msgRef.client));
         }
 
     }
