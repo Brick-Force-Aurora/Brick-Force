@@ -1,0 +1,1508 @@
+﻿{
+  "Platin": {
+    "coin": 14,
+    "token": 1699,
+    "items": [
+      {
+        "code": "afp",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "agj",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aa5",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "acs",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ajz",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e61",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ajh",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "az8",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wah",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "weg",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ahn",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "s18",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wfj",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "eb2",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wng",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wis",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wlf",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "as6",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "al5",
+        "opt": 7,
+        "isKey": true
+      },
+      {
+        "code": "wlk",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a16",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ael",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e27",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ag9",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a44",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wjn",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "as9",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ad2",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "woi",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e23",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "as5",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "abu",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wdn",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "afu",
+        "opt": 7,
+        "isKey": true
+      },
+      {
+        "code": "a21",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ee4",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wid",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "al1",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ax9",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "afj",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "an0",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aad",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "acy",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "afw",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "av4",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "akm",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ap9",
+        "opt": 7,
+        "isKey": true
+      },
+      {
+        "code": "af0",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "as0",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "au3",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wcq",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aki",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wnf",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wof",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wcw",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ahp",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "af6",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wop",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ab7",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ai3",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "adc",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "al2",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wkn",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e09",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wed",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e14",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "whm",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "afi",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "s96",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a05",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aih",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aj9",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aw3",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "afs",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e25",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "as8",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "afq",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wbk",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "agp",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wkl",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ec8",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wcc",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wiy",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aeb",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wnv",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e51",
+        "opt": 7,
+        "isKey": true
+      },
+      {
+        "code": "wfs",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "s06",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "adb",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ag5",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "s15",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "at9",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wnp",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e06",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aho",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aex",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a86",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ea9",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a81",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wal",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a71",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wdc",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ajs",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wfr",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "acj",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aat",
+        "opt": 7,
+        "isKey": true
+      },
+      {
+        "code": "wft",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wom",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aig",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wfq",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "whc",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "akr",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wfe",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "akf",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ahe",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wfp",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ai2",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ab2",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wlt",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "whj",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ar3",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aea",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aw0",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "afb",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wkb",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "an8",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wij",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wjp",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ahc",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a48",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "akb",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aib",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ec6",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ea7",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a92",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ago",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aap",
+        "opt": 7,
+        "isKey": true
+      },
+      {
+        "code": "e21",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a59",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ahr",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e98",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "abp",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wgw",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a37",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a63",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "u07",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "an3",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wca",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "whv",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "c13",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a31",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ae1",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a54",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e07",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wky",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "s98",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wjg",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "whf",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "c10",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ajf",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ail",
+        "opt": 7,
+        "isKey": true
+      },
+      {
+        "code": "wnq",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "add",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "u12",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wkr",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "win",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "av1",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ajr",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wkv",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aei",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "afl",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aau",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aiw",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wdo",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wbd",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "agg",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wkh",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e81",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "afx",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "adr",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aec",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ax1",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aeq",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wln",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a72",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ea4",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "az3",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a43",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ajc",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wjm",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "abk",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wgd",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wci",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "akn",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e72",
+        "opt": 7,
+        "isKey": true
+      },
+      {
+        "code": "wfy",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ap0",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ax3",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aji",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wnh",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "agr",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "eb6",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ak1",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aal",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e58",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wcm",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a53",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wgb",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "afk",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "av7",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e71",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wfk",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "agh",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ac7",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "s05",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "u09",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "s93",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "eb0",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "afy",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a10",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wek",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a74",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wco",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "s95",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e93",
+        "opt": 7,
+        "isKey": true
+      },
+      {
+        "code": "aax",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ay1",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "as3",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "al6",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "whd",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "agw",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ae9",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ajw",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wiw",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wkc",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wfo",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wct",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "s01",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e44",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wmn",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wks",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e01",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aet",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wgk",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "u06",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wce",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "u05",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ac9",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "c06",
+        "opt": 7,
+        "isKey": true
+      },
+      {
+        "code": "wmb",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "au7",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "av3",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wfg",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "afh",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e20",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "s92",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wob",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ah0",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wik",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e74",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "sa3",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wap",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wcn",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "c03",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wbs",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e66",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aw7",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a91",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wfd",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wlr",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ajx",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aiy",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wod",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ea5",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "aby",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e35",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wec",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a15",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "an5",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "c04",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ai0",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wdl",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "al9",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wil",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wch",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "a96",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ad3",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "al7",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ah5",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wjy",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ao6",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e46",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wep",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wou",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "waz",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wiq",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "wfb",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "e18",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "abe",
+        "opt": 7,
+        "isKey": false
+      },
+      {
+        "code": "ay6",
+        "opt": 7,
+        "isKey": false
+      }
+    ]
+  }
+}

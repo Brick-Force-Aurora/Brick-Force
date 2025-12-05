@@ -40,6 +40,7 @@ namespace _Emulator
         public MatchData matchData;
         public ChannelReference channel;
         public ChunkedBuffer chunkedBuffer;
+        public int lastOpenedChestSeq = -1;
 
         private readonly object dataLock = new object();
 

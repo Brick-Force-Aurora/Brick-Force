@@ -659,8 +659,12 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_CTF_FLAG_RETURN_REQ] = CTF.HandleFlagReturnRequest;
             _handlers[(int)MessageId.CS_WEAPON_HELD_RATIO_REQ] = HandleWeaponHeldRatioRequest;
             _handlers[(int)MessageId.CS_TC_OPEN_REQ] = HandleTCOpenRequest;
+            _handlers[(int)MessageId.CS_TC_ENTER_REQ] = HandleCS_TC_ENTER_REQ;
+            _handlers[(int)MessageId.CS_TC_OPEN_PRIZE_TAG_REQ] = HandleCS_TC_OPEN_PRIZE_TAG_REQ;
+            _handlers[(int)MessageId.CS_TC_RECEIVE_PRIZE_REQ] = HandleCS_TC_RECEIVE_PRIZE_REQ;
             _handlers[(int)MessageId.CS_ACCEPT_DAILY_MISSION_REQ] = Handle_CS_ACCEPT_DAILY_MISSION_REQ;
             _handlers[(int)MessageId.CS_DELEGATE_MASTER_REQ] = HandleDelegateMasterRequest;
+            _handlers[(int)MessageId.CS_TC_LEAVE_REQ] = HandleCS_TC_LEAVE_REQ;
             _handlers[(int)MessageId.CS_INFLICTED_DAMAGE_REQ] = HandleInflictedDamage;
             _handlers[(int)MessageId.CS_WEAPON_CHANGE_REQ] = HandleWeaponChangeRequest;
             _handlers[(int)MessageId.CS_SET_WEAPON_SLOT_REQ] = HandleSetWeaponSlotRequest;
@@ -4267,7 +4271,8 @@ namespace _Emulator
 
             MsgBody msg = new MsgBody();
 
-            msg.Write(0);
+            // MUST BE FIRST: number of chests
+            msg.Write(chests.Length);
 
             foreach (TcStatus tc in chests)
             {
@@ -4281,17 +4286,26 @@ namespace _Emulator
                 msg.Write(tc.TokenPrice);
                 msg.Write(tc.Alias);
 
-                // expectation groups
-                msg.Write(tc.TcTItemToArray().Count());
+                // number of unique item codes
+                var items = tc.TcTItemToArray();
+                var uniqueItems = items.GroupBy(i => i.code).ToArray();
+                msg.Write(uniqueItems.Length);
 
-                foreach (TcTItem item in tc.TcTItemToArray())
+                foreach (var group in uniqueItems)
                 {
-                    msg.Write(item.code);       // string
-                    msg.Write(1);    // int count
-                    msg.Write(item.opt);
-                    msg.Write((sbyte)(item.isKey ? 1 : 0));
+                    // group header
+                    msg.Write(group.First().code);
+                    msg.Write(group.Count());  // count (client expects this)
+
+                    foreach (var item in group)
+                    {  
+                        // one entry
+                        msg.Write(item.opt);
+                        msg.Write((sbyte)(item.isKey ? 1 : 0));
+                    }
                 }
             }
+
             Say(new MsgReference(370, msg, msgRef.client, SendType.Unicast));
         }
 
@@ -4475,8 +4489,273 @@ namespace _Emulator
             msg.Write(client.seq);      // val  → player sequence ID
             msg.Write(client.score);    // val2 → updated score
 
-            Say(new MsgReference(300, msg, msgRef.client));
+            Say(new MsgReference(300, msg, msgRef.client, SendType.Unicast));
         }
 
+        private void HandleCS_TC_LEAVE_REQ(MsgReference msgRef)
+        {
+            msgRef.client.lastOpenedChestSeq = -1;
+            //update chest?
+            //update inv
+            ClientExtension.instance.inventory.Apply();
+            ClientExtension.instance.inventory.Save();
+            ClientExtension.instance.SendInventoryData();
+        }
+
+        private void HandleCS_TC_ENTER_REQ(MsgReference msgRef)
+        {
+            MsgBody req = msgRef.msg._msg;
+            req.Read(out int chestSeq);
+
+            TcStatus tc = TreasureChestManager.Instance.Get(chestSeq);
+            msgRef.client.lastOpenedChestSeq = tc.Seq;
+            if (tc == null)
+            {
+                MsgBody fail = new MsgBody();
+                fail.Write(1);
+                fail.Write(chestSeq);
+                fail.Write(0);
+                fail.Write(0);
+                Say(new MsgReference(373, fail, msgRef.client, SendType.Unicast));
+                return;
+            }
+
+            // Collect rare items (premium)
+            List<int> rarePositions = TreasureChestManager.Instance.GetRareTiles(tc.Seq);
+
+            // SUCCESS response
+            MsgBody msg = new MsgBody();
+
+            // 1) result code
+            msg.Write(0);
+
+            // 2) chest seq
+            msg.Write(tc.Seq);
+
+            // 3) bitmask length
+            byte[] mask = TreasureChestManager.Instance.GetBitmask(tc.Seq);
+            msg.Write(mask.Length);
+            foreach (byte b in mask)
+                msg.Write(b);
+
+            // 5) number of rare items
+            msg.Write(rarePositions.Count);
+
+            // 6) rare tile indices
+            foreach (int pos in rarePositions)
+                msg.Write(pos);
+
+            Say(new MsgReference(373, msg, msgRef.client, SendType.Unicast));
+        }
+
+        private void HandleCS_TC_OPEN_PRIZE_TAG_REQ(MsgReference msgRef)
+        {
+            MsgBody req = msgRef.msg._msg;
+
+            req.Read(out int chestSeq);
+            req.Read(out int index);     // board index?
+            req.Read(out bool isCoin);
+
+            TcStatus tc = TreasureChestManager.Instance.Get(chestSeq);
+            if (tc == null)
+            {
+                // no such chest
+                MsgBody fail = new MsgBody();
+                fail.Write(-5L);     // matches TC_NO_SUCH_PRIZE
+                fail.Write(chestSeq);
+                fail.Write(index);
+                fail.Write(0);
+                fail.Write(false);
+                fail.Write(false);
+                Say(new MsgReference(376, fail, msgRef.client, SendType.Unicast));
+                return;
+            }
+
+            // get rare tile positions
+            var rareTiles = TreasureChestManager.Instance.GetRareTiles(tc.Seq);
+
+            // check if clicked tile is rare
+            bool clickedRare = rareTiles.Contains(index);
+
+            TcTItem item;
+
+            if (clickedRare)
+            {
+                // return the first rare item
+                item = tc.GetFirstRare();
+
+                // update chest (remove 1 rare)
+                tc.Update(tc.Cur - 1, tc.Key - 1, tc.MaxKey);
+            }
+            else
+            {
+                // return a random normal
+                var normals = tc.GetNormalArray();
+                item = normals[UnityEngine.Random.Range(0, normals.Length)];
+
+                // update chest (rare count unchanged)
+                tc.Update(tc.Cur - 1, tc.Key, tc.MaxKey);
+            }
+            SendTookoff(msgRef.client, tc, index, item.isKey);
+            SendChestUpdate(msgRef.client, tc);
+            TreasureChestManager.Instance.OpenTile(tc.Seq, index);
+
+            if (isCoin)
+            {
+                int coins = msgRef.client.data.coins = msgRef.client.data.coins - tc.CoinPrice;
+                //check so user does not go negative
+                MsgBody bodyUpdate = new MsgBody();
+                bodyUpdate.Write(msgRef.client.data.forcePoints);
+                bodyUpdate.Write(msgRef.client.data.brickPoints);
+                bodyUpdate.Write(msgRef.client.data.tokens);
+                bodyUpdate.Write(coins);
+                bodyUpdate.Write(msgRef.client.data.starDust);
+                Say(new MsgReference(102, bodyUpdate, msgRef.client, SendType.Unicast));
+            }
+            else
+            {
+                int tokens = msgRef.client.data.tokens = msgRef.client.data.tokens - tc.TokenPrice;
+                //check negative
+                MsgBody bodyUpdate = new MsgBody();
+                bodyUpdate.Write(msgRef.client.data.forcePoints);
+                bodyUpdate.Write(msgRef.client.data.brickPoints);
+                bodyUpdate.Write(tokens);
+                bodyUpdate.Write(msgRef.client.data.coins);
+                bodyUpdate.Write(msgRef.client.data.starDust);
+                Say(new MsgReference(102, bodyUpdate, msgRef.client, SendType.Unicast));
+            }
+
+            int amount = 1;
+            // SEND ACK (client will call RECEIVE_PRIZE_REQ afterwards)
+            long timestamp = DateTimeOffset.UtcNow.Ticks;
+            MsgBody ack = new MsgBody();
+            ack.Write(timestamp);   // error code /item
+            ack.Write(chestSeq);   // unused by client but expected
+            ack.Write(index);      // val3
+            ack.Write(amount);     // val4
+            ack.Write(item.isKey);     // val5 (wasKey)
+            ack.Write(isCoin);   // val6
+
+            Say(new MsgReference(376, ack, msgRef.client, SendType.Unicast));
+        }
+
+
+        private void HandleCS_TC_RECEIVE_PRIZE_REQ(MsgReference msgRef)
+        {
+            MsgBody req = msgRef.msg._msg;
+
+            // The client passes the prize CODE here, not a unique seq
+            req.Read(out long item);
+            Debug.Log(item);
+            req.Read(out int index);      // tile index
+            Debug.Log(index);
+            req.Read(out int amount);
+            req.Read(out bool wasKey);
+            req.Read(out bool freeCoin);
+
+            // 1. Get chest containing this tile
+            // The client knows the chest it opened; server must track last-entered chest per client.
+            TcStatus tc = TreasureChestManager.Instance.Get(msgRef.client.lastOpenedChestSeq);
+            if (tc == null)
+            {
+                MsgBody fail = new MsgBody();
+                fail.Write(-2);
+                Say(new MsgReference(380, fail, msgRef.client, SendType.Unicast));
+                return;
+            }
+            
+            //Update Board Here on TreasureChestManager
+            SendChestUpdate(msgRef.client, tc);
+
+            // 2. Find the TcTItem that matches the code
+            TcTItem reward = tc.TcTItemToArray()[index];
+
+            // 3. Load template from TItemManager
+            TItem template = TItemManager.Instance.Get<TItem>(reward.code.ToString());
+            if (template == null)
+            {
+                MsgBody fail = new MsgBody();
+                fail.Write(-6);
+                Say(new MsgReference(380, fail, msgRef.client, SendType.Unicast));
+                return;
+            }
+
+            // 5. Build SUCCESS response packet
+            MsgBody msg = new MsgBody();
+            msg.Write(0);                 // val >= 0 = success
+            msg.Write(item);              // seq (actually item code)
+            msg.Write(template.code);              // item code again
+            msg.Write((sbyte)Item.USAGE.UNEQUIP);
+            msg.Write(amount);            // remain amount
+            msg.Write(index);             // tile index
+            msg.Write(amount);            // amount
+            msg.Write(wasKey);            // rare item?
+            msg.Write(reward.opt);        // durability (days)
+
+            Say(new MsgReference(380, msg, msgRef.client, SendType.Unicast));
+
+            // 6. Add item to player inventory
+            msgRef.client.inventory.AddItem(template, false, reward.opt * 86400);
+            //ClientExtension.instance.inventory.AddItem(template, false, reward.opt * 86400);
+            //msgRef.client.myInfo.ReceivePrize(
+              //  0,           // seq is ignored by your ReceivePrize implementation unless >0
+             //   code,
+             //   Item.USAGE.NOT_USING,
+             //   amount,
+              //  durability
+            //);
+        }
+        private void SendChestUpdate(ClientReference client, TcStatus tc)
+        {
+            MsgBody body = new MsgBody();
+            body.Write(tc.Seq);
+            body.Write(tc.Cur);
+            body.Write(tc.Key);
+            body.Write(tc.MaxKey);
+
+            // CS_TC_UPDATE_CHEST_ACK = 378
+            Say(new MsgReference(378, body, client, SendType.Unicast));
+        }
+
+        private void SendChest(ClientReference client, TcStatus tc)
+        {
+            MsgBody msg = new MsgBody();
+
+            msg.Write(tc.Seq);
+            msg.Write(tc.Index);
+            msg.Write(tc.Max);
+            msg.Write(tc.Cur);
+            msg.Write(tc.Key);
+            msg.Write(tc.MaxKey);
+            msg.Write(tc.CoinPrice);
+            msg.Write(tc.TokenPrice);
+            msg.Write(tc.Alias);
+
+            // number of unique item codes
+            msg.Write(1);
+            var items = tc.TcTItemToArray();
+            // group header
+            msg.Write(items[0].code);
+            msg.Write(items.Length);  // count (client expects this)
+
+            foreach (var item in items)
+            {
+                // one entry
+                msg.Write(item.opt);
+                msg.Write((sbyte)(item.isKey ? 1 : 0));
+            }
+            Say(new MsgReference(375, msg, client, SendType.Unicast));
+        }
+
+        private void SendTookoff(ClientReference client, TcStatus tc, int index, bool wasKey)
+        {
+            MsgBody msg = new MsgBody();
+
+            msg.Write(tc.Seq);
+            msg.Write(index);
+            msg.Write(wasKey);
+
+            Say(new MsgReference(377, msg, client, SendType.Unicast));
+        }
     }
 }

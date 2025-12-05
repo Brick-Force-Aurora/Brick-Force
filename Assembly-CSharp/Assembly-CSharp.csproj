@@ -765,6 +765,7 @@
     <Compile Include="_Emulator\Network\DummyData.cs" />
     <Compile Include="_Emulator\Network\ServerEmulator.cs" />
     <Compile Include="_Emulator\Network\SlotData.cs" />
+    <Compile Include="_Emulator\Network\TreasureChestManager.cs" />
     <Compile Include="_Emulator\Steam\SteamFriend.cs" />
     <Compile Include="_Emulator\Steam\SteamFriendsManager.cs" />
     <Compile Include="_Emulator\Steam\SteamConstants.cs" />
@@ -832,6 +833,9 @@
   <ItemGroup>
     <EmbeddedResource Include="_Emulator\DATA\shop.txt" />
     <EmbeddedResource Include="_Emulator\DATA\shopCategory.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="_Emulator\DATA\TreasureChests.json" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
