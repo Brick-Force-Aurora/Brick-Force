@@ -97,6 +97,7 @@ namespace _Emulator.Network.Gamemodes
 
         static void SendMatchEnd(MatchData matchData)
         {
+            //fix this
             for (int team = 0; team < 2; team++)
             {
                 MsgBody body = new MsgBody();
@@ -104,8 +105,12 @@ namespace _Emulator.Network.Gamemodes
                 body.Write(team == 0 ? matchData.GetWinningTeam() : (sbyte)-matchData.GetWinningTeam());
                 body.Write(matchData.redScore); //RedScore
                 body.Write(matchData.blueScore); //BlueScore
-                body.Write(matchData.blueScore); //RedTotalKill
-                body.Write(matchData.redScore); //BluTotalKill
+                body.Write(0); //RedMission
+                body.Write(0); //BlueMission
+                body.Write(matchData.redKillCount); //RedTotalKill
+                body.Write(matchData.blueKillCount); //BluTotalKill
+                body.Write(matchData.blueKillCount); //RedTotalDeath
+                body.Write(matchData.redKillCount); //BlueTotalDeath
                 body.Write(matchData.clientList.Count);
                 for (int i = 0; i < matchData.clientList.Count; i++)
                 {

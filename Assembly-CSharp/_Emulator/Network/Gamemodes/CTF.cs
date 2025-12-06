@@ -106,10 +106,10 @@ namespace _Emulator.Network.Gamemodes
                 body.Write(team == 0 ? matchData.GetWinningTeam() : (sbyte)-matchData.GetWinningTeam());
                 body.Write(matchData.redScore); //RedScore
                 body.Write(matchData.blueScore); //BlueScore
-                body.Write(matchData.ctfRedKillCount); //RedTotalKill
-                body.Write(matchData.ctfBlueKillCount); //BluTotalKill
-                body.Write(matchData.ctfBlueKillCount); //RedTotalDeath
-                body.Write(matchData.ctfRedKillCount); //BlueTotalDeath
+                body.Write(matchData.redKillCount); //RedTotalKill
+                body.Write(matchData.blueKillCount); //BluTotalKill
+                body.Write(matchData.blueKillCount); //RedTotalDeath
+                body.Write(matchData.redKillCount); //BlueTotalDeath
                 body.Write(matchData.clientList.Count);
                 for (int i = 0; i < matchData.clientList.Count; i++)
                 {

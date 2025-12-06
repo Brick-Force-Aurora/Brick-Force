@@ -22,7 +22,7 @@ namespace _Emulator.Network.Gamemodes
             MsgBody msg = new MsgBody();
             data.zombieStatus = (ZombieMatch.STEP)status;
 
-            if (ServerEmulator.instance.debugPing)
+            if (ServerEmulator.instance.debugHandle)
             {
                 Debug.Log($"ZombieStatus: {status} Time: {time} Countdown: {countDown}");
             }
@@ -52,18 +52,18 @@ namespace _Emulator.Network.Gamemodes
                     break;
                 case ZombieMatch.STEP.ZOMBIE_PLAY:
                     Debug.Log("Zombie Play");
-                    /*if (data.humanPlayers.Count == 0 || data.zombiePlayers.Count == 0)
+                    if (data.humanPlayers.Count == 0 || data.zombiePlayers.Count == 0)
                     {
                         if (!data.roundInit)
                         {
-                            SendRoundEnd(msgRef.client, data);
+                            SendZombieRoundEnd(msgRef, data);
                         }
                     }
                     if (data.remainTime <= 0 && data.zombieRoundsLeft < 0)
                     {
                         data.EndMatch();
                         return;
-                    }*/
+                    }
                     //time = 0;\
                     if (data.zombieCountdown != 10)
                     {
@@ -85,10 +85,10 @@ namespace _Emulator.Network.Gamemodes
         internal static void HandleZombieObserverRequest(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out int seq); //MyInfoManager.Instance.Seq
-            /*MatchData data = msgRef.client.matchData;
+            MatchData data = msgRef.client.matchData;
             data.zombiePlayers.Remove(seq);
             data.killedPlayers.Add(seq);
-            if (debugSend)
+            if (ServerEmulator.instance.debugHandle)
             {
                 Debug.LogWarning("ZombieObserver: Zombies:" + data.zombiePlayers.Count + " Humans: " + data.humanPlayers.Count);
             }
@@ -96,13 +96,13 @@ namespace _Emulator.Network.Gamemodes
             {
                 if (data.zombieRoundsLeft > 0)
                 {
-                    SendRoundEnd(msgRef.client, data);
+                    SendZombieRoundEnd(msgRef, data);
                 }
                 else
                 {
                     data.EndMatch();
                 }
-            }*/
+            }
             // No Response
         }
 
@@ -242,7 +242,7 @@ namespace _Emulator.Network.Gamemodes
             }
         }
 
-        private static void SendZombieRoundEnd(MsgReference msgRef, MatchData data)
+        public static void SendZombieRoundEnd(MsgReference msgRef, MatchData data)
         {
             Debug.LogWarning($"Send RoundEnd client {msgRef.client.GetIdentifier()} data: {data.ToString()}");
 
@@ -253,20 +253,21 @@ namespace _Emulator.Network.Gamemodes
             }
 
             MsgBody msg = new MsgBody();
-            msg.Write(msgRef.client.seq);
+            msg.Write(data.zombieCurrentRound);
             if (data.humanPlayers.Count == 0)
             {
                 //Zombies win
                 msg.Write((sbyte)-1);
                 msg.Write((sbyte)1);
+                msg.Write(0); //roundcode (unused in zombie)
             }
             else
             {
                 //Humans win
                 msg.Write((sbyte)1);
                 msg.Write((sbyte)-1);
+                msg.Write(0); //roundcode (unused in zombie)
             }
-            msg.Write((sbyte)data.zombieCurrentRound);
             data.ResetForNewRound();
             data.zombieCurrentRound += 1;
             data.zombieRoundsLeft -= 1;

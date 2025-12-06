@@ -30,9 +30,9 @@ namespace _Emulator
         public ChannelReference channel;
         public Room room;
 
-        //CTF
-        public int ctfRedKillCount;
-        public int ctfBlueKillCount;
+        //Killcount (CTF, Defusion)
+        public int redKillCount;
+        public int blueKillCount;
 
         //Build only
         public UserMap cachedMap;
@@ -101,8 +101,8 @@ namespace _Emulator
             for (int i = 0; i < redSlots.Count; i++)
                 redSlots[i].isRed = true;
 
-            ctfRedKillCount = 0;
-            ctfBlueKillCount = 0;
+            redKillCount = 0;
+            blueKillCount = 0;
             room = new Room(false, 0, "", Room.ROOM_TYPE.TEAM_MATCH, Room.ROOM_STATUS.WAITING, 0, 0, 0, "", 0, 0, 0, 0, 0, 0, 0, false, false, false, 0, 0);
             cachedMap = new UserMap();
             mapCached = false;
@@ -128,8 +128,8 @@ namespace _Emulator
             usedCannons.Clear();
             usedTrains.Clear();
             killLog.Clear();
-            ctfRedKillCount = 0;
-            ctfBlueKillCount = 0;
+            redKillCount = 0;
+            blueKillCount = 0;
             isBuildPhase = true;
             repeat = 0;
             currentRound = 1;

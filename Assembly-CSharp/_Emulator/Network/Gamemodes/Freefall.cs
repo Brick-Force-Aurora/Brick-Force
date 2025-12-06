@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using UnityEngine;
 
 namespace _Emulator.Network.Gamemodes
 {
@@ -35,8 +36,21 @@ namespace _Emulator.Network.Gamemodes
                 body.Write(matchData.clientList[i].data.xp);
                 body.Write(matchData.clientList[i].data.xp);
                 body.Write((long)0); //buff
+                body.Write(matchData.clientList[i].kills); //param kill?
             }
             ServerEmulator.instance.Say(new MsgReference(476, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
+        }
+
+        public static void SendFreefallScore(MatchData matchData)
+        {
+            MsgBody body = new MsgBody();
+
+            body.Write(matchData.redScore);
+
+            ServerEmulator.instance.Say(new MsgReference(475, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
+
+            if (ServerEmulator.instance.debugSend)
+                Debug.Log("Broadcasted SendFreefallScore for room no: " + matchData.room.No);
         }
     }
 }

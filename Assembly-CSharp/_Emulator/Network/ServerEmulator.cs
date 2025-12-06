@@ -71,6 +71,7 @@ namespace _Emulator
 
         public void SetupServerSteam()
         {
+            RegisterHandlers();
             isSteam = true;
             serverCreated = true;
             Debug.Log("Server set to Steam");
@@ -623,6 +624,7 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_DESTROY_BRICK_REQ] = HandleDestroyBrickRequest;
             _handlers[(int)MessageId.CS_TEAM_CHANGE_REQ] = HandleTeamChangeRequest;
             _handlers[(int)MessageId.CS_SLOT_LOCK_REQ] = HandleSlotLockRequest;
+            _handlers[(int)MessageId.CS_KICK_REQ] = HandleKickRequest;
             _handlers[(int)MessageId.CS_ROOM_CONFIG_REQ] = HandleRoomConfig;
             _handlers[(int)MessageId.CS_TEAM_CHAT_REQ] = HandleTeamChatRequest;
             _handlers[(int)MessageId.CS_RADIO_MSG_REQ] = HandleRadioMsgRequest;
@@ -883,6 +885,30 @@ namespace _Emulator
                 if (matchData.repeat <= 0)
                 {
                     matchData.EndMatch();
+                }
+            }
+            else if (matchData.room.type == Room.ROOM_TYPE.EXPLOSION)
+            {
+                if (matchData.remainTime <= 0)
+                {
+                    if (matchData.redScore >= matchData.room.goal || matchData.blueScore >= matchData.room.goal)
+                    {
+                        matchData.EndMatch();
+                    }
+                    else
+                    {
+                        //round code blue team wins when time runs out
+                        //this could be wrong and needs to be checked and referenced in exlplosionMatch.cs
+                        matchData.blueScore++;
+                        Defusion.HandleRoundEnd(msgRef, 1);
+                    }
+                }
+            }
+            else if (matchData.room.type == Room.ROOM_TYPE.ZOMBIE)
+            {
+                if (matchData.remainTime <= 0 && matchData.zombieRoundsLeft >= 0)
+                {
+                    Zombie.SendZombieRoundEnd(msgRef, matchData);
                 }
             }
             else
@@ -1569,11 +1595,12 @@ namespace _Emulator
                     damageLog[key] += value;
             }
 
-            // MOB kill = victimType == 1
-            if (victimType == 1)
+            //Debug.Log("VictimType: " + victimType + " weaponBy: " + weaponBy);
+            if (victimType == 1 || weaponBy == -1)
             {
                 // We do NOT process mob kills here.
                 // No kill feed, no score change, nothing.
+                //update deathcunt for victim on mob kill
                 return;
             }
 
@@ -1624,7 +1651,13 @@ namespace _Emulator
 
                 }
             }
-
+            //Fix for hosting killing fall damage?
+            // does not work
+            if (weaponBy == 0)
+            {
+                killerType = 0;
+                killer = 0;
+            }
             KillLogEntry killLogEntry = new KillLogEntry(id, killerType, killer, victimType, victim, (Weapon.BY)weaponBy, slot, category, hitpart, damageLog);
             matchData.killLog.Add(killLogEntry);
             SendKillLogEntry(killLogEntry, matchData);
@@ -1677,9 +1710,9 @@ namespace _Emulator
 
                     case Room.ROOM_TYPE.CAPTURE_THE_FLAG:
                         if (victimClient.slot.slotIndex > 7)
-                            matchData.ctfRedKillCount++;
+                            matchData.redKillCount++;
                         else
-                            matchData.ctfBlueKillCount++;
+                            matchData.blueKillCount++;
                         SendTeamScore(matchData);
                         if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
                         {
@@ -1688,11 +1721,19 @@ namespace _Emulator
                         break;
 
                     case Room.ROOM_TYPE.EXPLOSION:
+                        //this needs fixing
+                        //we need to check that score does not get added on explosion through bomb
+                        //maybe if type == bomb?
+                        if((Weapon.BY)weaponBy == Weapon.BY.CLOCKBOMB)
+                            break;
+
                         int totalRed = matchData.redSlots.Count(x => x.isUsed);
                         int totalBlue = matchData.blueSlots.Count(x => x.isUsed);
 
                         int deadRed = matchData.deadRedPlayers.Count;
                         int deadBlue = matchData.deadBluePlayers.Count;
+
+                        //SendScore!!
 
                         // DEBUG:
                         Debug.Log($"Explosion check wipe - Red: {deadRed}/{totalRed}, Blue: {deadBlue}/{totalBlue}");
@@ -1706,6 +1747,28 @@ namespace _Emulator
                         {
                             matchData.redScore++;
                             Defusion.HandleRoundEnd(msgRef, 0); 
+                        }
+                        break;
+
+                    case Room.ROOM_TYPE.ZOMBIE:
+                        if ((HitPart.TYPE)hitpart == HitPart.TYPE.BRAIN && matchData.zombiePlayers.Contains(victim))
+                        {
+                            matchData.zombiePlayers.Remove(victim);
+                            matchData.killedPlayers.Add(victim);
+                            if (matchData.zombiePlayers.Count <= 0)
+                            {
+                                Zombie.SendZombieRoundEnd(msgRef, matchData);
+                            }
+                        }
+                        break;
+
+                    case Room.ROOM_TYPE.BUNGEE:
+                        matchData.redScore++;
+                        Freefall.SendFreefallScore(matchData);
+
+                        if (matchData.redScore >= matchData.room.goal)
+                        {
+                            Freefall.HandleMatchEnd(matchData);
                         }
                         break;
                 }
@@ -4756,6 +4819,16 @@ namespace _Emulator
             msg.Write(wasKey);
 
             Say(new MsgReference(377, msg, client, SendType.Unicast));
+        }
+
+        private void HandleKickRequest(MsgReference msgRef)
+        {
+            //not tested/ server side remove?
+            msgRef.msg._msg.Read(out int seq);
+            msgRef.matchData.RemoveClient(clientList.Find(client => client.seq == seq));
+            MsgBody body = new MsgBody();
+            body.Write(seq);
+            Say(new MsgReference(89, body, msgRef.client, SendType.Unicast));
         }
     }
 }
