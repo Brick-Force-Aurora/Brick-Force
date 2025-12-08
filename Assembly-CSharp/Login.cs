@@ -235,11 +235,11 @@ public class Login : MonoBehaviour
 					pswd.Trim();
 					if (id.Length <= 0)
 					{
-						MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("INPUT_ACCOUNT"));
+						MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("INPUT_ACCOUNT") + " (Use the F6 Menu to Host or Join a Server)");
 					}
 					else if (pswd.Length <= 0)
 					{
-						MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("INPUT_PSWD"));
+						MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("INPUT_PSWD") + " (Use the F6 Menu to Host or Join a Server)");
 					}
 					else
 					{
