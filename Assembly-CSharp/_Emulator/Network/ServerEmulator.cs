@@ -638,6 +638,7 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_SET_STATUS_REQ] = HandleSetStatusRequest;
             _handlers[(int)MessageId.CS_START_REQ] = HandleStartRequest;
             _handlers[(int)MessageId.CS_REGISTER_REQ] = HandleRegisterMapRequest;
+            _handlers[(int)MessageId.CS_CHANGE_USERMAP_ALIAS_REQ] = HandleChangeUserMapAliasRequest;
             _handlers[(int)MessageId.CS_RESPAWN_TICKET_REQ] = HandleRespawnTicketRequest;
             _handlers[(int)MessageId.CS_TIMER_REQ] = HandleTimer;
             _handlers[(int)MessageId.CS_MATCH_COUNTDOWN_REQ] = HandleMatchCountdown;
@@ -4852,6 +4853,19 @@ namespace _Emulator
             MsgBody body = new MsgBody();
             body.Write(seq);
             Say(new MsgReference(89, body, msgRef.client, SendType.Unicast));
+        }
+
+        private void HandleChangeUserMapAliasRequest(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out int slot);
+            msgRef.msg._msg.Read(out string newAlias);
+
+            MsgBody body = new MsgBody();
+            body.Write(1); //success
+            body.Write((sbyte)slot);
+            body.Write(newAlias);
+
+            Say(new MsgReference(55, body, msgRef.client, SendType.Unicast));
         }
     }
 }
