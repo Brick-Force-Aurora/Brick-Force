@@ -406,10 +406,32 @@ namespace _Emulator
             lock (dataLock)
             {
                 waitForShutDown = false;
-                if (!isSteam)
+                if (!isSteam && serverSocket != null)
                 {
-                    serverSocket.Shutdown(SocketShutdown.Both);
-                    serverSocket.Close();
+                    try
+                    {
+                        // Only attempt shutdown if the socket still claims to be connected
+                        if (serverSocket.Connected)
+                        {
+                            serverSocket.Shutdown(SocketShutdown.Both);
+                        }
+                    }
+                    catch (SocketException sockEx)
+                    {
+                        Debug.LogError("Encountered SocketException during Shutdown: " + sockEx.Message);
+                    }
+                    catch (ObjectDisposedException objDisEx)
+                    {
+                        Debug.LogError("Encountered ObjectDisposedException during Shutdown: " + objDisEx.Message);
+                    }
+                    try
+                    {
+                        serverSocket.Close();
+                    }
+                    catch(Exception ex) {
+                        Debug.LogError("Encountered Excpetion during Shutdown: " + ex.Message);
+                    }
+                    serverSocket = null;
                 }
                 ClearBuffers();
                 clientList.Clear();
@@ -4099,7 +4121,8 @@ namespace _Emulator
                     Debug.LogError("HandleEndChunkedBuffer: crc mismatch");
                 }
 
-                File.WriteAllBytes("test.png", msgRef.client.chunkedBuffer.buffer);
+                if (debugHandle)
+                    File.WriteAllBytes("Debug-Build-Mode-Thumbnail.png", msgRef.client.chunkedBuffer.buffer);
             }
         }
 
