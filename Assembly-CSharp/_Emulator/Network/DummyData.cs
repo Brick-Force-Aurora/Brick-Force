@@ -1,4 +1,6 @@
-﻿namespace _Emulator
+﻿using static MyInfoManager;
+
+namespace _Emulator
 {
     class DummyData
     {
@@ -26,6 +28,20 @@
         public sbyte tos = 1;
         public int extraSlots = 0;
         public int firstLoginFp = 0;
+        public int qjCommonMask =
+                  (int)COMMON_OPT.DONOT_NEWBIE_CHANNEL_MSG
+                | (int)COMMON_OPT.DONOT_BUNGEE_GUIDE
+                | (int)COMMON_OPT.DONOT_MAPEDIT_GUIDE
+                | (int)COMMON_OPT.DONOT_BND_GUIDE
+                | (int)COMMON_OPT.DONOT_EXPLOSION_ATTACK_GUIDE
+                | (int)COMMON_OPT.DONOT_EXPLOSION_DEFENCE_GUIDE
+                | (int)COMMON_OPT.DONOT_BATTLE_GUIDE
+                | (int)COMMON_OPT.DONOT_ZOMBIE_GUIDE
+                | (int)COMMON_OPT.DONOT_FLAG_GUIDE
+                | (int)COMMON_OPT.DONOT_DEFENSE_GUIDE
+                | (int)COMMON_OPT.DONOT_ESCAPE_GUIDE;
+        public int qjModeMask = 0;
+        public int qjOfficialMask = 0;
         public static string[][] startingGear =
         {
             new string[] { "MAIN", "wau" },

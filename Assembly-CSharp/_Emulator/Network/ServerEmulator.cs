@@ -12,6 +12,7 @@ using _Emulator.Network;
 using _Emulator.Network.Gamemodes;
 using Steamworks;
 using UnityEngine;
+using static MyInfoManager;
 using static Room;
 using Debug = UnityEngine.Debug;
 
@@ -3655,6 +3656,16 @@ namespace _Emulator
 
             if (debugSend)
                 Debug.Log("SendPlayerInitInfo to: " + client.GetIdentifier());
+
+            body = new MsgBody();
+            body.Write(client.data.qjModeMask);
+            body.Write(client.data.qjOfficialMask);
+            body.Write(client.data.qjCommonMask);
+
+            Say(new MsgReference(417, body, client));
+
+            if (debugSend)
+                Debug.Log("SendPlayerOpt to: " + client.GetIdentifier());
         }
 
         public void SendChannels(ClientReference client)
