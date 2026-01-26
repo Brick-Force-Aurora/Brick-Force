@@ -5,6 +5,7 @@
   <a href="https://github.com/Brick-Force-Aurora/Brick-Force/releases/latest">Latest Release</a> |
   <a href="https://brick-force-aurora.github.io/Website/">Website</a> |
   <a href="https://www.youtube.com/watch?v=mslPRyCIKgo">Gameplay Video</a> |
+  <a href="https://www.youtube.com/watch?v=fRpV5qkc_IM">Video Tutorial</a>
 </div>
 
 <p align="center">Open source Brick-Force server emulator project for everyone.</p>
