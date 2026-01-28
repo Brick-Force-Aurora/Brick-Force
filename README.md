@@ -41,11 +41,11 @@
 <img width="962" alt="setup_steam" src="https://github.com/user-attachments/assets/5f67e42d-1a19-4bd8-97d8-03305cbf52e1" />
 <img width="962" alt="lobbies_steam" src="https://github.com/user-attachments/assets/e14aaba1-b1d3-4584-83ba-cf1ce469762e" />
 
-- Download the newest [BfLauncher](https://github.com/Brick-Force-Aurora/Launcher/releases).
+- Follow the instructions on how to install the [BrickForce Aurora Launcher](https://github.com/Brick-Force-Aurora/Launcher?tab=readme-ov-file#installation-).
 - Start it to install the game and receive the newest updates (can be disabled in launcher settings).
 - Install and run [Steam](https://store.steampowered.com/), create or login to your Steam account.
 - Install 'Spacewar' (Proxy for Steamworks API access) to your Steam Library by opening `steam://install/480/` in your browser while Steam is running.
-- Run Brick-Force through BfLauncher.exe or BrickForce.exe. You can optionally add either to your Steam library as non-Steam game.
+- Run Brick-Force through the launcher or BrickForce.exe. You can optionally add either to your Steam library as non-Steam game.
 - Steam should show you as playing 'Spacewar'.
 - To create a new lobby, enter a lobby name and hit 'Create' in the 'Setup (Steam)' menu.
 - Lobby owner acts as the host for the game.
@@ -166,7 +166,7 @@
 - ~To Debug select the Brick-Force.exe as the external program.~ Regular debugging will crash due to Themida protection on BrickForce.exe by the original developer.
 
 ## Dependencies
-- [Brick-Force Base (Install with BfLauncher)](https://github.com/Brick-Force-Aurora/Launcher) (Root)
+- [Brick-Force Base (Install with the BrickForce Aurora Launcher)](https://github.com/Brick-Force-Aurora/Launcher) (Root)
 - [Steamworks.NET.dll](https://github.com/rlabrecque/Steamworks.NET) (BrickForce_Data\Managed)
 - [steam_api.dll](https://partner.steamgames.com/downloads/list) (Root)
 - [ImGui.NET.dll](https://github.com/Brick-Force-Aurora/ImGui.NET) (BrickForce_Data\Managed)
