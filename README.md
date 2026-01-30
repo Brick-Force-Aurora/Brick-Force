@@ -10,9 +10,9 @@
     </a>
     <h3 align="center">BrickForce Aurora</h3>
     <p align="center">
-        <a href="https://github.com/Brick-Force-Aurora/Launcher/issues/new">Report Bug</a>
+        <a href="https://github.com/Brick-Force-Aurora/Brick-Force/issues/new">Report Bug</a>
         ·
-        <a href="https://github.com/Brick-Force-Aurora/Launcher/issues/new">Request Feature</a>
+        <a href="https://github.com/Brick-Force-Aurora/Brick-Force/issues/new">Request Feature</a>
         ·
         <a href="https://brickforce-aurora.de/roadmap/">Roadmap</a>
         ·
