@@ -25,8 +25,16 @@ namespace _Emulator
             GameObject gameObject = GameObject.Find("Main");
             if (null != gameObject)
             {
-                Debug.Log(gameObject);
-                gameObject.BroadcastMessage("OnRoundRobin");
+                //Debug.Log(gameObject);
+                //gameObject.BroadcastMessage("OnRoundRobin");
+                var login = gameObject.GetComponentInChildren<Login>();
+                if (login != null)
+                {
+                    //login.loginStep = Login.LOGIN_STEP.WAITING_SEED;
+                    //login.id = "";
+                    login.BroadcastMessage("OnRoundRobin");
+                }
+
             }
             ShopEmulator shop = new ShopEmulator();
             //shop.LoadAndSave();
@@ -149,7 +157,7 @@ namespace _Emulator
 
         public bool HandleMessage(Msg2Handle msg)
         {
-            Debug.Log(msg._id);
+            //Debug.Log(msg._id);
             bool result = true;
             switch (msg._id)
             {
