@@ -141,6 +141,7 @@ public class ClanMatchRounding : MonoBehaviour
 			if (localController != null)
 			{
 				localController.Respawn(spawner.position, Rot.ToQuaternion(spawner.rotation));
+				Debug.LogWarning("RespawnLocalControllerClanMatchRounding");
 			}
 			VoiceManager.Instance.Play("Ingame_Ready_combo_1");
 		}

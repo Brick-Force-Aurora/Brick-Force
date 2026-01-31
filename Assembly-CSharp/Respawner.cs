@@ -203,6 +203,7 @@ public class Respawner : MonoBehaviour
 						{
 							ZombieVsHumanManager.Instance.AmIRespawnable = false;
 							DoSpawn(BrickManager.Instance.GetSpawner(Brick.SPAWNER_TYPE.SINGLE_SPAWNER, MyInfoManager.Instance.Ticket));
+							Debug.LogWarning("AmIRespawnable Respawn");
 						}
 						else
 						{

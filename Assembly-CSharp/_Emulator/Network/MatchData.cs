@@ -184,6 +184,17 @@ namespace _Emulator
             }
             deadRedPlayers.Clear();
             deadBluePlayers.Clear();
+            if (room.Type == Room.ROOM_TYPE.ZOMBIE)
+            {
+                foreach (ClientReference client in clientList)
+                {
+                    //Does not work
+                    ServerEmulator.instance.SendRespawnTicket(client);
+                }
+
+                if (ServerEmulator.instance.debugHandle)
+                    UnityEngine.Debug.Log($"[ZombieSpawn] Reassigned {clientList.Count} random tickets for next round.");
+            }
         }
 
         public void Shutdown()
@@ -303,7 +314,7 @@ namespace _Emulator
                     break;
 
                 case Room.ROOM_TYPE.ZOMBIE:
-                    Debug.LogWarning("ZombieMatchend");
+                    //Debug.LogWarning("ZombieMatchend");
                     Zombie.HandleZombieMatchEnd(this);
                     break;
 
@@ -312,7 +323,7 @@ namespace _Emulator
                     break;
 
                 case Room.ROOM_TYPE.ESCAPE:
-                    //DefenseGamemode.HandleMatchEnd(this);
+                    DefenseGamemode.HandleMatchEnd(this);
                     break;
 
                 case Room.ROOM_TYPE.BUNGEE:
@@ -400,47 +411,102 @@ namespace _Emulator
 
         public SlotData GetNextFreeSlot()
         {
-            // 1) Deathmatch-style modes: no teams, just fill from top
-            if (room.Type == Room.ROOM_TYPE.INDIVIDUAL || room.Type == Room.ROOM_TYPE.ZOMBIE)
+            // 1) Deathmatch style (16 slots)
+            if (room.Type == Room.ROOM_TYPE.INDIVIDUAL ||
+                room.Type == Room.ROOM_TYPE.ZOMBIE)
             {
-                // First free + unlocked slot starting from index 0
                 return slots.Find(s => !s.isUsed && !s.isLocked);
             }
 
-            // 2) Team modes (includes normal 16-slot and 8-slot modes like BUNGEE/MISSION)
-
-            int redCount = redSlots.FindAll(x => x.isUsed).Count;
-            int blueCount = blueSlots.FindAll(x => x.isUsed).Count;
-
-            // Choose the team with fewer players
-            // If blue has more or equal, give next slot to RED
-            if (blueCount >= redCount)
+            // 2) Bungee or Mission — limit to 8 total players
+            if (room.Type == Room.ROOM_TYPE.BUNGEE ||
+                room.Type == Room.ROOM_TYPE.MISSION)
             {
-                SlotData redFree = redSlots.Find(x => !x.isUsed && !x.isLocked);
-                if (redFree != null)
-                    return redFree;
+                int totalUsed = slots.FindAll(s => s.isUsed).Count;
+                if (totalUsed >= 8)
+                    return null; // no more allowed
 
-                // Fallback if red full
-                return blueSlots.Find(x => !x.isUsed && !x.isLocked);
+                // Try balance between teams
+                int redCount = redSlots.FindAll(x => x.isUsed).Count;
+                int blueCount = blueSlots.FindAll(x => x.isUsed).Count;
+
+                // Pick team with fewer players
+                if (blueCount >= redCount)
+                {
+                    var redFree = redSlots.Find(x => !x.isUsed && !x.isLocked);
+                    if (redFree != null) return redFree;
+
+                    return blueSlots.Find(x => !x.isUsed && !x.isLocked);
+                }
+                else
+                {
+                    var blueFree = blueSlots.Find(x => !x.isUsed && !x.isLocked);
+                    if (blueFree != null) return blueFree;
+
+                    return redSlots.Find(x => !x.isUsed && !x.isLocked);
+                }
             }
-            else
-            {
-                SlotData blueFree = blueSlots.Find(x => !x.isUsed && !x.isLocked);
-                if (blueFree != null)
-                    return blueFree;
 
-                // Fallback if blue full
-                return redSlots.Find(x => !x.isUsed && !x.isLocked);
+            // 3) Normal team modes (max 16)
+            {
+                int redCount = redSlots.FindAll(x => x.isUsed).Count;
+                int blueCount = blueSlots.FindAll(x => x.isUsed).Count;
+
+                if (blueCount >= redCount)
+                {
+                    var redFree = redSlots.Find(x => !x.isUsed && !x.isLocked);
+                    if (redFree != null) return redFree;
+
+                    return blueSlots.Find(x => !x.isUsed && !x.isLocked);
+                }
+                else
+                {
+                    var blueFree = blueSlots.Find(x => !x.isUsed && !x.isLocked);
+                    if (blueFree != null) return blueFree;
+
+                    return redSlots.Find(x => !x.isUsed && !x.isLocked);
+                }
             }
         }
 
 
         public SlotData GetNextFreeSlotOnOtherTeam(SlotData slot)
         {
+            bool isLimited8 = (room.Type == Room.ROOM_TYPE.BUNGEE ||
+                               room.Type == Room.ROOM_TYPE.MISSION);
+
+            // Count globally
+            int totalUsed = slots.FindAll(x => x.isUsed).Count;
+
+            // If in 8-slot mode and already full, no switch possible
+            if (isLimited8 && totalUsed >= 8)
+                return null;
+
+            // Player was on Red team (0–7), look for Blue
             if (slot.slotIndex < 8)
-                return blueSlots.Find(x => !x.isUsed && !x.isLocked);
-            else
-                return redSlots.Find(x => !x.isUsed && !x.isLocked);
+            {
+                // Try Blue first
+                SlotData freeBlue = blueSlots.Find(x => !x.isUsed && !x.isLocked);
+                if (freeBlue != null)
+                    return freeBlue;
+
+                // If Blue full, fallback Red (only used in normal 16-slot modes)
+                if (!isLimited8)
+                    return redSlots.Find(x => !x.isUsed && !x.isLocked);
+
+                return null;
+            }
+            else // Player was on Blue team (8–15), look for Red
+            {
+                SlotData freeRed = redSlots.Find(x => !x.isUsed && !x.isLocked);
+                if (freeRed != null)
+                    return freeRed;
+
+                if (!isLimited8)
+                    return blueSlots.Find(x => !x.isUsed && !x.isLocked);
+
+                return null;
+            }
         }
 
         public SlotData FindSlotByClient(ClientReference client)

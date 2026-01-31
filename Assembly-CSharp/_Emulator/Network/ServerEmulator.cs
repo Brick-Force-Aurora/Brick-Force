@@ -698,7 +698,7 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_MY_DOWNLOAD_MAP_REQ] = HandleRequestDownloadedMaps;
             _handlers[(int)MessageId.CS_MY_REGISTER_MAP_REQ] = HandleRequestRegisteredMaps;
             _handlers[(int)MessageId.CS_USER_MAP_REQ] = HandleRequestUserMaps;
-            _handlers[(int)MessageId.CS_ALL_MAP_REQ] = msgRef => Debug.LogWarning("AllMapRequest from: " + msgRef.client.GetIdentifier());
+            _handlers[(int)MessageId.CS_ALL_MAP_REQ] = HandleRequestAllMaps;
             _handlers[(int)MessageId.CS_OPEN_DOOR_REQ] = HandleOpenDoorRequest;
             _handlers[(int)MessageId.CS_CLOSE_DOOR_REQ] = HandleCloseDoorRequest;
             _handlers[(int)MessageId.CS_SAVE_PLAYER_COMMON_OPT_REQ] = HandleCommonOpt;
@@ -1026,6 +1026,60 @@ namespace _Emulator
                 Debug.Log("HandleRequestRegisteredMaps from: " + msgRef.client.GetIdentifier());
 
             SendRegisteredMaps(msgRef.client, nextPage);
+        }
+
+        private void HandleRequestAllMaps(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out int prevPage);
+            msgRef.msg._msg.Read(out int nextPage);
+            msgRef.msg._msg.Read(out int indexer);
+            msgRef.msg._msg.Read(out ushort modeMask);
+            msgRef.msg._msg.Read(out int flag);
+            msgRef.msg._msg.Read(out string filter);
+
+            if (debugHandle)
+                Debug.Log("HandleRequestRegisteredMaps from: " + msgRef.client.GetIdentifier());
+
+            SendAllMaps(msgRef.client, nextPage);
+        }
+
+        public void SendAllMaps(ClientReference client, int page)
+        {
+            MsgBody body = new MsgBody();
+
+            const int mapsPerPage = 12;
+            int offset = page * mapsPerPage;
+            int remaining = regMaps.Count - offset;
+            int count = remaining < mapsPerPage ? remaining : mapsPerPage;
+
+            body.Write(page); //page
+            body.Write(count); //count
+            for (int i = offset; i < offset + count; i++)
+            {
+                KeyValuePair<int, RegMap> entry = regMaps[i];
+                body.Write(entry.Value.Map);
+                body.Write(entry.Value.Developer);
+                body.Write(entry.Value.Alias);
+                body.Write(entry.Value.ModeMask);
+                body.Write((byte)(Room.clanMatch | Room.official));
+                body.Write(entry.Value.tagMask);
+                body.Write(entry.Value.RegisteredDate.Year);
+                body.Write((sbyte)entry.Value.RegisteredDate.Month);
+                body.Write((sbyte)entry.Value.RegisteredDate.Day);
+                body.Write((sbyte)entry.Value.RegisteredDate.Hour);
+                body.Write((sbyte)entry.Value.RegisteredDate.Minute);
+                body.Write((sbyte)entry.Value.RegisteredDate.Second);
+                body.Write(entry.Value.DownloadFee);
+                body.Write(entry.Value.Release);
+                body.Write(entry.Value.LatestRelease);
+                body.Write(entry.Value.Likes);
+                body.Write(entry.Value.DisLikes);
+                body.Write(entry.Value.DownloadCount);
+            }
+            Say(new MsgReference(432, body, client));
+
+            if (debugSend)
+                Debug.Log("SendRegisteredMaps to: " + client.GetIdentifier());
         }
 
         private void HandleRequestUserMaps(MsgReference msgRef)

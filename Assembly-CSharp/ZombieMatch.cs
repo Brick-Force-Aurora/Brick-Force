@@ -200,11 +200,14 @@ public class ZombieMatch : MonoBehaviour
 			SpawnerDesc spawner = BrickManager.Instance.GetSpawner(Brick.SPAWNER_TYPE.SINGLE_SPAWNER, MyInfoManager.Instance.Ticket);
 			if (spawner != null)
 			{
+				Debug.LogWarning("myInfoManager ticket: " + MyInfoManager.Instance.Ticket);
 				localController.Spawn(spawner.position, Rot.ToQuaternion(spawner.rotation));
 			}
 			else
 			{
-				localController.Spawn(BrickManager.Instance.GetRandomSpawnPos(), Rot.ToQuaternion((byte)UnityEngine.Random.Range(0, 4)));
+				Vector3 pos = BrickManager.Instance.GetRandomSpawnPos();
+                Debug.LogWarning("GetRandomSpawnPos " + pos.ToString());
+                localController.Spawn(pos, Rot.ToQuaternion((byte)UnityEngine.Random.Range(0, 4)));
 			}
 		}
 		if (!MyInfoManager.Instance.GetCommonMask(MyInfoManager.COMMON_OPT.DONOT_ZOMBIE_GUIDE))
@@ -423,6 +426,7 @@ public class ZombieMatch : MonoBehaviour
 	private void OnGetBack2Spawner()
 	{
 		ZombieVsHumanManager.Instance.ResetGameStuff();
+		Debug.LogWarning("OnGetBack2SPawner");
 	}
 
 	private void UpdateEndCode()

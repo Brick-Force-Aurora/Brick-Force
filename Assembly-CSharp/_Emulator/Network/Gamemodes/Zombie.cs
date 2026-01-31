@@ -274,7 +274,7 @@ namespace _Emulator.Network.Gamemodes
 
             HandleZombieScoreRequest(msgRef);
 
-            ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_ROUND_END_ACK, msg, null, SendType.BroadcastRoom, data.channel, data));
+            ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_ROUND_END_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
 
         internal static void HandleZombieScoreRequest(MsgReference msgRef)
