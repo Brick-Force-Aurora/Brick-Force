@@ -1,11 +1,26 @@
-![](https://i.imgur.com/fThs88a.png)
+[![Contributors][contributors-shield]][contributors-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![Discord][discord-shield]][discord-url]
 
-<div align="center">
-  <a href="https://discord.gg/qktjAYsKwH">Join The Discord</a> |
-  <a href="https://github.com/Brick-Force-Aurora/Brick-Force/releases/latest">Latest Release</a> |
-  <a href="https://brick-force-aurora.github.io/Website/">Website</a> |
-  <a href="https://www.youtube.com/watch?v=mslPRyCIKgo">Gameplay Video</a> |
-</div>
+<br/>
+<p align="center">
+    <a href="https://brickforce-aurora.de/">
+        <img src="https://raw.githubusercontent.com/Brick-Force-Aurora/Launcher/master/.github/assets/logo.png"/>
+    </a>
+    <h3 align="center">BrickForce Aurora</h3>
+    <p align="center">
+        <a href="https://github.com/Brick-Force-Aurora/Brick-Force/issues/new">Report Bug</a>
+        ·
+        <a href="https://github.com/Brick-Force-Aurora/Brick-Force/issues/new">Request Feature</a>
+        ·
+        <a href="https://brickforce-aurora.de/roadmap/">Roadmap</a>
+        ·
+        <a href="https://www.youtube.com/watch?v=mslPRyCIKgo">Gameplay Video</a>
+        ·
+        <a href="https://www.youtube.com/watch?v=fRpV5qkc_IM">Video Tutorial</a>
+    </p>
+</p>
 
 <p align="center">Open source Brick-Force server emulator project for everyone.</p>
 
@@ -26,11 +41,11 @@
 <img width="962" alt="setup_steam" src="https://github.com/user-attachments/assets/5f67e42d-1a19-4bd8-97d8-03305cbf52e1" />
 <img width="962" alt="lobbies_steam" src="https://github.com/user-attachments/assets/e14aaba1-b1d3-4584-83ba-cf1ce469762e" />
 
-- Download the newest [BfLauncher](https://github.com/Brick-Force-Aurora/Launcher/releases).
+- Follow the instructions on how to install the [BrickForce Aurora Launcher](https://github.com/Brick-Force-Aurora/Launcher?tab=readme-ov-file#installation-).
 - Start it to install the game and receive the newest updates (can be disabled in launcher settings).
 - Install and run [Steam](https://store.steampowered.com/), create or login to your Steam account.
 - Install 'Spacewar' (Proxy for Steamworks API access) to your Steam Library by opening `steam://install/480/` in your browser while Steam is running.
-- Run Brick-Force through BfLauncher.exe or BrickForce.exe. You can optionally add either to your Steam library as non-Steam game.
+- Run Brick-Force through the launcher or BrickForce.exe. You can optionally add either to your Steam library as non-Steam game.
 - Steam should show you as playing 'Spacewar'.
 - To create a new lobby, enter a lobby name and hit 'Create' in the 'Setup (Steam)' menu.
 - Lobby owner acts as the host for the game.
@@ -56,8 +71,7 @@
 ## How To Play (IP)
 <img width="962" alt="setup_ip" src="https://github.com/user-attachments/assets/35aaab53-d0cd-4e8d-a934-403a512040af" />
 
-- Download the newest [BfLauncher](https://github.com/Brick-Force-Aurora/Launcher/releases).
-- Start it to install the game and receive the newest updates (can be disabled in launcher settings).
+- Follow the instructions on how to install the [BrickForce Aurora Launcher](https://github.com/Brick-Force-Aurora/Launcher?tab=readme-ov-file#installation-).
 - Get into a network (VPN or LAN) with other players (recommended free VPN Service: Radmin).
 - Make sure to allow any firewall exceptions that may pop up in the process.
 - One player will act as host, make sure to put his network IP in the Host IP text field in the Setup (IP) menu after starting the game (default value can be set in Config).
@@ -152,7 +166,7 @@
 - ~To Debug select the Brick-Force.exe as the external program.~ Regular debugging will crash due to Themida protection on BrickForce.exe by the original developer.
 
 ## Dependencies
-- [Brick-Force Base (Install with BfLauncher)](https://github.com/Brick-Force-Aurora/Launcher) (Root)
+- [Brick-Force Base (Install with the BrickForce Aurora Launcher)](https://github.com/Brick-Force-Aurora/Launcher) (Root)
 - [Steamworks.NET.dll](https://github.com/rlabrecque/Steamworks.NET) (BrickForce_Data\Managed)
 - [steam_api.dll](https://partner.steamgames.com/downloads/list) (Root)
 - [ImGui.NET.dll](https://github.com/Brick-Force-Aurora/ImGui.NET) (BrickForce_Data\Managed)
@@ -173,3 +187,33 @@
 ## Troubleshooting
 
 - **Stuck in "Downloading Once..":** Most likely something is faulty in your config. To fix this issue go to the Registry Editor and go to the path: `Computer\HKEY_CURRENT_USER\SOFTWARE\EXE Games\BrickForce` and delete the `EXE Games` Folder. Now restart the game and it should work
+
+
+
+<!-- CONTRIBUTING -->
+## Contributing
+
+Contributions are what make the open source community such an amazing place to be learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+
+
+<!-- LICENSE -->
+## License
+
+Distributed under the GPL-3.0 License. See `LICENSE` for more information.
+
+<!-- MARKDOWN LINKS & IMAGES -->
+[contributors-shield]: https://img.shields.io/github/contributors/Brick-Force-Aurora/Brick-Force.svg?style=flat-square&labelColor=%231D1F22&logo=devbox&logoColor=%230088cc&color=%230088cc
+[contributors-url]: https://github.com/Brick-Force-Aurora/Brick-Force/graphs/contributors
+[stars-shield]: https://img.shields.io/github/stars/Brick-Force-Aurora/Brick-Force.svg?style=flat-square&labelColor=%231D1F22&logo=reverbnation&logoColor=%23E3B341&color=%23E3B341
+[stars-url]: https://github.com/Brick-Force-Aurora/Brick-Force/stargazers
+[issues-shield]: https://img.shields.io/github/issues/Brick-Force-Aurora/Brick-Force.svg?style=flat-square&labelColor=%231D1F22&logo=buffer&logoColor=%230ec784&color=%230ec784
+[issues-url]: https://github.com/Brick-Force-Aurora/Brick-Force/issues
+[discord-shield]: https://img.shields.io/discord/777075012032004107?style=flat-square&logo=discord&logoColor=%235865f2&label=Discord&labelColor=%231D1F22&color=%23404eed
+[discord-url]: https://discord.com/invite/npqB9f6xXZ
