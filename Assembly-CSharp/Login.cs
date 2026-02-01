@@ -324,13 +324,13 @@ public class Login : MonoBehaviour
 	private void OnRoundRobin()
 	{
 		DialogManager.Instance.CloseAll();
-		CSNetManager.Instance.SwitchAfter = new SockTcp();
+        if (CSNetManager.Instance.Sock != null)
+        {
+            CSNetManager.Instance.Sock.Close();
+        }
+        CSNetManager.Instance.SwitchAfter = new SockTcp();
 		if (CSNetManager.Instance.SwitchAfter.Open(CSNetManager.Instance.BfServer, CSNetManager.Instance.BfPort))
 		{
-			if (CSNetManager.Instance.Sock != null)
-			{
-				CSNetManager.Instance.Sock.Close();
-			}
 			loginStep = LOGIN_STEP.WAITING_SEED;
 		}
 		else
