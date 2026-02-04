@@ -2098,7 +2098,7 @@ namespace _Emulator
                 }
             }
 
-            msgRef.client.inventory.GenerateActiveTools();
+            msgRef.client.inventory.UpdateActiveEquipment();
             SendShooterToolList(msgRef.client);
             //SendSetShooterTool(msgRef.client, slot, item.Seq);
         }
