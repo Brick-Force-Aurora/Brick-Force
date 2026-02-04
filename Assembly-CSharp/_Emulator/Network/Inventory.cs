@@ -22,8 +22,8 @@ namespace _Emulator
         public Inventory(int _seq, bool load = false)
         {
             equipment = new List<Item>();
-            weaponChg = new Item[5];
-            shooterTools = new Item[5];
+            weaponChg = new Item[10];
+            shooterTools = new Item[10];
             activeSlots = new Item[19];
             seq = _seq;
 
@@ -155,7 +155,7 @@ namespace _Emulator
 
         public void GenerateActiveTools()
         {
-            shooterTools = new Item[5];
+            shooterTools = new Item[10];
             List<Item> activeTools = equipment.FindAll(x => x.IsShooterSlotAble && x.toolSlot >= 0);
             for (int i = 0; i < activeTools.Count && i < shooterTools.Length; i++)
             {
@@ -165,7 +165,7 @@ namespace _Emulator
 
         public void GenerateActiveChange()
         {
-            weaponChg = new Item[5];
+            weaponChg = new Item[10];
             List<Item> activeChange = equipment.FindAll(x => x.IsWeaponSlotAble && x.toolSlot >= 0);
             weaponChgString = new string[activeChange.Count];
             for (int i = 0; i < activeChange.Count && i < weaponChg.Length; i++)
