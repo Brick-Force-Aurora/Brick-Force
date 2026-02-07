@@ -524,18 +524,22 @@ namespace _Emulator
 
         private void HandleDeadClients()
         {
-            if (!Config.instance.autoClearDeadClients)
-                return;
-
             foreach (ClientReference client in clientList)
             {
+                if (client.isHost) { continue;  }
+                if (Time.time - client.lastHeartBeatTime > 3f)
+                {
+                    client.Disconnect(false);
+                    continue;
+                }
+
                 if (client.seq == -1)
                 {
                     client.toleranceTime += Time.deltaTime;
                     if (client.toleranceTime >= 3f)
                     {
                         client.Disconnect(false);
-                        break;
+                        continue;
                     }
                 }
             }
@@ -844,11 +848,7 @@ namespace _Emulator
         private void HandleHeartbeat(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out int gmFunction);
-            if (Time.time - msgRef.client.lastHeartBeatTime > 3f)
-                msgRef.client.Disconnect();
-
-            else
-                msgRef.client.lastHeartBeatTime = Time.time;
+            msgRef.client.lastHeartBeatTime = Time.time;
         }
 
         private void HandleLoginRequest(MsgReference msgRef)

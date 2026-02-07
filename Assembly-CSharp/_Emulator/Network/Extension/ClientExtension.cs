@@ -208,6 +208,7 @@ namespace _Emulator
         {
             clientConnected = true;
             MainGUI.instance.setupHidden = true;
+            CSNetManager.Instance.Sock._heartbeat = true;
             GameObject gameObject = GameObject.Find("Main");
             if (null != gameObject)
             {
