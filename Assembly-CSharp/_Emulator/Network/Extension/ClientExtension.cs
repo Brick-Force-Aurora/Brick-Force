@@ -566,35 +566,55 @@ namespace _Emulator
         {
             try
             {
-                string launcherPath = Path.GetFullPath(
-                    Path.Combine(Application.dataPath, "../launcher.txt")
+                string path = Path.GetFullPath(
+                    Path.Combine(Application.dataPath, "../launcher_data.dat")
                 );
 
-                if (!File.Exists(launcherPath))
+                if (!File.Exists(path))
                 {
-                    Debug.LogWarning("launcher.txt not found at: " + launcherPath);
+                    Debug.LogWarning("launcher_data.dat not found at: " + path);
                     return "unknown";
                 }
 
-                string text = File.ReadAllText(launcherPath);
-
-                // Beispiel: github-version=2.1.2
-                var m = Regex.Match(text, @"(?im)^\s*github-version\s*=\s*([0-9A-Za-z\.\-_]+)\s*$");
-                if (m.Success)
+                using (var fs = File.OpenRead(path))
+                using (var br = new BinaryReader(fs))
                 {
-                    var ver = m.Groups[1].Value.Trim();
+                    // Uses your NBT reader extension method
+                    CompoundTag root = br.ReadAsNbt().Value;
+
+                    if (root == null || !root.Has("version", TagType.INT_ARRAY))
+                    {
+                        Debug.LogWarning("NBT key 'version' not found or not INT_ARRAY in launcher_data.dat");
+                        return "unknown";
+                    }
+
+                    // Directly access the stored IntArrayTag
+                    IntArrayTag verTag = root["version"] as IntArrayTag;
+                    if (verTag.Value.Length != 4)
+                    {
+                        Debug.LogWarning("NBT 'version' array missing/invalid");
+                        return "unknown";
+                    }
+
+                    int major = verTag.Value[0];
+                    int minor = verTag.Value[1];
+                    int patch = verTag.Value[2];
+                    int release = verTag.Value[3];
+
+                    string ver = (release >= 0)
+                        ? (major + "." + minor + "." + patch + "-R" + release)
+                        : (major + "." + minor + "." + patch);
+
                     Debug.Log("GameVersion: " + ver);
                     return ver;
                 }
-
-                Debug.LogWarning("github-version key not found in launcher.txt");
-                return "unknown";
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                Debug.LogWarning("Failed to read launcher version: " + ex.Message);
+                Debug.LogWarning("Failed to read launcher version (launcher_data.dat): " + ex.Message);
                 return "unknown";
             }
         }
+
     }
 }
