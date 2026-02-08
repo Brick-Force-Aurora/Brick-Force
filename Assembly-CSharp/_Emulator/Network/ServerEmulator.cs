@@ -38,6 +38,7 @@ namespace _Emulator
         private float killLogTimer = 0f;
         public List<KeyValuePair<int, RegMap>> regMaps = new List<KeyValuePair<int, RegMap>>();
         private bool waitForShutDown = false;
+        private string hostGithubVersion = "unknown";
 
         private void Start()
         {
@@ -58,6 +59,7 @@ namespace _Emulator
                 serverSocket.Listen(16);
                 serverSocket.BeginAccept(new AsyncCallback(AcceptCallback), null);
                 serverCreated = true;
+                hostGithubVersion = ClientExtension.GetGithubVersionOrUnknown();
                 Debug.Log("Server created");
             }
 
@@ -75,6 +77,7 @@ namespace _Emulator
             RegisterHandlers();
             isSteam = true;
             serverCreated = true;
+            hostGithubVersion = ClientExtension.GetGithubVersionOrUnknown();
             Debug.Log("Server set to Steam");
 
             //Pulls all loaded RegMaps into the emulator
@@ -723,6 +726,7 @@ namespace _Emulator
             _handlers[ExtensionOpcodes.opBeginChunkedBufferReq] = HandleBeginChunkedBuffer;
             _handlers[ExtensionOpcodes.opChunkedBufferReq] = HandleChunkedBuffer;
             _handlers[ExtensionOpcodes.opEndChunkedBufferReq] = HandleEndChunkedBuffer;
+            _handlers[ExtensionOpcodes.opVersionCheckReq] = HandleVersionCheck;
         }
 
         private void HandleMessages()
@@ -4931,6 +4935,44 @@ namespace _Emulator
             body.Write(newAlias);
 
             Say(new MsgReference(55, body, msgRef.client, SendType.Unicast));
+        }
+
+        private void HandleVersionCheck(MsgReference msg)
+        {
+            ClientReference client = msg.client;
+
+            // Host selbst muss nicht geprüft werden
+            if (client.isHost)
+                return;
+
+            msg.msg._msg.Read(out string clientVersion);
+            if (string.IsNullOrEmpty(clientVersion))
+                clientVersion = "unknown";
+
+            // Vergleich
+            bool match = string.Equals(clientVersion, hostGithubVersion, System.StringComparison.OrdinalIgnoreCase);
+
+            if (!match)
+            {
+
+                var ack = new MsgBody();
+                ack.Write(hostGithubVersion);
+                ack.Write(clientVersion);
+                SayInstant(new MsgReference(1019, ack, client, SendType.Unicast));
+
+                string error = $"Version mismatch! Host={hostGithubVersion}, Client={clientVersion}";
+
+                Debug.LogWarning("Disconnecting client: " + error);
+
+                SendDisconnect(client);
+                return;
+            } else
+            {
+                string success = $"Version Check: Host={hostGithubVersion}, Client={clientVersion}";
+
+                if (debugHandle)
+                    Debug.Log(success);
+            }
         }
     }
 }

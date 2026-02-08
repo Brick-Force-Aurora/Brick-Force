@@ -65,7 +65,8 @@ namespace _Emulator
         {
             ImGui.SetNextWindowSizeConstraints(new Vector2(windowWidth * dpiScale, windowMinHeight * dpiScale), new Vector2(windowWidth * dpiScale, windowMaxHeight * dpiScale));
             bool visible = isVisible;
-            ImGui.Begin("Brick-Force Aurora", ref visible, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoBringToFrontOnFocus);
+            var ver = ClientExtension.GetGithubVersionOrUnknown();
+            ImGui.Begin($"Brick-Force Aurora v{ver}", ref visible, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoBringToFrontOnFocus);
             {
                 ImGui.BeginTabBar("##MenuTabs");
                 {

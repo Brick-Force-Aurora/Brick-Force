@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Text.RegularExpressions;
 using Steamworks;
 using UnityEngine;
@@ -197,6 +198,10 @@ namespace _Emulator
                     HandleReceiveSlotDataSteam(msg._msg);
                     break;
 
+                case ExtensionOpcodes.opVersionCheckAck:
+                    HandleVersionCheck(msg._msg);
+                    break;
+
                 default:
                     result = false;
                     break;
@@ -215,6 +220,17 @@ namespace _Emulator
                 gameObject.BroadcastMessage("OnSeed");
             }
             Core.SetBalancedItemProperties();
+            SendVersionCheck();
+        }
+
+        private void SendVersionCheck()
+        {
+            string version = GetGithubVersionOrUnknown();
+
+            MsgBody body = new MsgBody();
+            body.Write(version);
+
+            Say(ExtensionOpcodes.opVersionCheckReq, body);
         }
 
         private void HandleDisconnected(MsgBody msg)
@@ -484,6 +500,101 @@ namespace _Emulator
 
             Debug.LogWarning("End");
             Say(ExtensionOpcodes.opEndChunkedBufferReq, body);
+        }
+
+        private void HandleVersionCheck(MsgBody msg)
+        {
+            msg.Read(out string hostVer);
+            msg.Read(out string clientVer);
+
+            int result = CompareVersions(hostVer, clientVer);
+
+            string relation =
+                result > 0 ? "a newer" :
+                result < 0 ? "an older" :
+                "the same";
+
+            MessageBoxMgr.Instance.AddMessage(
+                $"Version mismatch detected, the host is using {relation} version ({hostVer}). "
+            );
+        }
+
+        private int CompareVersions(string a, string b)
+        {
+            int aMaj, aMin, aPat, aRev;
+            int bMaj, bMin, bPat, bRev;
+
+            ParseVersion(a, out aMaj, out aMin, out aPat, out aRev);
+            ParseVersion(b, out bMaj, out bMin, out bPat, out bRev);
+
+            if (aMaj != bMaj) return aMaj.CompareTo(bMaj);
+            if (aMin != bMin) return aMin.CompareTo(bMin);
+            if (aPat != bPat) return aPat.CompareTo(bPat);
+
+            // No -R is older than any -R
+            if (aRev == -1 && bRev != -1) return -1;
+            if (aRev != -1 && bRev == -1) return 1;
+
+            return aRev.CompareTo(bRev);
+        }
+
+        private void ParseVersion(
+            string version,
+            out int major,
+            out int minor,
+            out int patch,
+            out int revision)
+        {
+            major = minor = patch = 0;
+            revision = -1; // -1 = no -R suffix
+
+            string[] dashSplit = version.Split('-');
+            string[] nums = dashSplit[0].Split('.');
+
+            if (nums.Length > 0) int.TryParse(nums[0], out major);
+            if (nums.Length > 1) int.TryParse(nums[1], out minor);
+            if (nums.Length > 2) int.TryParse(nums[2], out patch);
+
+            if (dashSplit.Length > 1 && dashSplit[1].StartsWith("R"))
+            {
+                int.TryParse(dashSplit[1].Substring(1), out revision);
+            }
+        }
+
+
+        public static string GetGithubVersionOrUnknown()
+        {
+            try
+            {
+                string launcherPath = Path.GetFullPath(
+                    Path.Combine(Application.dataPath, "../launcher.txt")
+                );
+
+                if (!File.Exists(launcherPath))
+                {
+                    Debug.LogWarning("launcher.txt not found at: " + launcherPath);
+                    return "unknown";
+                }
+
+                string text = File.ReadAllText(launcherPath);
+
+                // Beispiel: github-version=2.1.2
+                var m = Regex.Match(text, @"(?im)^\s*github-version\s*=\s*([0-9A-Za-z\.\-_]+)\s*$");
+                if (m.Success)
+                {
+                    var ver = m.Groups[1].Value.Trim();
+                    Debug.Log("GameVersion: " + ver);
+                    return ver;
+                }
+
+                Debug.LogWarning("github-version key not found in launcher.txt");
+                return "unknown";
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("Failed to read launcher version: " + ex.Message);
+                return "unknown";
+            }
         }
     }
 }

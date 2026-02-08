@@ -20,5 +20,7 @@
         public const int opRendezvousInfoSteamAck = 1015;
         public const int opEnterSteamAck = 1016;
         public const int opSlotDataSteamAck = 1017;
+        public const int opVersionCheckReq = 1018;
+        public const int opVersionCheckAck = 1019;
     }
 }
