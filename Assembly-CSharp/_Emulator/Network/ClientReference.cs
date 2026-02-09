@@ -41,6 +41,7 @@ namespace _Emulator
         public ChannelReference channel;
         public ChunkedBuffer chunkedBuffer;
         public int lastOpenedChestSeq = -1;
+        public bool isVersionSetUp = false;
 
         private readonly object dataLock = new object();
 
@@ -56,6 +57,7 @@ namespace _Emulator
             ip = socket.RemoteEndPoint.ToString().Split(':')[0];
             isLoaded = false;
             isHost = ServerEmulator.instance.clientList.Count == 0;
+            isVersionSetUp = false;
             buffer = new byte[8192];
             toleranceTime = 0f;
             isSteam = false;
@@ -72,6 +74,7 @@ namespace _Emulator
             data = new DummyData();
             isLoaded = false;
             isHost = ServerEmulator.instance.clientList.Count == 0;
+            isVersionSetUp = false;
             buffer = new byte[8192];
             toleranceTime = 0f;
             isSteam = true;

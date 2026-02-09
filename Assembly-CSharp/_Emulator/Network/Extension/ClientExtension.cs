@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.IO;
 using System.Text.RegularExpressions;
 using Steamworks;
@@ -18,6 +19,13 @@ namespace _Emulator
         public int lastKillLogId = -1;
         public float killLogRealiableTime = 0f;
         public bool isSteam = false;
+
+        public readonly Version clientVersion;
+        private ClientExtension()
+        {
+            clientVersion = GetGithubVersionOrUnknown();
+            Debug.Log($"GameVersion: {clientVersion}");
+        }
 
         public void LoadServer()
         {
@@ -165,6 +173,9 @@ namespace _Emulator
                 case ExtensionOpcodes.opConnectedAck:
                     HandleConnected(msg._msg);
                     break;
+                case ExtensionOpcodes.opVersionCheckAck:
+                    HandleVersionCheck(msg._msg);
+                    break;
 
                 case ExtensionOpcodes.opSlotDataAck:
                     HandleReceiveSlotData(msg._msg);
@@ -198,10 +209,6 @@ namespace _Emulator
                     HandleReceiveSlotDataSteam(msg._msg);
                     break;
 
-                case ExtensionOpcodes.opVersionCheckAck:
-                    HandleVersionCheck(msg._msg);
-                    break;
-
                 default:
                     result = false;
                     break;
@@ -212,6 +219,11 @@ namespace _Emulator
         private void HandleConnected(MsgBody msg)
         {
             clientConnected = true;
+            SendVersionCheck();
+        }
+
+        private void HandleVersionCheck(MsgBody msg)
+        {
             MainGUI.instance.setupHidden = true;
             CSNetManager.Instance.Sock._heartbeat = true;
             GameObject gameObject = GameObject.Find("Main");
@@ -220,31 +232,54 @@ namespace _Emulator
                 gameObject.BroadcastMessage("OnSeed");
             }
             Core.SetBalancedItemProperties();
-            SendVersionCheck();
         }
 
         private void SendVersionCheck()
         {
-            string version = GetGithubVersionOrUnknown();
-
             MsgBody body = new MsgBody();
-            body.Write(version);
+            body.Write(clientVersion.Major);
+            body.Write(clientVersion.Minor);
+            body.Write(clientVersion.Patch);
+            body.Write(clientVersion.Revision);
 
             Say(ExtensionOpcodes.opVersionCheckReq, body);
         }
 
         private void HandleDisconnected(MsgBody msg)
         {
+            string message = StringMgr.Instance.Get("NETWORK_BROKEN");
+            bool customMessage = false;
+            if (msg.Buffer.Length != 0)
+            {
+                customMessage = true;
+                msg.Read(out message);
+            }
+
             clientConnected = false;
             if (!isSteam)
             {
+                Debug.Log(message);
                 if (CSNetManager.Instance.Sock != null)
                     CSNetManager.Instance.Sock.Close();
-                MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("NETWORK_BROKEN"));
                 BuildOption.Instance.Exit();
+                BuildOption.Instance.StartCoroutine(ShowDialogOnExit(message));
             }
             else
-                SteamLobbyManager.instance.LeaveCurrentLobbyAndShutdown();
+            {
+                if (customMessage)
+                {
+                    SteamLobbyManager.instance.LeaveCurrentLobbyAndShutdown(message);
+                } else
+                {
+                    SteamLobbyManager.instance.LeaveCurrentLobbyAndShutdown();
+                }
+            }
+        }
+
+        public static IEnumerator ShowDialogOnExit(string message)
+        {
+            yield return new WaitForSeconds(0.05f);
+            MessageBoxMgr.Instance.AddMessage(message);
         }
 
         private void HandleRendezvousInfoSteam(MsgBody msg)
@@ -502,67 +537,8 @@ namespace _Emulator
             Say(ExtensionOpcodes.opEndChunkedBufferReq, body);
         }
 
-        private void HandleVersionCheck(MsgBody msg)
-        {
-            msg.Read(out string hostVer);
-            msg.Read(out string clientVer);
 
-            int result = CompareVersions(hostVer, clientVer);
-
-            string relation =
-                result > 0 ? "a newer" :
-                result < 0 ? "an older" :
-                "the same";
-
-            MessageBoxMgr.Instance.AddMessage(
-                $"Version mismatch detected, the host is using {relation} version ({hostVer}). "
-            );
-        }
-
-        private int CompareVersions(string a, string b)
-        {
-            int aMaj, aMin, aPat, aRev;
-            int bMaj, bMin, bPat, bRev;
-
-            ParseVersion(a, out aMaj, out aMin, out aPat, out aRev);
-            ParseVersion(b, out bMaj, out bMin, out bPat, out bRev);
-
-            if (aMaj != bMaj) return aMaj.CompareTo(bMaj);
-            if (aMin != bMin) return aMin.CompareTo(bMin);
-            if (aPat != bPat) return aPat.CompareTo(bPat);
-
-            // No -R is older than any -R
-            if (aRev == -1 && bRev != -1) return -1;
-            if (aRev != -1 && bRev == -1) return 1;
-
-            return aRev.CompareTo(bRev);
-        }
-
-        private void ParseVersion(
-            string version,
-            out int major,
-            out int minor,
-            out int patch,
-            out int revision)
-        {
-            major = minor = patch = 0;
-            revision = -1; // -1 = no -R suffix
-
-            string[] dashSplit = version.Split('-');
-            string[] nums = dashSplit[0].Split('.');
-
-            if (nums.Length > 0) int.TryParse(nums[0], out major);
-            if (nums.Length > 1) int.TryParse(nums[1], out minor);
-            if (nums.Length > 2) int.TryParse(nums[2], out patch);
-
-            if (dashSplit.Length > 1 && dashSplit[1].StartsWith("R"))
-            {
-                int.TryParse(dashSplit[1].Substring(1), out revision);
-            }
-        }
-
-
-        public static string GetGithubVersionOrUnknown()
+        public static Version GetGithubVersionOrUnknown()
         {
             try
             {
@@ -573,7 +549,7 @@ namespace _Emulator
                 if (!File.Exists(path))
                 {
                     Debug.LogWarning("launcher_data.dat not found at: " + path);
-                    return "unknown";
+                    return Version.UNKNOWN;
                 }
 
                 using (var fs = File.OpenRead(path))
@@ -585,34 +561,23 @@ namespace _Emulator
                     if (root == null || !root.Has("version", TagType.INT_ARRAY))
                     {
                         Debug.LogWarning("NBT key 'version' not found or not INT_ARRAY in launcher_data.dat");
-                        return "unknown";
+                        return Version.UNKNOWN;
                     }
 
                     // Directly access the stored IntArrayTag
-                    IntArrayTag verTag = root["version"] as IntArrayTag;
-                    if (verTag.Value.Length != 4)
+                    int[] components = root.GetIntArray("version");
+                    if (components.Length != 4)
                     {
                         Debug.LogWarning("NBT 'version' array missing/invalid");
-                        return "unknown";
+                        return Version.UNKNOWN;
                     }
-
-                    int major = verTag.Value[0];
-                    int minor = verTag.Value[1];
-                    int patch = verTag.Value[2];
-                    int release = verTag.Value[3];
-
-                    string ver = (release >= 0)
-                        ? (major + "." + minor + "." + patch + "-R" + release)
-                        : (major + "." + minor + "." + patch);
-
-                    Debug.Log("GameVersion: " + ver);
-                    return ver;
+                    return Version.From(components);
                 }
             }
             catch (Exception ex)
             {
                 Debug.LogWarning("Failed to read launcher version (launcher_data.dat): " + ex.Message);
-                return "unknown";
+                return Version.UNKNOWN;
             }
         }
 

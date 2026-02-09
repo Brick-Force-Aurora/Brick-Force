@@ -112,6 +112,7 @@ namespace _Emulator
 
     public class CompoundTag : Tag<CompoundTag>, IEnumerable<KeyValuePair<string, ITag>>
     {
+
         public override TagType Type => TagType.COMPOUND;
 
         private readonly Dictionary<string, ITag> content = new Dictionary<string, ITag>();
@@ -256,6 +257,81 @@ namespace _Emulator
                 return 0;
             }
             return (tag as INumericTag).AsDouble();
+        }
+
+        public byte[] GetByteArray(string key)
+        {
+            var tag = content[key];
+            if (tag == null || tag.Type != TagType.BYTE_ARRAY)
+            {
+                return null;
+            }
+            return (tag as ByteArrayTag).Value;
+        }
+
+        public int[] GetIntArray(string key)
+        {
+            var tag = content[key];
+            if (tag == null || tag.Type != TagType.INT_ARRAY)
+            {
+                return null;
+            }
+            return (tag as IntArrayTag).Value;
+        }
+
+        public long[] GetLongArray(string key)
+        {
+            var tag = content[key];
+            if (tag == null || tag.Type != TagType.LONG_ARRAY)
+            {
+                return null;
+            }
+            return (tag as LongArrayTag).Value;
+        }
+
+        public string GetString(string key)
+        {
+            var tag = content[key];
+            if (tag == null || tag.Type != TagType.STRING)
+            {
+                return null;
+            }
+            return (tag as StringTag).Value;
+        }
+
+        public CompoundTag GetCompound(string key)
+        {
+            var tag = content[key];
+            if (tag == null || tag.Type != TagType.COMPOUND)
+            {
+                return null;
+            }
+            return tag as CompoundTag;
+        }
+
+        public ListTag GetList(string key)
+        {
+            var tag = content[key];
+            if (tag == null || tag.Type!= TagType.LIST)
+            {
+                return null;
+            }
+            return tag as ListTag;
+        }
+
+        public ListTag GetList(string key, TagType type)
+        {
+            var tag = content[key];
+            if (tag == null || tag.Type != TagType.LIST)
+            {
+                return null;
+            }
+            ListTag list = tag as ListTag;
+            if (list.ElementType != TagType.END && list.ElementType != type)
+            {
+                return null;
+            }
+            return list;
         }
     }
 

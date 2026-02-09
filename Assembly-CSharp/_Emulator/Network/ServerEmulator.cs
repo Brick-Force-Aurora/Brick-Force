@@ -38,10 +38,11 @@ namespace _Emulator
         private float killLogTimer = 0f;
         public List<KeyValuePair<int, RegMap>> regMaps = new List<KeyValuePair<int, RegMap>>();
         private bool waitForShutDown = false;
-        private string hostGithubVersion = "unknown";
+        public readonly Version hostVersion;
 
-        private void Start()
+        public ServerEmulator()
         {
+            hostVersion = ClientExtension.GetGithubVersionOrUnknown();
         }
 
         public void SetupServer()
@@ -59,7 +60,6 @@ namespace _Emulator
                 serverSocket.Listen(16);
                 serverSocket.BeginAccept(new AsyncCallback(AcceptCallback), null);
                 serverCreated = true;
-                hostGithubVersion = ClientExtension.GetGithubVersionOrUnknown();
                 Debug.Log("Server created");
             }
 
@@ -77,7 +77,6 @@ namespace _Emulator
             RegisterHandlers();
             isSteam = true;
             serverCreated = true;
-            hostGithubVersion = ClientExtension.GetGithubVersionOrUnknown();
             Debug.Log("Server set to Steam");
 
             //Pulls all loaded RegMaps into the emulator
@@ -857,6 +856,13 @@ namespace _Emulator
 
         private void HandleLoginRequest(MsgReference msgRef)
         {
+            if (!msgRef.client.isVersionSetUp)
+            {
+                Debug.LogWarning($"Disconnecting client: Version check failed, client didn't send any version");
+                SendDisconnect(msgRef.client, message: $"Version mismatch detected, the host is using a newer version ({hostVersion})");
+                return;
+            }
+
             msgRef.msg._msg.Read(out string id);
             msgRef.msg._msg.Read(out string pswd);
             msgRef.msg._msg.Read(out int major);
@@ -2697,10 +2703,13 @@ namespace _Emulator
                 Debug.Log("Broadcasted SendEmptyTrain for room no: " + matchData.room.No);
         }
 
-        public void SendDisconnect(ClientReference client, SendType sendType = SendType.Unicast)
+        public void SendDisconnect(ClientReference client, SendType sendType = SendType.Unicast, string message = null)
         {
             MsgBody body = new MsgBody();
-
+            if (message != null)
+            {
+                body.Write(message);
+            }
             SayInstant(new MsgReference(ExtensionOpcodes.opDisconnectAck, body, client, sendType));
         }
 
@@ -4940,39 +4949,45 @@ namespace _Emulator
         private void HandleVersionCheck(MsgReference msg)
         {
             ClientReference client = msg.client;
-
-            // Host selbst muss nicht geprüft werden
-            if (client.isHost)
-                return;
-
-            msg.msg._msg.Read(out string clientVersion);
-            if (string.IsNullOrEmpty(clientVersion))
-                clientVersion = "unknown";
-
-            // Vergleich
-            bool match = string.Equals(clientVersion, hostGithubVersion, System.StringComparison.OrdinalIgnoreCase);
-
-            if (!match)
+            if (client.isVersionSetUp)
             {
-
-                var ack = new MsgBody();
-                ack.Write(hostGithubVersion);
-                ack.Write(clientVersion);
-                SayInstant(new MsgReference(1019, ack, client, SendType.Unicast));
-
-                string error = $"Version mismatch! Host={hostGithubVersion}, Client={clientVersion}";
-
-                Debug.LogWarning("Disconnecting client: " + error);
-
-                SendDisconnect(client);
                 return;
-            } else
-            {
-                string success = $"Version Check: Host={hostGithubVersion}, Client={clientVersion}";
-
-                if (debugHandle)
-                    Debug.Log(success);
             }
+            client.isVersionSetUp = true;
+            if (client.isHost)
+            {
+                SayInstant(new MsgReference(ExtensionOpcodes.opVersionCheckAck, new MsgBody(), client));
+                return;
+            }
+
+            MsgBody body = msg.msg._msg;
+            body.Read(out int clientMajor);
+            body.Read(out int clientMinor);
+            body.Read(out int clientPatch);
+            body.Read(out int clientRevision);
+
+            if (clientMajor == -1)
+            {
+                // We are pretty sure the client has an unknown version if this is -1
+                Debug.LogWarning($"Disconnecting client: Version check failed, client sent invalid version");
+                SendDisconnect(client, message: $"Version mismatch detected, the host is using a newer version ({hostVersion})");
+                return;
+            }
+
+            Version clientVersion = new Version(clientMajor, clientMinor, clientPatch, clientRevision);
+            int result = hostVersion.CompareTo(clientVersion);
+            if (result != 0)
+            {
+                Debug.LogWarning($"Disconnecting client: Version check failed, expected {hostVersion} but got {clientVersion}");
+                string relation = result < 0 ? "an older" : "a newer";
+                SendDisconnect(client, message: $"Version mismatch detected, the host is using {relation} version ({hostVersion})");
+                return;
+            }
+            if (debugHandle)
+            {
+                Debug.Log($"Version check succeeded, got host version {hostVersion} and client version {clientVersion}");
+            }
+            SayInstant(new MsgReference(ExtensionOpcodes.opVersionCheckAck, new MsgBody(), client));
         }
     }
 }

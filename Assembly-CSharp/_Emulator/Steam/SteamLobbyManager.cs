@@ -206,7 +206,7 @@ namespace _Emulator
             }
         }
 
-        public void LeaveCurrentLobbyAndShutdown()
+        public void LeaveCurrentLobbyAndShutdown(string message = "Steam Lobby Disconnected.")
         {
             if (SteamManager.Initialized)
             {
@@ -214,8 +214,8 @@ namespace _Emulator
 
                 if (IsInLobby())
                 {
-                    MessageBoxMgr.Instance.AddMessage("Steam Lobby Disconnected.");
                     BuildOption.Instance.Exit();
+                    BuildOption.Instance.StartCoroutine(ClientExtension.ShowDialogOnExit(message));
                 }
 
                 LeaveCurrentLobby();

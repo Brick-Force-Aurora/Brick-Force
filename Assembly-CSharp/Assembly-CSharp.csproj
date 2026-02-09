@@ -779,9 +779,13 @@
     <Compile Include="_Emulator\Utils\BfUtils.cs" />
     <Compile Include="_Emulator\Utils\CRC32.cs" />
     <Compile Include="_Emulator\Utils\ImportTypes.cs" />
+    <Compile Include="_Emulator\Utils\NBT.cs" />
+    <Compile Include="_Emulator\Utils\NBTReaderExtension.cs" />
+    <Compile Include="_Emulator\Utils\ReaderExtension.cs" />
     <Compile Include="_Emulator\Utils\Utils.cs" />
     <Compile Include="_Emulator\Utils\ManagedHook.cs" />
     <Compile Include="_Emulator\Utils\Import.cs" />
+    <Compile Include="_Emulator\Utils\Version.cs" />
     <Compile Include="_Emulator\Utils\Zip.cs" />
   </ItemGroup>
   <ItemGroup>
