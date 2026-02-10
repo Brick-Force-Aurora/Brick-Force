@@ -526,21 +526,21 @@ namespace _Emulator
 
         private void HandleDeadClients()
         {
-            foreach (ClientReference client in clientList)
+            for (int i = clientList.Count - 1; i >= 0; i--)
             {
-                if (client.isHost) { continue;  }
-                if (Time.time - client.lastHeartBeatTime > 3f)
+                ClientReference clientRef = clientList[i];
+                if (clientRef.isHost) { continue; }
+                if (Time.time - clientRef.lastHeartBeatTime > 3f)
                 {
-                    client.Disconnect(false);
+                    clientRef.Disconnect(false);
                     continue;
                 }
-
-                if (client.seq == -1)
+                if (clientRef.seq == -1)
                 {
-                    client.toleranceTime += Time.deltaTime;
-                    if (client.toleranceTime >= 3f)
+                    clientRef.toleranceTime += Time.deltaTime;
+                    if (clientRef.toleranceTime >= 3f)
                     {
-                        client.Disconnect(false);
+                        clientRef.Disconnect(false);
                         continue;
                     }
                 }
