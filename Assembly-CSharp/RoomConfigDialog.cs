@@ -168,7 +168,9 @@ public class RoomConfigDialog : Dialog
 
 	private Color txtMainClr;
 
-	public override void Start()
+    private _Emulator.RegMapQuickFilter regMapFilter = new _Emulator.RegMapQuickFilter();
+
+    public override void Start()
 	{
 		id = DialogManager.DIALOG_INDEX.ROOM_CONFIG;
 	}
@@ -476,7 +478,9 @@ public class RoomConfigDialog : Dialog
 	{
 		reg = RegMapManager.Instance.ToArray(option, (Channel.MODE)ChannelManager.Instance.CurChannel.Mode);
 		reg = reg.OrderBy(x => x.Alias).ToArray();
-	}
+        //quick filters
+        regMapFilter.Rebuild(reg);
+    }
 
 	private void DoTitleAndPswd()
 	{
@@ -1220,8 +1224,21 @@ public class RoomConfigDialog : Dialog
 	private bool DoRegMap()
 	{
 		bool result = false;
-		int num = reg.Length / 3;
-		if (reg.Length % 3 > 0)
+
+        //quickFilters
+        bool changed = regMapFilter.Draw(new Vector2(500f, 12f), new Rect(500f, 22f, 210f, 26f));
+
+        if (changed)
+        {
+            regMapFilter.Rebuild(reg);
+            regMap = regMapFilter.ClampSelection(reg, regMap);
+        }
+
+        int[] visible = regMapFilter.Indices;
+        int visibleCount = (visible != null) ? visible.Length : 0;
+
+        int num = visibleCount / 3;
+		if (visibleCount % 3 > 0)
 		{
 			num++;
 		}
@@ -1236,9 +1253,10 @@ public class RoomConfigDialog : Dialog
 			for (int j = 0; j < 3; j++)
 			{
 				int num2 = 3 * i + j;
-				if (num2 < reg.Length)
+				if (num2 < visibleCount)
 				{
-					Rect rect = new Rect((float)j * (crdMapSize.x + crdMapOffset), (float)i * (crdMapSize.y + crdMapOffset), crdMapSize.x, crdMapSize.y);
+                    num2 = visible[num2];   // <-- index into reg[]
+                    Rect rect = new Rect((float)j * (crdMapSize.x + crdMapOffset), (float)i * (crdMapSize.y + crdMapOffset), crdMapSize.x, crdMapSize.y);
 					Rect position = new Rect(rect.x, rect.y, rect.width, rect.width + 4f);
 					TextureUtil.DrawTexture(position, (!(reg[num2].Thumbnail == null)) ? reg[num2].Thumbnail : nonAvailable);
 					if (GlobalVars.Instance.MyButton(rect, string.Empty, "BoxMapSelectBorder"))
