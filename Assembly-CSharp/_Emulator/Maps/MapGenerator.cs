@@ -88,20 +88,20 @@ namespace _Emulator
             map.min.x = 0;
             map.min.y = 0;
             map.min.z = 0;
-            map.max.x = Convert.ToSingle(size);
-            map.max.y = Convert.ToSingle(size);
-            map.max.z = Convert.ToSingle(size);
+            map.max.x = 255;
+            map.max.y = 255;
+            map.max.z = 255;
             map.cenX = (map.min.x + map.max.x) * 0.5f;
             map.cenZ = (map.min.z + map.max.z) * 0.5f;
 
             List<int> morphes = new List<int>();
 
             int seq = 0;
-            for (byte x = 0; x < size; x++)
+            for (byte x = 100; x < size+100; x++)
             {
-                for (byte z = 0; z < size; z++)
+                for (byte z = 100; z < size+100; z++)
                 {
-                    for (byte y = 0; y < height; y++)
+                    for (byte y = 40; y < height+40; y++)
                     {
                         byte template = GetNextTemplateByDistribution(landscape);
                         map.AddBrickInst(seq, template, x, y, z, 0, ref morphes);
