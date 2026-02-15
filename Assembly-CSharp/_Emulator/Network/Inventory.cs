@@ -376,7 +376,6 @@ namespace _Emulator
                         var item = equipment.FirstOrDefault(x => x.Code == code && x.IsShooterSlotAble);
                         if (item != null)
                             item.toolSlot = (sbyte)i;
-                        Debug.LogError($"LoadActiveState ShooterTools");
                     }
                 }
 
@@ -391,7 +390,6 @@ namespace _Emulator
                         var item = equipment.FirstOrDefault(x => x.Code == code && x.IsWeaponSlotAble);
                         if (item != null)
                             item.toolSlot = (sbyte)i;
-                        Debug.LogError($"LoadActiveState WeaponCHg");
                     }
                 }
 
@@ -415,7 +413,6 @@ namespace _Emulator
                             item.Usage = Item.USAGE.EQUIP;
                     }
                 }
-                Debug.LogError($"LoadActiveState");
             }
             catch (Exception ex)
             {
