@@ -327,7 +327,7 @@ public class UserMapInfoManager : MonoBehaviour
 			num2 = 0;
 		}
 		int b = 1;
-		while (num2 > 0 && b < 200)
+		while (num2 > 0)
 		{
 			UserMapInfo userMapInfo = Get(b);
 			if (userMapInfo == null)
@@ -338,7 +338,7 @@ public class UserMapInfoManager : MonoBehaviour
 			b = (int)(b + 1);
 		}
 		int b2 = 1;
-		while (num > 0 && b2 < 200)
+		while (num > 0)
 		{
 			UserMapInfo userMapInfo2 = Get(b2);
 			if (userMapInfo2 == null)

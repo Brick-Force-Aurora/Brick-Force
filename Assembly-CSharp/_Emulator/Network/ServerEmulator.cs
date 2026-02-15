@@ -207,6 +207,12 @@ namespace _Emulator
                     {
                         readQueue.Enqueue(new MsgReference(new Msg2Handle(recv.GetId(), msgBody), client, _channelRef: client.channel, _matchData: client.matchData));
                     }
+                } else
+                {
+                    Debug.LogWarning("ReceiveSteam: no ClientReference for " + steamID + " (closing session)");
+                    if (SteamManager.Initialized && SteamNetworkingManager.instance != null)
+                        SteamNetworkingManager.instance.CloseSessionWithUser(steamID);
+                    return;
                 }
             }
 
@@ -468,7 +474,7 @@ namespace _Emulator
             }
         }
 
-        private void Update()
+        private void FixedUpdate()
         {
             if (!serverCreated)
                 return;
@@ -530,20 +536,22 @@ namespace _Emulator
             {
                 ClientReference clientRef = clientList[i];
                 if (clientRef.isHost) { continue; }
-                if (Time.time - clientRef.lastHeartBeatTime > 3f)
+                if (Time.time - clientRef.lastHeartBeatTime > 10f)
                 {
-                    clientRef.Disconnect(false);
+                    SendDisconnect(clientRef);
+                    clientRef.Disconnect(true);
                     continue;
                 }
                 if (clientRef.seq == -1)
                 {
                     clientRef.toleranceTime += Time.deltaTime;
-                    if (clientRef.toleranceTime >= 3f)
-                    {
+                    if (clientRef.toleranceTime >= 10f)
+                {
+                        SendDisconnect(clientRef);
                         clientRef.Disconnect(false);
                         continue;
-                    }
                 }
+            }
             }
         }
 
@@ -3954,41 +3962,49 @@ namespace _Emulator
 
         public void SendAllUserMaps(ClientReference client)
         {
-            MsgBody body = new MsgBody();
+            const int chunkSize = 200;
 
-            int chunkSize = 200;
-            int chunkCount = Mathf.CeilToInt((float)regMaps.Count / (float)chunkSize);
-            int processedCount = 0;
-            Debug.LogWarning("RegMapCount: " + regMaps.Count);
+            int total = regMaps.Count;
+            int chunkCount = Mathf.CeilToInt((float)total / chunkSize);
 
-            for (int chunk = 0; chunk < chunkCount; chunk++)
+            Debug.LogWarning("RegMapCount: " + total);
+
+            int processed = 0;
+
+            for (int page = 0; page < chunkCount; page++)
             {
-                int remaining = regMaps.Count - processedCount;
-                if (remaining < chunkSize)
-                    chunkSize = remaining;
+                int remaining = total - processed;
+                int currentChunkSize = (remaining < chunkSize) ? remaining : chunkSize;
 
-                body.Write(-1); //page
-                body.Write(chunkSize); //count
-                for (int i = 0; i < chunkSize; i++, processedCount++)
+                MsgBody body = new MsgBody();
+
+                body.Write(page);  
+                body.Write(currentChunkSize);  
+
+                for (int i = 0; i < currentChunkSize; i++, processed++)
                 {
-                    KeyValuePair<int, RegMap> entry = regMaps[processedCount];
-                    body.Write(entry.Key); //slot
+                    KeyValuePair<int, RegMap> entry = regMaps[processed];
+
+                    body.Write(entry.Key); // slot
                     body.Write(entry.Value.Alias);
-                    body.Write(-1); //brick count
+                    body.Write(-1); // brick count
                     body.Write(entry.Value.RegisteredDate.Year);
                     body.Write((sbyte)entry.Value.RegisteredDate.Month);
                     body.Write((sbyte)entry.Value.RegisteredDate.Day);
                     body.Write((sbyte)entry.Value.RegisteredDate.Hour);
                     body.Write((sbyte)entry.Value.RegisteredDate.Minute);
                     body.Write((sbyte)entry.Value.RegisteredDate.Second);
-                    body.Write((sbyte)0); //premium
+
+                    body.Write((sbyte)0); // premium
                 }
+
                 Say(new MsgReference(430, body, client));
             }
 
             if (debugSend)
                 Debug.Log("SendAllUserMaps to: " + client.GetIdentifier());
         }
+
 
         public void SendEmptyUserMap(ClientReference client)
         {
