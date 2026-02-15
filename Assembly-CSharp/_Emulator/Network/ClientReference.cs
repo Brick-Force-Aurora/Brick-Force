@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Net.Sockets;
 using Steamworks;
+using Debug = UnityEngine.Debug;
 
 namespace _Emulator
 {
@@ -82,13 +84,20 @@ namespace _Emulator
 
         public bool Disconnect(bool send = true)
         {
-            if (send)
+            string idInfo = isSteam
+                ? ("SteamID=" + steamID.m_SteamID)
+                : (socket != null ? socket.RemoteEndPoint.ToString() : "Socket=null");
+
+            if (send && isLoaded)
             {
                 try
                 {
                     ServerEmulator.instance.SendLeave(this);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[Disconnect] SendLeave failed for " + idInfo + "\n" + ex);
+                }
 
                 try
                 {
@@ -97,22 +106,54 @@ namespace _Emulator
                     else
                         ServerEmulator.instance.SendSlotData(matchData);
                 }
-
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[Disconnect] SendSlotData failed for " + idInfo + "\n" + ex);
+                }
             }
 
             if (isSteam)
             {
+                try
+                {
+                    if (SteamManager.Initialized &&
+                        SteamNetworkingManager.instance != null &&
+                        steamID != CSteamID.Nil)
+                    {
+                        Debug.Log("[Disconnect] Closing Steam session for " + idInfo);
+                        SteamNetworkingManager.instance.CloseSessionWithUser(steamID);
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[Disconnect] Steam session close skipped (not initialized or invalid ID) for " + idInfo);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[Disconnect] CloseSessionWithUser failed for " + idInfo + "\n" + ex);
+                }
             }
             else
             {
                 try
                 {
-                    socket.Shutdown(SocketShutdown.Both);
-                    socket.Close();
+                    if (socket != null)
+                    {
+                        Debug.Log("[Disconnect] Closing TCP socket for " + idInfo);
+                        socket.Shutdown(SocketShutdown.Both);
+                        socket.Close();
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[Disconnect] Socket already null for " + idInfo);
+                    }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[Disconnect] Socket close failed for " + idInfo + "\n" + ex);
+                }
             }
+
             lock (dataLock)
             {
                 try
@@ -120,20 +161,31 @@ namespace _Emulator
                     if (matchData != null)
                         matchData.RemoveClient(this);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[Disconnect] matchData.RemoveClient failed for " + idInfo + "\n" + ex);
+                }
 
                 try
                 {
                     if (channel != null)
                         channel.RemoveClient(this);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[Disconnect] channel.RemoveClient failed for " + idInfo + "\n" + ex);
+                }
 
                 try
                 {
-                    return ServerEmulator.instance.clientList.Remove(this);
+                    bool removed = ServerEmulator.instance.clientList.Remove(this);
+                    Debug.Log("[Disconnect] clientList.Remove(" + idInfo + ") => " + removed);
+                    return removed;
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[Disconnect] clientList.Remove failed for " + idInfo + "\n" + ex);
+                }
             }
 
             return false;
