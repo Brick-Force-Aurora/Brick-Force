@@ -782,25 +782,35 @@
     <Compile Include="_Emulator\Utils\NBT.cs" />
     <Compile Include="_Emulator\Utils\NBTReaderExtension.cs" />
     <Compile Include="_Emulator\Utils\ReaderExtension.cs" />
+    <Compile Include="_Emulator\Utils\RegMapQuickFilter.cs" />
+    <Compile Include="_Emulator\Utils\UMIQuickFilter.cs" />
     <Compile Include="_Emulator\Utils\Utils.cs" />
     <Compile Include="_Emulator\Utils\ManagedHook.cs" />
     <Compile Include="_Emulator\Utils\Import.cs" />
     <Compile Include="_Emulator\Utils\Version.cs" />
+    <Compile Include="_Emulator\Utils\WinUtils.cs" />
     <Compile Include="_Emulator\Utils\Zip.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp-firstpass">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
     </Reference>
+    <Reference Include="Assembly-UnityScript">
+      <HintPath>C:\Users\g\AppData\Local\BrickForce Aurora\game\BrickForce_Data\Managed\Assembly-UnityScript.dll</HintPath>
+    </Reference>
     <Reference Include="Assembly-UnityScript-firstpass">
       <HintPath>..\..\..\Brick-Force-1.1.0\Brick-Force\BrickForce_Data\Managed\Assembly-UnityScript-firstpass.dll</HintPath>
+    </Reference>
+    <Reference Include="Boo.Lang">
+      <HintPath>C:\Users\g\AppData\Local\BrickForce Aurora\game\BrickForce_Data\Managed\Boo.Lang.dll</HintPath>
     </Reference>
     <Reference Include="EasyHook, Version=2.7.7097.0, Culture=neutral, PublicKeyToken=4b580fca19d0b0c5, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\BfLauncher\BrickForce_Data\Managed\EasyHook.dll</HintPath>
     </Reference>
-    <Reference Include="ICSharpCode.SharpZipLib">
-      <HintPath>..\..\BfLauncher\ICSharpCode.SharpZipLib.dll</HintPath>
+    <Reference Include="ICSharpCode.SharpZipLib, Version=0.86.0.518, Culture=neutral, PublicKeyToken=1b03e6acf1164f73, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\BfLauncher\BrickForce_Data\Managed\ICSharpCode.SharpZipLib.dll</HintPath>
     </Reference>
     <Reference Include="ImGui.NET, Version=1.91.6.1, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>

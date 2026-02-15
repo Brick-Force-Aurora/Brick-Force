@@ -56,7 +56,7 @@ namespace _Emulator
                 var pD3D9Present = Import.GetD3D9Present();
                 if (pD3D9Present != IntPtr.Zero)
                 {
-                    Debug.Log("D3D9 Present: 0x" + (pD3D9Present.ToInt64() - hD3D9.ToInt64()).ToString("X"));
+                    Debug.Log("D3D9 Present: " + WinUtils.GetModuleFileNameWithOffset(pD3D9Present));
 
                     dD3D9Present = (D3D9PresentDelegate)Marshal.GetDelegateForFunctionPointer(pD3D9Present, typeof(D3D9PresentDelegate));
                     RuntimeHelpers.PrepareMethod(oD3D9PresentHookInfo.MethodHandle);
@@ -69,7 +69,7 @@ namespace _Emulator
                 var pD3D9Reset = Import.GetD3D9Reset();
                 if (pD3D9Reset != IntPtr.Zero)
                 {
-                    Debug.Log("D3D9 Reset: 0x" + (pD3D9Reset.ToInt64() - hD3D9.ToInt64()).ToString("X"));
+                    Debug.Log("D3D9 Reset: " + WinUtils.GetModuleFileNameWithOffset(pD3D9Reset));
 
                     dD3D9Reset = (D3D9ResetDelegate)Marshal.GetDelegateForFunctionPointer(pD3D9Reset, typeof(D3D9ResetDelegate));
                     RuntimeHelpers.PrepareMethod(oD3D9ResetHookInfo.MethodHandle);

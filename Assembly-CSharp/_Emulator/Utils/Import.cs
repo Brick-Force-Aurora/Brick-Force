@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Numerics;
+using System.Runtime.ConstrainedExecution;
 using System.Runtime.InteropServices;
+using System.Security;
+using System.Text;
 
 namespace _Emulator
 {
@@ -31,6 +34,37 @@ namespace _Emulator
         STD_INPUT_HANDLE = -10,
         STD_OUTPUT_HANDLE = -11,
         STD_ERROR_HANDLE = -12
+    }
+
+    [Flags]
+    public enum SnapshotFlags : uint
+    {
+        HeapList = 0x00000001,
+        Process = 0x00000002,
+        Thread = 0x00000004,
+        Module = 0x00000008,
+        Module32 = 0x00000010,
+        All = (HeapList | Process | Thread | Module),
+        Inherit = 0x80000000,
+        NoHeaps = 0x40000000
+
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+    public struct MODULEENTRY32
+    {
+        internal uint dwSize;
+        internal uint th32ModuleID;
+        internal uint th32ProcessID;
+        internal uint GlblcntUsage;
+        internal uint ProccntUsage;
+        internal IntPtr modBaseAddr;
+        internal uint modBaseSize;
+        internal IntPtr hModule;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        internal string szModule;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        internal string szExePath;
     }
 
     class Import
@@ -127,5 +161,27 @@ namespace _Emulator
 
         [DllImport("cimgui", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr igGetGlyphRanges();
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern IntPtr CreateToolhelp32Snapshot(SnapshotFlags dwFlags, uint th32ProcessID);
+
+        [DllImport("kernel32.dll")]
+        public static extern bool Module32First(IntPtr hSnapshot, ref MODULEENTRY32 lpme);
+
+        [DllImport("kernel32.dll")]
+        public static extern bool Module32Next(IntPtr hSnapshot, ref MODULEENTRY32 lpme);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [ReliabilityContract(Consistency.WillNotCorruptState, Cer.Success)]
+        [SuppressUnmanagedCodeSecurity]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool CloseHandle(IntPtr hObject);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [PreserveSig]
+        public static extern uint GetModuleFileName([In]IntPtr hModule, [Out]StringBuilder lpFilename, [In][MarshalAs(UnmanagedType.U4)]int nSize);
+
+        [DllImport("psapi.dll")]
+        public static extern uint GetModuleBaseName(IntPtr hProcess, IntPtr hModule, StringBuilder lpBaseName, int nSize);
     }
 }
