@@ -4,18 +4,18 @@ namespace _Emulator
 {
     class DummyData
     {
-        public int xp = 7000000;
+        public int xp = 9400000;
         public int forcePoints = 100000000;
-        public int brickPoints = 100000000;
+        public int brickPoints = 0;
         public int tokens = 100000000;
         public int coins = 100000000;
-        public int starDust = 100000000;
+        public int starDust = 0;
         public int gm = 0;
         public int clanSeq = 0;
         public string clanName = "Clan";
         public int clanMark = 0;
         public int clanLv = 0;
-        public int rank = 60;
+        public int rank = 65;
         public int heavy = 0;
         public int assault = 0;
         public int sniper = 0;
