@@ -474,7 +474,7 @@ namespace _Emulator
             }
         }
 
-        private void FixedUpdate()
+        private void Update()
         {
             if (!serverCreated)
                 return;
