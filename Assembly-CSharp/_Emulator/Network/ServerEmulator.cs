@@ -4286,22 +4286,20 @@ namespace _Emulator
                     return;
                 }
 
-                byte template = (byte)b.seq;
-
                 int newSeq = msgRef.matchData.GetNextBrickSeq();
 
                 List<int> morphes = new List<int>(32);
                 morphes.Clear();
-                bool ok = map.AddBrickInst(newSeq, template, x, y, z, rot, ref morphes);
+                bool ok = map.AddBrickInst(newSeq, b.index, x, y, z, rot, ref morphes);
 
                 if (!ok)
                 {
-                    Debug.LogError($"LINE_REQ: AddBrickInst failed newSeq={newSeq} template={template} at({x},{y},{z})");
+                    Debug.LogError($"LINE_REQ: AddBrickInst failed newSeq={newSeq} template={b.index} at({x},{y},{z})");
                     SendLineFail(msgRef, -6);
                     return;
                 }
 
-                SendLineAck(msgRef, playerSeq, newSeq, template, x, y, z, rot);
+                SendLineAck(msgRef, playerSeq, newSeq, b.index, x, y, z, rot);
             }
         }
 
@@ -4372,7 +4370,7 @@ namespace _Emulator
 
                 int newSeq = msgRef.matchData.GetNextBrickSeq();
 
-                //morphes.Clear();
+                morphes.Clear();
                 if (!map.DelBrickInst(existingSeq, ref morphes))
                 {
                     Debug.LogError($"ReplaceBrick: DelBrickInst failed for seq={existingSeq}");
@@ -4380,15 +4378,15 @@ namespace _Emulator
                     return;
                 }
 
-                //morphes.Clear();
-                if (!map.AddBrickInst(newSeq, brickIndex, x, y, z, rot, ref morphes))
+                morphes.Clear();
+                if (!map.AddBrickInst(newSeq, brickIndex, old.PosX, old.PosY, old.PosZ, old.Rot, ref morphes))
                 {
-                    Debug.LogError($"ReplaceBrick: AddBrickInst failed newSeq={newSeq} template={brickIndex} at ({x},{y},{z})");
+                    Debug.LogError($"ReplaceBrick: AddBrickInst failed newSeq={newSeq} template={brickIndex} at ({old.PosX},{old.PosY},{old.PosZ})");
                     SendReplaceFail(msgRef, -6);
                     return;
                 }
 
-                SendReplaceSuccess(msgRef, playerSeq, existingSeq, newSeq, brickIndex, x, y, z, rot);
+                SendReplaceSuccess(msgRef, playerSeq, existingSeq, newSeq, brickIndex, old.PosX, old.PosY, old.PosZ, old.Rot);
             }
         }
 
@@ -4434,6 +4432,7 @@ namespace _Emulator
                     Debug.LogWarning($"MORPH_BRICK_REQ: unknown brick seq={seq}");
                     return;
                 }
+                bi.Code = code;
             }
         }
 
