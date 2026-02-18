@@ -32,6 +32,8 @@ namespace _Emulator
         public int maxNumRooms = 1;
         public bool onlyHostRooms = true;
         public bool announceLobbyToFriends = true;
+        public bool vsync = false;
+        public int fpsLimit = -1;
 
         public Config()
         {
@@ -64,6 +66,8 @@ namespace _Emulator
                 data["max_num_rooms"] = maxNumRooms;
                 data["only_host_rooms"] = onlyHostRooms;
                 data["announce_lobby_to_friends"] = announceLobbyToFriends;
+                data["limitFPS"] = fpsLimit;
+                data["vsync"] = vsync;
 
                 StringBuilder stringBuilder = new StringBuilder();
                 JsonWriter writer = new JsonWriter(stringBuilder)
@@ -118,6 +122,8 @@ namespace _Emulator
                 try { maxNumRooms = (int)data["max_num_rooms"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
                 try { onlyHostRooms = (bool)data["only_host_rooms"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
                 try { announceLobbyToFriends = (bool)data["announce_lobby_to_friends"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { fpsLimit = (int)data["limitFPS"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { vsync = (bool)data["vsync"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
             }
 
             catch (Exception ex)
@@ -128,6 +134,8 @@ namespace _Emulator
             Utils.RGBToHSV(crosshairColor, out float H, out float S, out float V);
             crosshairHue = H * 360f;
             oldUskTextures = !uskTextures;
+            Application.targetFrameRate = fpsLimit;
+            QualitySettings.vSyncCount = vsync ? fpsLimit : 0;
 
             ApplyUskTextures();
             ApplyAxisRatio();

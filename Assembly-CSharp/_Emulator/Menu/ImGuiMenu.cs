@@ -456,6 +456,8 @@ namespace _Emulator
             ImGui.SliderFloat("Axis Ratio", ref Config.instance.axisRatio, 1f, 2.25f, "%.2f");
             ImGui.SliderFloat("Crosshair Hue", ref Config.instance.crosshairHue, 0f, 360f, "%.2f");
             ImGui.Checkbox("USK Textures (Requires Restart)", ref Config.instance.uskTextures);
+            ImGui.Checkbox("VSync (Requires Restart)", ref Config.instance.vsync);
+            ImGui.SliderInt("Limit FPS (Requires Restart)", ref Config.instance.fpsLimit, -1, 400);
 
             ImGui.Separator();
 
