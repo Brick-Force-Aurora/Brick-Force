@@ -212,11 +212,11 @@ namespace _Emulator
                     break;
 
                 case ExtensionOpcodes.opBulkBrickAck:
-                    HandleBulkBrickAck();
+                    HandleBulkBrickAck(msg._msg);
                     break;
 
                 case ExtensionOpcodes.opBulkBrickFailAck:
-                    HandleBulkBrickFailAck();
+                    HandleBulkBrickFailAck(msg._msg);
                     break;
 
                 default:
