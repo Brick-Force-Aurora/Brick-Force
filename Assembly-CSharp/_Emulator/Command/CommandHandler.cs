@@ -68,6 +68,12 @@ namespace _Emulator
         public ICommand FindCommand(string command)
         {
             CommandReader reader = new CommandReader(command);
+            reader.SkipWhitespace();
+            if (reader.Peek() != '/')
+            {
+                return null;
+            }
+            reader.Skip();
             int lastIndex = reader.Index;
             string lastToken;
             StringBuilder fullCommand = new StringBuilder();
@@ -99,6 +105,12 @@ namespace _Emulator
         public bool Execute(string command)
         {
             CommandReader reader = new CommandReader(command);
+            reader.SkipWhitespace();
+            if (reader.Peek() != '/')
+            {
+                return false;
+            }
+            reader.Skip();
             int lastIndex = reader.Index;
             string lastToken;
             StringBuilder fullCommand = new StringBuilder();
@@ -134,7 +146,8 @@ namespace _Emulator
             {
                 Debug.Log($"Executing command '{command}'");
                 node.Command.Execute(fullCommand.ToString(), reader);
-            } catch (IndexOutOfRangeException e)
+            }
+            catch (IndexOutOfRangeException e)
             {
                 // Ignore this exception :)
                 Debug.LogWarning($"Command reader couldn't read: {e.Message}");
@@ -261,10 +274,6 @@ namespace _Emulator
                 }
                 builder.Append(reader.ReadToken());
             }
-            if (builder.Length != 0 && builder[0] == '/')
-            {
-                builder.Remove(0, 1);
-            }
             return builder.ToString();
         }
 
@@ -282,16 +291,14 @@ namespace _Emulator
             {
                 throw new ArgumentException("Empty path");
             }
-            CommandNode node = this, tmp;
+            CommandNode node = this;
             for (int i = 0; i < path.Length; i++)
             {
-                tmp = commands[path[i]];
-                if (tmp == null)
+                if (!commands.ContainsKey(path[i]))
                 {
-                    tmp = new CommandNode();
-                    commands[path[i]] = tmp;
+                    commands[path[i]] = new CommandNode();
                 }
-                node = tmp;
+                node = commands[path[i]];
             }
             if (node.Command != null)
             {
@@ -302,7 +309,11 @@ namespace _Emulator
 
         public CommandNode Node(string name)
         {
-            return this.commands[name];
+            if (commands.TryGetValue(name, out var cmd))
+            {
+                return cmd;
+            }
+            return null;
         }
 
     }
@@ -337,6 +348,16 @@ namespace _Emulator
         public bool HasNext()
         {
             return index < buffer.Length;
+        }
+
+        public char Peek()
+        {
+            return buffer[index];
+        }
+
+        public CommandReader Skip()
+        {
+            return this;
         }
 
         public CommandReader SkipWhitespace()
