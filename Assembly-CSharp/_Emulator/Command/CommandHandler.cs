@@ -357,6 +357,8 @@ namespace _Emulator
 
         public CommandReader Skip()
         {
+            if (HasNext())
+                index++;
             return this;
         }
 
@@ -417,10 +419,6 @@ namespace _Emulator
 
         private bool IsValidUnquoted(char ch)
         {
-            if (char.IsWhiteSpace(ch))
-            {
-                return false;
-            }
             if (char.IsLetter(ch) || char.IsDigit(ch))
             {
                 return true;
