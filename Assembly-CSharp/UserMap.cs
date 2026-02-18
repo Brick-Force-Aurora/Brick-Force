@@ -65,7 +65,32 @@ public class UserMap
 
 	public bool IsPortalMove;
 
-	public UserMap()
+    private static HashSet<int> limitedTemplates = new HashSet<int>(){
+            22, //red team spawner
+			23, //blue team spawner
+			24, //single spawner
+			123, //flag spawner
+			122, //blue flag spawner
+			121, //red flag spawner
+			124, //bomb spawner
+			134, //df spawner start
+			135, //df spawner way
+			136, //df spawner end
+			181, //es goal
+			182, //es itembox
+			104, //canon
+			105, //vulcan
+			155, //gravity_brick_blueA
+			157, //gravity_brick_blueB
+			156, //gravity_brick_redA
+			158, //gravity_brick_redB
+			163, //portal red
+			164, //portal blue
+			178, //portal green
+			196 //train
+    };
+
+    public UserMap()
 	{
 		dic = new Dictionary<int, BrickInst>();
 		geometry = new BrickInst[xMax, yMax, zMax];
@@ -957,7 +982,7 @@ public class UserMap
 			scriptables.Add(geometry[x, y, z]);
 			geometry[x, y, z].UpdateScript(seq.ToString(), enableOnAwake: false, visibleOnAwake: false, string.Empty);
 		}
-		if (brick.maxInstancePerMap > 0)
+        if (brick.maxInstancePerMap > 0 && limitedTemplates.Contains(template))
 		{
 			IncreaseLimitedBrick(template);
 		}

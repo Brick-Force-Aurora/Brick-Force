@@ -22,5 +22,8 @@
         public const int opSlotDataSteamAck = 1017;
         public const int opVersionCheckReq = 1018;
         public const int opVersionCheckAck = 1019;
+        public const int opBulkBrickReq = 1020;
+        public const int opBulkBrickAck = 1021;
+        public const int opBulkBrickFailAck = 1022;
     }
 }

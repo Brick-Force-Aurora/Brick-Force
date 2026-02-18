@@ -736,6 +736,7 @@ namespace _Emulator
             _handlers[ExtensionOpcodes.opChunkedBufferReq] = HandleChunkedBuffer;
             _handlers[ExtensionOpcodes.opEndChunkedBufferReq] = HandleEndChunkedBuffer;
             _handlers[ExtensionOpcodes.opVersionCheckReq] = HandleVersionCheck;
+            _handlers[ExtensionOpcodes.opBulkBrickReq] = HandleBulkBrickRequest;
         }
 
         private void HandleMessages()
@@ -895,7 +896,7 @@ namespace _Emulator
             SendLogin(msgRef.client, channel.channel.Id);
             SendPlayerInfo(msgRef.client);
             SendAllDownloadedMaps(msgRef.client);
-            SendUserMapSlots(msgRef.client);
+            //SendUserMapSlots(msgRef.client);
             //SendAllUserMaps(msgRef.client);
         }
 
@@ -1109,7 +1110,7 @@ namespace _Emulator
             if (debugHandle)
                 Debug.Log("HandleRequestUserMaps from: " + msgRef.client.GetIdentifier());
 
-            SendUserMapSlots(msgRef.client);
+            //SendUserMapSlots(msgRef.client);
             //SendUserMaps(msgRef.client, page);
         }
 
@@ -4107,7 +4108,6 @@ namespace _Emulator
             msgRef.msg._msg.Read(out long item);
             msgRef.msg._msg.Read(out string itemCode);
 
-            // only allow your user-slot id range
             if (slot < 33 || slot > 44)
             {
                 SendResetAck(msgRef.client, result: 1, slot: slot);
@@ -4427,7 +4427,7 @@ namespace _Emulator
             mb.Write(z);
             mb.Write(rot);
 
-            Say(new MsgReference((int)MessageId.CS_LINE_BRICK_ACK, mb, req.client));
+            Say(new MsgReference((int)MessageId.CS_LINE_BRICK_ACK, mb, req.client, SendType.BroadcastRoom, req.matchData.channel, req.matchData));
         }
 
         private void SendLineFail(MsgReference req, int resultCode)
@@ -4435,6 +4435,112 @@ namespace _Emulator
             MsgBody mb = new MsgBody();
             mb.Write(resultCode);
             Say(new MsgReference((int)MessageId.CS_LINE_BRICK_FAIL_ACK, mb, req.client));
+        }
+
+        private void HandleBulkBrickRequest(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out long item);
+            msgRef.msg._msg.Read(out string code);
+            msgRef.msg._msg.Read(out byte brickIndex);
+            msgRef.msg._msg.Read(out byte commonRot);
+            msgRef.msg._msg.Read(out ushort count);
+
+            if (msgRef?.matchData?.cachedMap == null)
+            {
+                Debug.LogError("BULK_REQ: matchData/cachedMap null");
+                SendBulkFail(msgRef, -6);
+                return;
+            }
+
+            Brick b = BrickManager.Instance.GetBrick(brickIndex);
+            if (b == null)
+            {
+                Debug.LogWarning($"BULK_REQ: unknown brick index={brickIndex}");
+                SendBulkFail(msgRef, -6);
+                return;
+            }
+
+            int playerSeq = msgRef.client.seq;
+
+            // Pre-read coordinates (so if msg is malformed we fail before touching map)
+            var xs = new byte[count];
+            var ys = new byte[count];
+            var zs = new byte[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                msgRef.msg._msg.Read(out xs[i]);
+                msgRef.msg._msg.Read(out ys[i]);
+                msgRef.msg._msg.Read(out zs[i]);
+            }
+
+            // Apply in one lock
+            ushort appliedCount = count;
+            int[] newSeqs = new int[count];
+            byte[] results = new byte[count]; // 0 ok, 1 occupied, 3 failed
+            Array.Clear(newSeqs, 0, newSeqs.Length);
+            Array.Clear(results, 0, results.Length);
+
+            lock (dataLock)
+            {
+                var map = msgRef.matchData.cachedMap;
+                List<int> morphes = new List<int>(32);
+
+                for (int i = 0; i < count; i++)
+                {
+                    byte x = xs[i], y = ys[i], z = zs[i];
+
+                    if (map.GetByCoord(x, y, z) != null)
+                    {
+                        results[i] = 1; // occupied
+                        continue;
+                    }
+
+                    int newSeq = msgRef.matchData.GetNextBrickSeq();
+                    morphes.Clear();
+                    bool ok = map.AddBrickInst(newSeq, b.index, x, y, z, commonRot, ref morphes);
+                    if (!ok)
+                    {
+                        results[i] = 3; // failed
+                        continue;
+                    }
+
+                    newSeqs[i] = newSeq;
+                    results[i] = 0;
+                }
+            }
+
+            // Broadcast one ACK to room
+            MsgBody mb = new MsgBody();
+            mb.Write(playerSeq);
+            mb.Write(appliedCount);
+
+            for (int i = 0; i < count; i++)
+            {
+                mb.Write(xs[i]);
+                mb.Write(ys[i]);
+                mb.Write(zs[i]);
+                mb.Write(newSeqs[i]);
+                mb.Write(results[i]);
+                mb.Write(b.index);
+                mb.Write(commonRot);
+            }
+
+            Say(new MsgReference(
+                (int)ExtensionOpcodes.opBulkBrickAck,
+                mb,
+                msgRef.client,
+                SendType.BroadcastRoom,
+                msgRef.matchData.channel,
+                msgRef.matchData
+            ));
+        }
+
+        private void SendBulkFail(MsgReference req, int resultCode)
+        {
+            MsgBody mb = new MsgBody();
+            mb.Write(resultCode);
+            Say(new MsgReference((int)ExtensionOpcodes.opBulkBrickFailAck, mb, req.client));
         }
 
         private void HandleReplaceBrickRequest(MsgReference msgRef)
@@ -4515,7 +4621,7 @@ namespace _Emulator
             msgBody.Write(z);
             msgBody.Write(rot);
 
-            Say(new MsgReference((int)MessageId.CS_REPLACE_BRICK_ACK, msgBody, req.client));
+            Say(new MsgReference((int)MessageId.CS_REPLACE_BRICK_ACK, msgBody, req.client, SendType.BroadcastRoom, req.matchData.channel, req.matchData));
         }
 
         private void SendReplaceFail(MsgReference req, int resultCode)

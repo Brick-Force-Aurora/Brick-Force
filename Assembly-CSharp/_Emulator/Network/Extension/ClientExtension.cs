@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using _Emulator.Network;
 using Steamworks;
 using UnityEngine;
 using static Room;
@@ -209,6 +211,14 @@ namespace _Emulator
                     HandleReceiveSlotDataSteam(msg._msg);
                     break;
 
+                case ExtensionOpcodes.opBulkBrickAck:
+                    HandleBulkBrickAck();
+                    break;
+
+                case ExtensionOpcodes.opBulkBrickFailAck:
+                    HandleBulkBrickFailAck();
+                    break;
+
                 default:
                     result = false;
                     break;
@@ -243,6 +253,69 @@ namespace _Emulator
             body.Write(clientVersion.Revision);
 
             Say(ExtensionOpcodes.opVersionCheckReq, body);
+        }
+
+        public void SendBulkBrickRequest(long item, string code, byte brickIndex, byte rot, List<byte> coords, int count)
+        {
+            MsgBody mb = new MsgBody();
+            mb.Write(item);
+            mb.Write(code);
+            mb.Write(brickIndex);
+            mb.Write(rot);
+            mb.Write((ushort)count);
+
+            for (int i = 0; i < count; i++)
+            {
+                mb.Write(coords[i * 3 + 0]);
+                mb.Write(coords[i * 3 + 1]);
+                mb.Write(coords[i * 3 + 2]);
+            }
+
+            Say((int)ExtensionOpcodes.opBulkBrickReq, mb);
+        }
+
+        private void HandleCS_BULK_BRICK_ACK(MsgBody msg)
+        {
+            msg.Read(out int playerSeq);
+            msg.Read(out ushort count);
+
+            int successCount = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                msg.Read(out byte x);
+                msg.Read(out byte y);
+                msg.Read(out byte z);
+                msg.Read(out int newSeq);
+                msg.Read(out byte result);
+                msg.Read(out byte template);
+                msg.Read(out byte rot);
+
+                // result: 0 = ok, non-zero = not placed
+                if (result != 0 || newSeq <= 0)
+                    continue;
+
+                MyInfoManager.Instance.IsModified = true;
+
+                Brick brick = BrickManager.Instance.GetBrick(template);
+                if (brick != null)
+                {
+                    BrickManager.Instance.AddBrickCreator(
+                        newSeq,
+                        template,
+                        new Vector3((float)(int)x, (float)(int)y, (float)(int)z),
+                        rot
+                    );
+                }
+
+                successCount++;
+            }
+        }
+
+        private void HandleCS_BULK_BRICK_FAIL_ACK(MsgBody msg)
+        {
+            msg.Read(out int val);
+            Debug.LogError("Failed to process Bulkbrick " + val);
         }
 
         private void HandleDisconnected(MsgBody msg)

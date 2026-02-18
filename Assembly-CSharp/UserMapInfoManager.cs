@@ -288,7 +288,30 @@ public class UserMapInfoManager : MonoBehaviour
 
 	public void ValidateEmpty()
 	{
-		List<int> list = new List<int>();
+        const int FIRST_SLOT = 33;
+        const int LAST_SLOT = 44;
+
+        List<int> removeKeys = new List<int>();
+        foreach (KeyValuePair<int, UserMapInfo> kv in listUMI)
+        {
+            if (kv.Key < FIRST_SLOT || kv.Key > LAST_SLOT)
+                continue;
+
+            if (kv.Value == null || kv.Value.Alias == null || kv.Value.Alias.Length <= 0)
+                removeKeys.Add(kv.Key);
+        }
+
+        for (int i = 0; i < removeKeys.Count; i++)
+            listUMI.Remove(removeKeys[i]);
+
+        for (int slot = FIRST_SLOT; slot <= LAST_SLOT; slot++)
+        {
+            if (!listUMI.ContainsKey(slot))
+            {
+                listUMI.Add(slot, new UserMapInfo(slot, 0));
+            }
+        }
+        /*List<int> list = new List<int>();
 		foreach (KeyValuePair<int, UserMapInfo> item in listUMI)
 		{
 			if (item.Value.Alias.Length <= 0)
@@ -337,7 +360,7 @@ public class UserMapInfoManager : MonoBehaviour
 			}
 			b = (int)(b + 1);
 		}
-		/*int b2 = 1;
+		int b2 = 1;
 		while (num > 0)
 		{
 			UserMapInfo userMapInfo2 = Get(b2);
@@ -348,7 +371,7 @@ public class UserMapInfoManager : MonoBehaviour
 			}
 			b2 = (int)(b2 + 1);
 		}*/
-	}
+    }
 
 	public void AddOrUpdate(int slot, string alias, int brickCount, DateTime lastModified, sbyte premium)
 	{

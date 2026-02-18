@@ -2,6 +2,7 @@ using _Emulator;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -2714,12 +2715,45 @@ public class SockTcp
 
 	public void SendCS_RESET_USER_MAP_SLOTS_REQ(int slot, long item, string itemCode)
 	{
-		MsgBody msgBody = new MsgBody();
+		/*MsgBody msgBody = new MsgBody();
 		msgBody.Write(slot);
 		msgBody.Write(item);
 		msgBody.Write(itemCode);
-		Say(405, msgBody);
-	}
+		Say(405, msgBody);*/
+
+        int result = 0;
+        if (slot < 33 || slot > 44)
+        {
+            MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("FAIL_TO_RESET_MAP_SLOT"));
+        }
+        else
+        {
+            try
+            {
+                // Keep this EXACTLY consistent with wherever your client actually stores these files.
+                string cacheDir = Path.Combine(Application.dataPath, "Resources/Cache");
+
+                string geom = Path.Combine(cacheDir, "downloaded" + slot + ".geometry");
+                string umi = Path.Combine(cacheDir, "downloaded" + slot + ".umi.cache");
+
+                if (File.Exists(geom)) File.Delete(geom);
+                if (File.Exists(umi)) File.Delete(umi);
+                UserMapInfo userMapInfo = UserMapInfoManager.Instance.Get((byte)slot);
+                if (userMapInfo != null && userMapInfo.Alias.Length > 0)
+                {
+                    string msg2 = string.Format(StringMgr.Instance.Get("RESET_MAP_SLOT_SUCCESS"), userMapInfo.Alias);
+                    SystemMsgManager.Instance.ShowMessage(msg2);
+                }
+                UserMapInfoManager.Instance.Remove((byte)slot);
+                UserMapInfoManager.Instance.ValidateEmpty();
+            }
+            catch (Exception ex)
+            {
+                result = 1;
+                Debug.LogError("Local ResetUserMapSlot failed: " + ex);
+            }
+        }
+    }
 
 	public void SendCS_INC_EXTRA_SLOTS_REQ(long item, string itemCode)
 	{
@@ -4266,10 +4300,40 @@ public class SockTcp
 
 	public void SendCS_USER_MAP_REQ(int page)
 	{
-		MsgBody msgBody = new MsgBody();
+		/*MsgBody msgBody = new MsgBody();
 		msgBody.Write(page);
-		Say(429, msgBody);
-	}
+		Say(429, msgBody);*/
+		const int firstId = 33;
+        const int slotCount = 12;
+
+        for (int id = firstId; id < firstId + slotCount; id++)
+        {
+            string alias = "";
+            int brickCount = -1;
+            DateTime lastModified = DateTime.MinValue;
+            sbyte premium = 0;
+
+            var umi = new UserMapInfo(id, premium);
+            if (umi.LoadCache())
+            {
+                umi.VerifySavedData();
+                alias = umi.Alias;
+                brickCount = umi.BrickCount;
+                lastModified = umi.LastModified;
+                premium = umi.Premium;
+            }
+
+            if (!string.IsNullOrEmpty(alias) && lastModified.Year > 1971)
+            {
+                UserMapInfoManager.Instance.AddOrUpdate(id, alias, brickCount, lastModified, premium);
+            }
+            else
+            {
+                UserMapInfoManager.Instance.AddOrUpdate(id, alias, brickCount, DateTime.MinValue, premium);
+            }
+        }
+        return;
+    }
 
 	public void SendCS_ALL_MAP_REQ(int prevPage, int nextPage, int indexer, ushort modeMask, int flag, string filter)
 	{
@@ -5231,7 +5295,7 @@ public class SockTcp
 		MyInfoManager.Instance.Special = val23;
 		//XTrap.Instance.SetUserInfo(val);
 		Aps.Instance.SetLevel(val9, val10);
-	}
+    }
 
 	private void HandleCS_CACHE_BRICK_ACK(MsgBody msg)
 	{
@@ -6031,7 +6095,7 @@ public class SockTcp
 
 	private void HandleCS_LOGIN_ACK(MsgBody msg)
 	{
-		msg.Read(out int val);
+        msg.Read(out int val);
 		msg.Read(out int val2);
         _waitingAck = false;
 		if (val >= 0)
@@ -6063,7 +6127,7 @@ public class SockTcp
 				gameObject.BroadcastMessage("OnLoginFailMessage", GetLoginFailString(val));
 			}
 		}
-	}
+    }
 
 	private void HandleCS_USERMAP_ACK(MsgBody msg)
 	{
@@ -9629,7 +9693,8 @@ public class SockTcp
 		MyInfoManager.Instance.qjModeMask = val;
 		MyInfoManager.Instance.qjOfficialMask = val2;
 		MyInfoManager.Instance.qjCommonMask = val3;
-	}
+		SendCS_USER_MAP_REQ(1);
+    }
 
 	private void HandleCS_WEAPON_SLOT_ACK(MsgBody msg)
 	{
