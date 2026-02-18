@@ -25,6 +25,14 @@ namespace _Emulator
             Object.DontDestroyOnLoad(coreObject);
             Config.instance = new Config();
             SetupBuildConfig();
+            RegisterCommands();
+        }
+
+        private void RegisterCommands()
+        {
+            CommandHandler handler = CommandHandler.Instance;
+            handler.Register("w", "whisper", new WhisperCommand());
+            handler.Register("r", "reply", new WhisperReplyCommand());
         }
 
         private void SetupBuildConfig()

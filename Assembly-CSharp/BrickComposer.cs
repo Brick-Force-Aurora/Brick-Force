@@ -535,6 +535,8 @@ public class BrickComposer : WeaponFunction
 
 	private void CheckFire1Replace()
 	{
+        // AURORA - Start: Switch 'Replace tool' to 'Selection tool'.
+        /*
 		if (custom_inputs.Instance.GetButtonDown("K_FIRE1") && UserMapInfoManager.Instance.CheckAuth(showMessage: true))
 		{
 			Brick brick = PaletteManager.Instance.GetCurrentBrick();
@@ -556,6 +558,38 @@ public class BrickComposer : WeaponFunction
 				}
 			}
 		}
+		*/
+        if (!UserMapInfoManager.Instance.CheckAuth(showMessage: true) || tools == null)
+		{
+			return;
+		}
+		ReplaceTool tool = tools.GetReplaceTool();
+		if (tool == null)
+		{
+			return;
+        }
+        Brick currentBrick = PaletteManager.Instance.GetCurrentBrick();
+		if (currentBrick == null || !currentBrick.IsEnable(RoomManager.Instance.CurrentRoomType)) 
+		{
+			return;
+        }
+        Vector3 newBricksPos = GetNewBricksPos(currentBrick, hitBrick.normal, hitBrick.point);
+        byte newBricksRot = GetNewBricksRot(currentBrick, hitBrick.normal);
+        byte x = 0;
+        byte y = 0;
+        byte z = 0;
+		if (!BrickManager.Instance.ToCoord(newBricksPos, ref x, ref y, ref z))
+		{
+			return;
+		}
+        if (custom_inputs.Instance.GetButtonDown("K_FIRE1"))
+		{
+			tool.SetPos1(x, y, z, newBricksRot);
+		} else if (custom_inputs.Instance.GetButtonDown("K_FIRE2"))
+        {
+            tool.SetPos2(x, y, z);
+        }
+		// AURORA - End
 	}
 
 	private void CheckFire1(bool forceDown = false)

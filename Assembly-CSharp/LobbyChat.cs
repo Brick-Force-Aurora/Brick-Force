@@ -1,3 +1,4 @@
+using _Emulator;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -246,13 +247,22 @@ public class LobbyChat
 		if (message.Length > maxMessageLength)
 		{
 			message = text;
-		}
-		if (GlobalVars.Instance.whisperNickFrom.Length > 0 && CommandInterpreter.Instance.IsReturnWhisper(message))
-		{
-			message = "/w " + GlobalVars.Instance.whisperNickFrom + " ";
-			cursorToEnd = true;
-		}
-		if (cursorToEnd)
+        }
+        // AURORA - Start: Use own whisper
+        /*
+        if (GlobalVars.Instance.whisperNickFrom.Length > 0 && CommandInterpreter.Instance.IsReturnWhisper(message))
+        */
+        if (GlobalVars.Instance.whisperNickFrom.Length > 0)
+        {
+            ICommand command = CommandHandler.Instance.FindCommand(message);
+            if (command != null && command.GetType() == typeof(WhisperReplyCommand))
+            {
+                message = "/w " + GlobalVars.Instance.whisperNickFrom + " ";
+                cursorToEnd = true;
+            }
+        }
+        // AURORA - End
+        if (cursorToEnd)
 		{
 			cursorToEnd = false;
 			TextEditor textEditor = (TextEditor)GUIUtility.GetStateObject(typeof(TextEditor), GUIUtility.keyboardControl);
@@ -320,11 +330,22 @@ public class LobbyChat
 				message.Trim();
 				message = RemoveSystemKey(message);
 				if (message.Length > 0)
-				{
-					CommandInterpreter.Instance.IsWhisper = false;
-					if (ChatLogManager.Instance.Log(message) && !CommandInterpreter.Instance.Parse(message))
-					{
-						switch (chatMode)
+                {
+                    // AURORA - Start: Use own Wispher
+                    /*
+                    CommandInterpreter.Instance.IsWhisper = false;
+					*/
+                    WhisperCommand.IsWhisper = false;
+                    // AURORA - End
+
+                    // AURORA - Start: Use own command manager
+                    /*
+                    if (ChatLogManager.Instance.Log(message) && !CommandInterpreter.Instance.Parse(message))
+					*/
+                    if (ChatLogManager.Instance.Log(message) && !CommandHandler.Instance.Execute(message))
+                    // AURORA - End
+                    {
+                        switch (chatMode)
 						{
 						case ChatText.CHAT_TYPE.NORMAL:
 							if (MyInfoManager.Instance.CheckChatTime())
@@ -349,9 +370,14 @@ public class LobbyChat
 						}
 					}
 					message = string.Empty;
+                    // AURORA - Start: Use own Wispher
+                    /*
 					if (!CommandInterpreter.Instance.IsWhisper)
-					{
-						GlobalVars.Instance.whisperNickTo = string.Empty;
+					*/
+                    if (!WhisperCommand.IsWhisper)
+                    // AURORA - End
+                    {
+                        GlobalVars.Instance.whisperNickTo = string.Empty;
 					}
 					if (GlobalVars.Instance.whisperNickTo.Length > 0)
 					{
@@ -367,8 +393,13 @@ public class LobbyChat
 			else if (Event.current.keyCode == KeyCode.UpArrow)
 			{
 				string command = message;
-				command = CommandInterpreter.Instance.GetNextCommand(command);
-				if (command.Length > 0)
+                // AURORA - Start: Use own command manager
+                /*
+                command = CommandInterpreter.Instance.GetNextCommand(command
+                */
+                command = CommandHandler.Instance.History.Next(command);
+                // AURORA - End
+                if (command.Length > 0)
 				{
 					message = command;
 				}
@@ -376,8 +407,13 @@ public class LobbyChat
 			else if (Event.current.keyCode == KeyCode.DownArrow)
 			{
 				string command2 = message;
+                // AURORA - Start: Use own command manager
+                /*
 				command2 = CommandInterpreter.Instance.GetPrevCommand(command2);
-				if (command2.Length > 0)
+                */
+                command2 = CommandHandler.Instance.History.Previous(command2);
+                // AURORA - End
+                if (command2.Length > 0)
 				{
 					message = command2;
 				}

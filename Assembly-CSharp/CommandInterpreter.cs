@@ -40,6 +40,8 @@ public class CommandInterpreter : MonoBehaviour
 
 	public void Load()
 	{
+        // AURORA - Start: No need to load anything, we use our own command manager
+        /*
 		Property props = BuildOption.Instance.Props;
 		if (props.isWebPlayer)
 		{
@@ -49,9 +51,11 @@ public class CommandInterpreter : MonoBehaviour
 		{
 			isLoaded = LoadFromLocalFileSystem();
 		}
-	}
+		*/
+        // AURORA - End
+    }
 
-	private void Awake()
+    private void Awake()
 	{
 		cmdLog = new List<string>();
 		dic = new Dictionary<string, string>();

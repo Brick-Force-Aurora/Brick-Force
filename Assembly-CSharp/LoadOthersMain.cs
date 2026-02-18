@@ -157,7 +157,7 @@ public class LoadOthersMain : MonoBehaviour
 		if (!once && SceneLoadManager.Instance.IsLoadedDone())
 		{
 			once = true;
-			CommandInterpreter.Instance.Load();
+			// CommandInterpreter.Instance.Load(); // AURORA: Use own command manager
 			BuffManager.Instance.Load();
 			DefenseManager.Instance.LoadAll();
 			UpgradePropManager.Instance.LoadAll();
@@ -325,7 +325,8 @@ public class LoadOthersMain : MonoBehaviour
 	{
 		if (!isProgressStop)
 		{
-			if (StringMgr.Instance.IsLoaded && WordFilter.Instance.IsLoaded && CommandInterpreter.Instance.IsLoaded && TItemManager.Instance.IsLoaded && VoiceManager.Instance.bLoaded && VoiceManager.Instance.bLoaded2 && ShopManager.Instance.IsLoaded && BundleManager.Instance.IsLoaded)
+            // AURORA: Use own command manager
+            if (StringMgr.Instance.IsLoaded && WordFilter.Instance.IsLoaded /*&& CommandInterpreter.Instance.IsLoaded*/ && TItemManager.Instance.IsLoaded && VoiceManager.Instance.bLoaded && VoiceManager.Instance.bLoaded2 && ShopManager.Instance.IsLoaded && BundleManager.Instance.IsLoaded)
 			{
 				if (BuildOption.Instance.Props.ShowGrb)
 				{

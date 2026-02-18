@@ -97,9 +97,21 @@ public class EditorTools : MonoBehaviour
 			}
 		}
 		return null;
-	}
+    }
 
-	private void OnGUI()
+    public ReplaceTool GetReplaceTool()
+    {
+        for (int i = 0; i < editorTool.Length; i++)
+        {
+            if (editorTool[i].IsActive && editorTool[i].Name == "replace_tool")
+            {
+                return (ReplaceTool)editorTool[i];
+            }
+        }
+        return null;
+    }
+
+    private void OnGUI()
 	{
 		if (MyInfoManager.Instance.isGuiOn)
 		{
