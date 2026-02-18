@@ -51,7 +51,7 @@ namespace _Emulator
             new string[] { "UPPER", "aac" },
             new string[] { "LOWER", "aad" },
             new string[] { "BRICK-GUN", "s07" },
-            new string[] { "NONE","sb7", "sb8", "sb9", "sc0", "sc1", "sc2", "sc3", "sc4", "s34", "s43", "s78", "s79", "s22" }
+            new string[] { "NONE","sb7", "sb8", "sb9", "sc0", "sc1", "sc2", "sc3", "sc4", "s34", "s43", "s78", "s79", "s22", "s06", "s05" }
         };
 
     }

@@ -645,6 +645,7 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_CHAT_REQ] = HandleChatRequest;
             _handlers[(int)MessageId.CS_JOIN_REQ] = HandleJoinRequest;
             _handlers[(int)MessageId.CS_RESUME_ROOM_REQ] = HandleResumeRoomRequest;
+            _handlers[(int)MessageId.CS_MORPH_BRICK_REQ] = HandleMorphBrickRequest;
             _handlers[(int)MessageId.CS_EQUIP_REQ] = HandleEquipRequest;
             _handlers[(int)MessageId.CS_UNEQUIP_REQ] = HandleUnequipRequest;
             _handlers[(int)MessageId.CS_SAVE_REQ] = HandleSaveMap;
@@ -4248,55 +4249,192 @@ namespace _Emulator
         {
             msgRef.msg._msg.Read(out long item);
             msgRef.msg._msg.Read(out string code);
-            msgRef.msg._msg.Read(out byte brick);
+            msgRef.msg._msg.Read(out byte brickIndex);
             msgRef.msg._msg.Read(out byte x);
             msgRef.msg._msg.Read(out byte y);
             msgRef.msg._msg.Read(out byte z);
             msgRef.msg._msg.Read(out byte rot);
 
-            //Line Brick Success 326
-            /*MyInfoManager.Instance.IsModified = true;
-            Brick brick = BrickManager.Instance.GetBrick(val3);
-            if (brick != null)
+            //Debug.LogWarning($"LINE_REQ item:{item} code:{code} brickIndex:{brickIndex} at({x},{y},{z}) rot:{rot}");
+
+            if (msgRef?.matchData?.cachedMap == null)
             {
-                BrickManager.Instance.AddBrickCreator(val2, val3, new Vector3((float)(int)val4, (float)(int)val5, (float)(int)val6), val7);
+                Debug.LogError("LINE_REQ: matchData/cachedMap null");
+                SendLineFail(msgRef, -6);
+                return;
             }
-            if (val == MyInfoManager.Instance.Seq)
+
+            int playerSeq = msgRef.client.seq; 
+
+            lock (dataLock)
             {
-                ((LineToolDialog)DialogManager.Instance.GetDialog(DialogManager.DIALOG_INDEX.LINE_TOOL))?.MoveNext(success: true);
-            }*/
-            //Line Brick Fail 330
-            /*msg.Read(out int val);
-            ShowBuildErrorMessage(val);
-            ((LineToolDialog)DialogManager.Instance.GetDialog(DialogManager.DIALOG_INDEX.LINE_TOOL))?.MoveNext(success: false);*/
+                var map = msgRef.matchData.cachedMap;
+
+                if (map.GetByCoord(x, y, z) != null)
+                {
+                    // Success ACK but do not add (prevents the tool from stalling on overlaps)
+                    Debug.LogWarning("Trying to replace Brick with line tool.");
+                    SendLineAck(msgRef, playerSeq, /*newSeq*/ 0, /*template*/ 0, x, y, z, rot);
+                    return;
+                }
+
+                Brick b = BrickManager.Instance.GetBrick(brickIndex); 
+                if (b == null)
+                {
+                    Debug.LogWarning($"LINE_REQ: unknown brick index={brickIndex}");
+                    SendLineFail(msgRef, -6);
+                    return;
+                }
+
+                byte template = (byte)b.seq;
+
+                int newSeq = msgRef.matchData.GetNextBrickSeq();
+
+                List<int> morphes = new List<int>(32);
+                morphes.Clear();
+                bool ok = map.AddBrickInst(newSeq, template, x, y, z, rot, ref morphes);
+
+                if (!ok)
+                {
+                    Debug.LogError($"LINE_REQ: AddBrickInst failed newSeq={newSeq} template={template} at({x},{y},{z})");
+                    SendLineFail(msgRef, -6);
+                    return;
+                }
+
+                SendLineAck(msgRef, playerSeq, newSeq, template, x, y, z, rot);
+            }
+        }
+
+        private void SendLineAck(MsgReference req, int playerSeq, int newSeq, byte template, byte x, byte y, byte z, byte rot)
+        {
+            MsgBody mb = new MsgBody();
+            mb.Write(playerSeq);
+            mb.Write(newSeq);
+            mb.Write(template);
+            mb.Write(x);
+            mb.Write(y);
+            mb.Write(z);
+            mb.Write(rot);
+
+            Say(new MsgReference((int)MessageId.CS_LINE_BRICK_ACK, mb, req.client));
+        }
+
+        private void SendLineFail(MsgReference req, int resultCode)
+        {
+            MsgBody mb = new MsgBody();
+            mb.Write(resultCode);
+            Say(new MsgReference((int)MessageId.CS_LINE_BRICK_FAIL_ACK, mb, req.client));
         }
 
         private void HandleReplaceBrickRequest(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out long item);
             msgRef.msg._msg.Read(out string code);
-            msgRef.msg._msg.Read(out int existing);
-            msgRef.msg._msg.Read(out byte brick);
+            msgRef.msg._msg.Read(out int existingSeq);
+            msgRef.msg._msg.Read(out byte brickIndex);
             msgRef.msg._msg.Read(out byte x);
             msgRef.msg._msg.Read(out byte y);
             msgRef.msg._msg.Read(out byte z);
             msgRef.msg._msg.Read(out byte rot);
-            //Replace Brick Success 328
-            /*MyInfoManager.Instance.IsModified = true;
-            BrickManager.Instance.DelBrick(val2, shrink: true);
-            Brick brick = BrickManager.Instance.GetBrick(val4);
-            if (brick != null)
+
+            //Debug.LogWarning($"REPLACE_REQ item:{item} code:{code} brickIndex:{brickIndex} at({x},{y},{z}) rot:{rot}");
+
+            if (msgRef?.matchData?.cachedMap == null)
             {
-                BrickManager.Instance.AddBrickCreator(val3, val4, new Vector3((float)(int)val5, (float)(int)val6, (float)(int)val7), val8);
+                Debug.LogError("HandleReplaceBrickRequest: matchData/cachedMap is null");
+                SendReplaceFail(msgRef, -6);
+                return;
             }
-            if (val == MyInfoManager.Instance.Seq)
+
+            int playerSeq = msgRef.client.seq;
+
+            lock (dataLock)
             {
-                ((ReplaceToolDialog)DialogManager.Instance.GetDialog(DialogManager.DIALOG_INDEX.REPLACE_TOOL))?.MoveNext(success: true);
-            }*/
-            //Replace Brick Fail 331
-            /*msg.Read(out int val);
-            ShowBuildErrorMessage(val);
-            ((ReplaceToolDialog)DialogManager.Instance.GetDialog(DialogManager.DIALOG_INDEX.REPLACE_TOOL))?.MoveNext(success: false);*/
+                var map = msgRef.matchData.cachedMap;
+
+                BrickInst old = map.Get(existingSeq);
+                if (old == null)
+                {
+                    Debug.LogError($"ReplaceBrick: existing seq not found: {existingSeq}");
+                    SendReplaceFail(msgRef, -6);
+                    return;
+                }
+
+                Brick newBrick = BrickManager.Instance.GetBrick(brickIndex);
+                if (newBrick == null)
+                {
+                    Debug.LogWarning($"REPLACE_REQ: unknown brick index={brickIndex}");
+                    SendReplaceFail(msgRef, -6);
+                    return;
+                }
+
+                List<int> morphes = new List<int>();
+
+                int newSeq = msgRef.matchData.GetNextBrickSeq();
+
+                //morphes.Clear();
+                if (!map.DelBrickInst(existingSeq, ref morphes))
+                {
+                    Debug.LogError($"ReplaceBrick: DelBrickInst failed for seq={existingSeq}");
+                    SendReplaceFail(msgRef, -6);
+                    return;
+                }
+
+                //morphes.Clear();
+                if (!map.AddBrickInst(newSeq, brickIndex, x, y, z, rot, ref morphes))
+                {
+                    Debug.LogError($"ReplaceBrick: AddBrickInst failed newSeq={newSeq} template={brickIndex} at ({x},{y},{z})");
+                    SendReplaceFail(msgRef, -6);
+                    return;
+                }
+
+                SendReplaceSuccess(msgRef, playerSeq, existingSeq, newSeq, brickIndex, x, y, z, rot);
+            }
+        }
+
+        private void SendReplaceSuccess(MsgReference req, int playerSeq, int oldSeq, int newSeq, byte template, byte x, byte y, byte z, byte rot)
+        {
+            MsgBody msgBody = new MsgBody();
+            msgBody.Write(playerSeq); // val
+            msgBody.Write(oldSeq);    // val2
+            msgBody.Write(newSeq);    // val3
+            msgBody.Write(template);  // val4
+            msgBody.Write(x);
+            msgBody.Write(y);
+            msgBody.Write(z);
+            msgBody.Write(rot);
+
+            Say(new MsgReference((int)MessageId.CS_REPLACE_BRICK_ACK, msgBody, req.client));
+        }
+
+        private void SendReplaceFail(MsgReference req, int resultCode)
+        {
+            // Client handler expects: msg.Read(out int val); ShowBuildErrorMessage(val); MoveNext(false)
+            MsgBody msgBody = new MsgBody();
+            msgBody.Write(resultCode);
+
+            Say(new MsgReference((int)MessageId.CS_REPLACE_BRICK_FAIL_ACK, msgBody, req.client));
+        }
+
+
+        private void HandleMorphBrickRequest(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out int seq);
+            msgRef.msg._msg.Read(out ushort code);
+
+            var match = msgRef.matchData;
+            if (match?.cachedMap == null)
+                return;
+
+            lock (dataLock)
+            {
+                BrickInst bi = match.cachedMap.Get(seq);
+                if (bi == null)
+                {
+                    Debug.LogWarning($"MORPH_BRICK_REQ: unknown brick seq={seq}");
+                    return;
+                }
+            }
         }
 
         private void HandleSaveMap(MsgReference msgRef)
