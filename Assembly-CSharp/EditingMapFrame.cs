@@ -88,6 +88,7 @@ public class EditingMapFrame
 
 	public int GetEmptyPremiumSlot(int page, int count)
 	{
+		return 0;
 		if (count == 12)
 		{
 			return 0;

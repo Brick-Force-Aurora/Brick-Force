@@ -707,6 +707,7 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_DELEGATE_MASTER_REQ] = HandleDelegateMasterRequest;
             _handlers[(int)MessageId.CS_TC_LEAVE_REQ] = HandleCS_TC_LEAVE_REQ;
             _handlers[(int)MessageId.CS_INFLICTED_DAMAGE_REQ] = HandleInflictedDamage;
+            _handlers[(int)MessageId.CS_RESET_USER_MAP_SLOTS_REQ] = HandleResetUserMapSlot;
             _handlers[(int)MessageId.CS_WEAPON_CHANGE_REQ] = HandleWeaponChangeRequest;
             _handlers[(int)MessageId.CS_SET_WEAPON_SLOT_REQ] = HandleSetWeaponSlotRequest;
             _handlers[(int)MessageId.CS_CLEAR_WEAPON_SLOTS_REQ] = HandleClearWeaponSlots;
@@ -894,8 +895,8 @@ namespace _Emulator
             SendLogin(msgRef.client, channel.channel.Id);
             SendPlayerInfo(msgRef.client);
             SendAllDownloadedMaps(msgRef.client);
-            SendEmptyUserMap(msgRef.client);
-            SendAllUserMaps(msgRef.client);
+            SendUserMapSlots(msgRef.client);
+            //SendAllUserMaps(msgRef.client);
         }
 
         private void HandleLoadComplete(MsgReference msgRef)
@@ -1044,7 +1045,7 @@ namespace _Emulator
             if (debugHandle)
                 Debug.Log("HandleRequestRegisteredMaps from: " + msgRef.client.GetIdentifier());
 
-            SendRegisteredMaps(msgRef.client, nextPage);
+            //SendRegisteredMaps(msgRef.client, nextPage);
         }
 
         private void HandleRequestAllMaps(MsgReference msgRef)
@@ -1108,7 +1109,8 @@ namespace _Emulator
             if (debugHandle)
                 Debug.Log("HandleRequestUserMaps from: " + msgRef.client.GetIdentifier());
 
-            SendUserMaps(msgRef.client, page);
+            SendUserMapSlots(msgRef.client);
+            //SendUserMaps(msgRef.client, page);
         }
 
         private void HandleRequestUserList(MsgReference msgRef)
@@ -1266,11 +1268,12 @@ namespace _Emulator
                 if (param1 == 1)
                 {
                     //matchData.CacheMap(regMaps.Find(x => x.Value.Map == param2).Value, new UserMapInfo(param2, (sbyte)param5));
-                    matchData.CacheMap(regMaps.Find(x => x.Value.Map == param2).Value, UserMapInfoManager.Instance.Get(param2));
+                    //matchData.CacheMap(regMaps.Find(x => x.Value.Map == param2).Value, UserMapInfoManager.Instance.Get(param2));
+                    matchData.CacheMapFromSlot(UserMapInfoManager.Instance.Get(param2));
                 }
                 else
                 {
-                    matchData.CacheMapGenerate(param3, param4, alias);
+                    matchData.CacheMapGenerate(param2, param3, param4, alias);
                 }
             }
             else
@@ -2451,42 +2454,75 @@ namespace _Emulator
             if (debugHandle)
                 Debug.Log("HandleRegisterMap from: " + msgRef.client.GetIdentifier());
 
-            msgRef.msg._msg.Read(out int map);
+            msgRef.msg._msg.Read(out int slot);
             msgRef.msg._msg.Read(out ushort modeMask);
             msgRef.msg._msg.Read(out int regHow);
             msgRef.msg._msg.Read(out int point);
             msgRef.msg._msg.Read(out int downloadFee);
             msgRef.msg._msg.Read(out string msgEval);
 
-            if (map == matchData.cachedMap.map)
+            if (slot != matchData.cachedMap.map)
             {
-                Texture2D thumbnail = new Texture2D(1, 1);
-                if (msgRef.client.chunkedBuffer.id == ExtensionOpcodes.opChunkedBufferThumbnailReq)
-                {
-                    if (msgRef.client.chunkedBuffer.finished)
-                    {
-                        thumbnail.LoadImage(msgRef.client.chunkedBuffer.buffer);
-                        thumbnail.Apply();
-                        if (debugSend)
-                            Debug.Log("Load Thumbnail");
-                    }
-                    else
-                        Debug.LogError("HandleRegisterMapRequest: ChunkedBuffer not finished");
-                }
-
-                DateTime time = DateTime.Now;
-                int hashId = MapGenerator.instance.GetHashIdForTime(time);
-                RegMap regMap = new RegMap(hashId, msgRef.client.name + "@Aurora", matchData.cachedUMI.Alias, time, modeMask, true, false, 0, 0, 0, 0, 0, 0, 0, false);
-                regMap.Thumbnail = thumbnail;
-                matchData.cachedMap.map = hashId;
-                matchData.cachedUMI.regMap = regMap;
-                matchData.cachedUMI.slot = hashId;
-
-                matchData.cachedUMI.regMap.Save();
-                matchData.cachedMap.Save(hashId, matchData.cachedMap.skybox);
-
-                SendCustomMessage("Saved " + matchData.cachedUMI.regMap.Alias + " with ID " + hashId);
+                Debug.LogWarning($"HandleRegisterMapRequest: map mismatch. req={slot} cached={matchData.cachedMap.map}");
+                msgRef.client.chunkedBuffer = null;
+                return;
             }
+
+            // Thumbnail for the registered map
+            Texture2D thumbnail = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
+            if (msgRef.client.chunkedBuffer != null &&
+                msgRef.client.chunkedBuffer.id == ExtensionOpcodes.opChunkedBufferThumbnailReq)
+            {
+                if (msgRef.client.chunkedBuffer.finished)
+                {
+                    thumbnail.LoadImage(msgRef.client.chunkedBuffer.buffer);
+                    thumbnail.Apply();
+                    if (debugSend) Debug.Log("Load Thumbnail (Register)");
+                }
+                else
+                {
+                    Debug.LogError("HandleRegisterMapRequest: ChunkedBuffer not finished");
+                }
+            }
+
+            DateTime time = DateTime.Now;
+            int hashId = MapGenerator.instance.GetHashIdForTime(time);
+
+            // Create & register RegMap ONLY here
+            RegMap regMap = new RegMap(
+                hashId,
+                msgRef.client.name + "@Aurora",
+                matchData.cachedUMI.Alias,
+                time,
+                modeMask,
+                true, false,
+                0, 0, 0, 0, 0, 0, 0,
+                false
+            );
+
+            regMap.Thumbnail = thumbnail;
+
+            RegMapManager.Instance.Add(regMap);
+            RegMapManager.Instance.SetThumbnail(regMap.map, thumbnail);
+
+            // Save registered files under the RegMap ID (separate from user slot file)
+            regMap.Save();
+            matchData.cachedMap.Save(hashId, matchData.cachedMap.skybox);
+
+            // Keep the user slot as-is; optionally link regMap for current session info
+            matchData.cachedUMI.regMap = regMap;   // ok to remember it's registered now
+                                                   // DO NOT do: cachedUMI.slot = hashId
+                                                   // DO NOT do: cachedMap.map = hashId
+
+            // Pull current map list into the emulator (registered list changed)
+            regMaps = RegMapManager.Instance.dicRegMap.ToList();
+
+            MsgBody body = new MsgBody();
+
+            body.Write(matchData.cachedUMI.slot);
+            body.Write((int)regMap.ModeMask);
+
+            Say(new MsgReference(52, body, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             msgRef.client.chunkedBuffer = null;
         }
@@ -4007,28 +4043,105 @@ namespace _Emulator
         }
 
 
-        public void SendEmptyUserMap(ClientReference client)
+        public void SendUserMapSlots(ClientReference client)
         {
-            MsgBody body = new MsgBody();
+            const int firstId = 33;
+            const int slotCount = 12;
 
-            body.Write(-1); //page
-            body.Write(1); //count
-            body.Write(0); //slot
-            body.Write("");
-            body.Write(-1); //brick count
-            body.Write(2000);
-            body.Write((sbyte)0);
-            body.Write((sbyte)0);
-            body.Write((sbyte)0);
-            body.Write((sbyte)0);
-            body.Write((sbyte)0);
-            body.Write((sbyte)0);
+            MsgBody body = new MsgBody();
+            body.Write(1);            // page
+            body.Write(slotCount);    // count
+
+            for (int id = firstId; id < firstId + slotCount; id++)
+            {
+                // Default = empty slot
+                string alias = "";
+                int brickCount = -1;
+                DateTime lastModified = DateTime.MinValue;
+                sbyte premium = 0;
+
+                // Try load from cache before sending
+                var umi = new UserMapInfo(id, premium);
+                if (umi.LoadCache())
+                {
+                    umi.VerifySavedData();
+
+                    alias = umi.Alias;
+                    brickCount = umi.BrickCount;
+                    lastModified = umi.LastModified;
+                    premium = umi.Premium;
+                }
+
+                body.Write(id);        // slot/id the client uses
+                body.Write(alias);
+                body.Write(brickCount);
+
+                if (!string.IsNullOrEmpty(alias) && lastModified.Year > 1971)
+                {
+                    body.Write(lastModified.Year);
+                    body.Write((sbyte)lastModified.Month);
+                    body.Write((sbyte)lastModified.Day);
+                    body.Write((sbyte)lastModified.Hour);
+                    body.Write((sbyte)lastModified.Minute);
+                    body.Write((sbyte)lastModified.Second);
+                }
+                else
+                {
+                    body.Write(0);
+                    body.Write((sbyte)0);
+                    body.Write((sbyte)0);
+                    body.Write((sbyte)0);
+                    body.Write((sbyte)0);
+                    body.Write((sbyte)0);
+                }
+
+                body.Write(premium);
+            }
 
             Say(new MsgReference(430, body, client));
-
-            if (debugSend)
-                Debug.Log("SendEmptyUserMap to: " + client.GetIdentifier());
         }
+
+        private void HandleResetUserMapSlot(MsgReference msgRef)
+        {
+            msgRef.msg._msg.Read(out int slot);
+            msgRef.msg._msg.Read(out long item);
+            msgRef.msg._msg.Read(out string itemCode);
+
+            // only allow your user-slot id range
+            if (slot < 33 || slot > 44)
+            {
+                SendResetAck(msgRef.client, result: 1, slot: slot);
+                return;
+            }
+
+            bool ok = true;
+            try
+            {
+                string cacheDir = Path.Combine(Application.dataPath, "Resources/Cache");
+
+                string geom = Path.Combine(cacheDir, "downloaded" + slot + ".geometry");
+                string umi = Path.Combine(cacheDir, "downloaded" + slot + ".umi.cache");
+
+                if (File.Exists(geom)) File.Delete(geom);
+                if (File.Exists(umi)) File.Delete(umi);
+            }
+            catch (Exception ex)
+            {
+                ok = false;
+                Debug.LogError("HandleResetUserMapSlot: " + ex);
+            }
+
+            SendResetAck(msgRef.client, result: ok ? 0 : 1, slot: slot);
+        }
+
+        private void SendResetAck(ClientReference client, int result, int slot)
+        {
+            MsgBody body = new MsgBody();
+            body.Write(result); // val
+            body.Write(slot);   // val2
+            Say(new MsgReference((int)MessageId.CS_RESET_USER_MAP_SLOTS_ACK, body, client));
+        }
+
 
         public void SendDownloadedMaps(ClientReference client, int page)
         {
@@ -4442,74 +4555,60 @@ namespace _Emulator
 
             MatchData matchData = msgRef.matchData;
 
-            //Generate ModeMask by counting the special bricks
-            ushort modeMask = GenerateModeMask(matchData.cachedMap.dic);    
-
-            int hashId = slot;
             DateTime time = DateTime.Now;
-            RegMap regMap = null;
 
-            if (hashId == 0)
-            {
-                hashId = MapGenerator.instance.GetHashIdForTime(time);
-                //todo ModeMask
-                regMap = new RegMap(hashId, msgRef.client.name + "@Aurora", matchData.cachedUMI.Alias, time, modeMask, true, false, 0, 0, 0, 0, 0, 0, 0, false);
-                if (debugHandle)
-                    Debug.Log("Generated new Hash");
-            } else
-            {
-                regMap = RegMapManager.Instance.dicRegMap.FirstOrDefault(map => map.Value != null && map.Value.map == hashId).Value;
-                regMap.ModeMask = modeMask;
-                if (debugHandle)
-                    Debug.Log("Saving Map: " + regMap.map);
-            }
+            // Generate ModeMask (if you still want it saved/used locally, keep it here; otherwise remove)
+            ushort modeMask = GenerateModeMask(matchData.cachedMap.dic);
 
+            // Load thumbnail from chunked buffer (local slot thumbnail)
             Texture2D thumbnail = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
-            
-            if (msgRef.client.chunkedBuffer.id == ExtensionOpcodes.opChunkedBufferThumbnailReq)
+            if (msgRef.client.chunkedBuffer != null &&
+                msgRef.client.chunkedBuffer.id == ExtensionOpcodes.opChunkedBufferThumbnailReq)
             {
                 if (msgRef.client.chunkedBuffer.finished)
                 {
                     thumbnail.LoadImage(msgRef.client.chunkedBuffer.buffer);
                     thumbnail.Apply();
-                    if (debugSend)
-                        Debug.Log("Load Thumbnail");
+                    if (debugSend) Debug.Log("Load Thumbnail (SaveMap)");
                 }
                 else
-                    Debug.LogError("HandleRegisterMapRequest: ChunkedBuffer not finished");
+                {
+                    Debug.LogError("HandleSaveMap: ChunkedBuffer not finished");
+                }
             }
-            regMap.Thumbnail = thumbnail;
-            if (slot == 0)
-                RegMapManager.Instance.Add(regMap);
-            else 
-                RegMapManager.Instance.UpdateMap(regMap);
-            RegMapManager.Instance.SetThumbnail(regMap.map, thumbnail);
-            // It is important that we first add the thumbnail and regmap to the RegMapManager 
-            // and then add the map to the User Info Manager
-            // Because when a new UserMap is created with a slot > 0 the regMap is retrieved from the RegMapManager
-            UserMapInfoManager.Instance.AddOrUpdate(hashId, regMap.Alias, matchData.cachedUMI.BrickCount, time, 0);
-            UserMapInfoManager.Instance.SetThumbnail(hashId, thumbnail);
 
-            //Update MatchData
-            matchData.cachedMap.map = hashId;
-            matchData.cachedUMI.regMap = regMap;
-            matchData.cachedUMI.slot = hashId;
-            //Save Files
-            matchData.cachedUMI.regMap.Save();
-            matchData.cachedMap.Save(hashId, matchData.cachedMap.skybox);
+            // IMPORTANT: Do NOT touch RegMapManager here.
+            // Only update the user map metadata (UMI) for this slot.
+            // (Alias/BrickCount come from cachedUMI; adjust if you store alias elsewhere.)
+            UserMapInfoManager.Instance.AddOrUpdate(
+                slot,
+                matchData.cachedUMI.Alias,
+                matchData.cachedUMI.BrickCount,
+                time,
+                0 // premium
+            );
+            UserMapInfoManager.Instance.SetThumbnail(slot, thumbnail);
+            UserMapInfoManager.Instance.CurMapName = matchData.cachedUMI.Alias;
 
-            // Reset chunkedBuffer to be able to recieve the next thumbnail
+            // Update current working map references WITHOUT registering
+            matchData.cachedMap.map = slot;          // working map id stays "slot"
+            matchData.cachedUMI.slot = slot;         // slot stays 1..12
+            matchData.cachedUMI.regMap = null;       // NOT registered on save
+
+            // Save files as user-slot files (local)
+            // geometry: downloaded{slot}.geometry
+            matchData.cachedMap.Save(slot, matchData.cachedMap.skybox);
+
+            // if you have a cache save method for UMI on server-side:
+            //matchData.cachedUMI.SaveCache();
+            // If not, UserMapInfoManager probably handles it; otherwise add it there.
+
+            // Reset chunkedBuffer so next thumbnail can arrive
             msgRef.client.chunkedBuffer = null;
 
-            // Pull current map list into the emulator
-            regMaps = RegMapManager.Instance.dicRegMap.ToList();
-
-            // Answer the Request
             MsgBody msgBody = new MsgBody();
-
-            msgBody.Write(hashId);
-            msgBody.Write(0); //success
-
+            msgBody.Write(slot);
+            msgBody.Write(0);
             Say(new MsgReference(40, msgBody, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));
         }
 
@@ -5080,7 +5179,7 @@ namespace _Emulator
         {
             //not tested/ server side remove?
             msgRef.msg._msg.Read(out int seq);
-            msgRef.matchData.RemoveClient(clientList.Find(client => client.seq == seq));
+            //msgRef.matchData.RemoveClient(clientList.Find(client => client.seq == seq));
             MsgBody body = new MsgBody();
             body.Write(seq);
             Say(new MsgReference(89, body, msgRef.client, SendType.Unicast));
@@ -5091,8 +5190,11 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int slot);
             msgRef.msg._msg.Read(out string newAlias);
 
+            UserMapInfoManager.Instance.Get(slot).Alias = newAlias;
+            bool ok = UserMapInfoManager.Instance.Get(slot).SaveCache();
+
             MsgBody body = new MsgBody();
-            body.Write(1); //success
+            body.Write(ok ? 1 : 0); //success
             body.Write((sbyte)slot);
             body.Write(newAlias);
 

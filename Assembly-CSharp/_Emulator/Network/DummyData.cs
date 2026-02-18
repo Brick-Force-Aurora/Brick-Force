@@ -26,7 +26,7 @@ namespace _Emulator
         public sbyte tutorialed = 3;
         public int countryFilter = -1;
         public sbyte tos = 1;
-        public int extraSlots = 0;
+        public int extraSlots = 9;
         public int firstLoginFp = 0;
         public int qjCommonMask =
                   (int)COMMON_OPT.DONOT_NEWBIE_CHANNEL_MSG

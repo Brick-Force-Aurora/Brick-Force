@@ -86,18 +86,76 @@ public class DownloadMapFrame
 
 	public void Start()
 	{
-		crdBtns = new Rect[2];
-		crdBtns[0] = new Rect(715f, 714f, 139f, 38f);
-		crdBtns[1] = new Rect(859f, 714f, 139f, 38f);
-		crdBtns2 = new Rect[2];
-		crdBtns2[0] = new Rect(715f, 714f - chatGap, 139f, 38f);
-		crdBtns2[1] = new Rect(859f, 714f - chatGap, 139f, 38f);
+		crdBtns = new Rect[3];
+        crdBtns[0] = new Rect(300f, 714f, 139f, 38f);
+        crdBtns[1] = new Rect(715f, 714f, 139f, 38f);
+		crdBtns[2] = new Rect(859f, 714f, 139f, 38f);
+		crdBtns2 = new Rect[3];
+        crdBtns2[0] = new Rect(300f, 714f - chatGap, 139f, 38f);
+        crdBtns2[1] = new Rect(715f, 714f - chatGap, 139f, 38f);
+		crdBtns2[2] = new Rect(859f, 714f - chatGap, 139f, 38f);
 		selected = 0;
 		waitingList = true;
 		CSNetManager.Instance.Sock.SendCS_MY_DOWNLOAD_MAP_REQ(-1, 1, 0, GlobalVars.Instance.getBattleMode(subTab));
 	}
 
-	public void BeginMapList(int curPage)
+    private const int USER_SLOT_FIRST = 33;
+    private const int USER_SLOT_LAST = 44;
+
+    private int GetFirstEmptyUserSlot()
+    {
+        for (int slot = USER_SLOT_FIRST; slot <= USER_SLOT_LAST; slot++)
+        {
+            UserMapInfo umi = UserMapInfoManager.Instance.Get(slot);
+            if (umi == null || string.IsNullOrEmpty(umi.Alias))
+                return slot;
+        }
+        return -1;
+    }
+
+    private bool CopyRegMapToUserSlot(RegMap reg, int slot)
+    {
+        try
+        {
+            // Load the regmap geometry (downloaded{regId}.geometry)
+            UserMap src = new UserMap();
+            if (!src.Load(reg.Map))
+            {
+                Debug.LogError("CopyRegMapToUserSlot: failed to load reg geometry id=" + reg.Map);
+                return false;
+            }
+
+            // Save into user slot geometry (downloaded{slot}.geometry)
+            src.Save(slot, src.skybox);
+
+            // Update slot UMI and persist .umi.cache
+            DateTime now = DateTime.Now;
+
+            // Ensure slot exists, then fill it
+            UserMapInfoManager.Instance.AddOrUpdate(
+                slot,
+                reg.Alias,                 // slot name becomes regmap name
+                src.dic != null ? src.dic.Count : -1,
+                now,
+                0
+            );
+
+			// copy thumbnail if available
+			if (reg.Thumbnail != null)
+				UserMapInfoManager.Instance.SetThumbnail(slot, reg.Thumbnail);
+			else
+				UserMapInfoManager.Instance.Get(slot).SaveCache();
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("CopyRegMapToUserSlot: " + ex);
+            return false;
+        }
+    }
+
+    public void BeginMapList(int curPage)
 	{
 		page = curPage;
 		scrollPosition = Vector2.zero;
@@ -423,38 +481,57 @@ public class DownloadMapFrame
 				}
 			}
 			GUI.EndScrollView();
-			if (selected >= 0)
-			{
-				int num5 = 1;
-				Rect rc = new Rect(crdBtns[num5]);
-				if (chatView)
-				{
-					rc = crdBtns2[num5];
-				}
-				GUI.enabled = !array[selected].Blocked;
-				GUIContent content = new GUIContent(StringMgr.Instance.Get("CREATE_ROOM").ToUpper(), GlobalVars.Instance.iconJoin);
-				if (ChannelManager.Instance.CurChannel.Mode != 3 && GlobalVars.Instance.MyButton3(rc, content, "BtnAction"))
-				{
-					CreateRoomDialog createRoomDialog = (CreateRoomDialog)DialogManager.Instance.Popup(DialogManager.DIALOG_INDEX.CREATE_ROOM, exclusive: true);
-					if (createRoomDialog != null && !createRoomDialog.InitDialog4TeamMatch(array[selected].Map, array[selected].ModeMask))
-					{
-						DialogManager.Instance.Clear();
-					}
-				}
-				num5--;
-				GUI.enabled = true;
-				rc = crdBtns[num5];
-				if (chatView)
-				{
-					rc = crdBtns2[num5];
-				}
-				content = new GUIContent(StringMgr.Instance.Get("DELETE").ToUpper(), GlobalVars.Instance.iconGarbage);
-				if (GlobalVars.Instance.MyButton3(rc, content, "BtnAction"))
-				{
-					CSNetManager.Instance.Sock.SendCS_DEL_DOWNLOAD_MAP_REQ(array[selected].Map);
-					selected = 0;
-				}
-			}
-		}
+            if (selected >= 0)
+            {
+                // Button: LOAD TO SLOT (new)
+                Rect rc = new Rect(crdBtns[0]);
+                if (chatView) rc = crdBtns2[0];
+
+                GUI.enabled = !array[selected].Blocked;
+                GUIContent loadContent = new GUIContent("LOAD TO SLOT", GlobalVars.Instance.iconJoin); // pick any icon you like
+                if (GlobalVars.Instance.MyButton3(rc, loadContent, "BtnAction"))
+                {
+                    int slot = GetFirstEmptyUserSlot();
+                    if (slot < 0)
+                    {
+                        MessageBoxMgr.Instance.AddMessage("No empty map slots available.");
+                    }
+                    else
+                    {
+                        if (CopyRegMapToUserSlot(array[selected], slot))
+                            SystemMsgManager.Instance.ShowMessage($"Loaded '{array[selected].Alias}' into slot {slot}.");
+                        else
+                            MessageBoxMgr.Instance.AddMessage("Failed to load map into slot.");
+                    }
+                }
+
+                // Button: CREATE ROOM (existing)
+                rc = new Rect(crdBtns[1]);
+                if (chatView) rc = crdBtns2[1];
+
+                GUI.enabled = !array[selected].Blocked;
+                GUIContent content = new GUIContent(StringMgr.Instance.Get("CREATE_ROOM").ToUpper(), GlobalVars.Instance.iconJoin);
+                if (ChannelManager.Instance.CurChannel.Mode != 3 && GlobalVars.Instance.MyButton3(rc, content, "BtnAction"))
+                {
+                    CreateRoomDialog createRoomDialog = (CreateRoomDialog)DialogManager.Instance.Popup(DialogManager.DIALOG_INDEX.CREATE_ROOM, exclusive: true);
+                    if (createRoomDialog != null && !createRoomDialog.InitDialog4TeamMatch(array[selected].Map, array[selected].ModeMask))
+                        DialogManager.Instance.Clear();
+                }
+
+                // Button: DELETE (existing)
+                GUI.enabled = true;
+                rc = new Rect(crdBtns[2]);
+                if (chatView) rc = crdBtns2[2];
+
+                GUIContent delContent = new GUIContent(StringMgr.Instance.Get("DELETE").ToUpper(), GlobalVars.Instance.iconGarbage);
+                if (GlobalVars.Instance.MyButton3(rc, delContent, "BtnAction"))
+                {
+                    CSNetManager.Instance.Sock.SendCS_DEL_DOWNLOAD_MAP_REQ(array[selected].Map);
+                    selected = 0;
+                }
+
+                GUI.enabled = true;
+            }
+        }
 	}
 }

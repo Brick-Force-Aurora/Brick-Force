@@ -2070,10 +2070,10 @@ public class CreateRoomDialog : Dialog
 		return result;
 	}
 
-	private bool DoCreator()
-	{
-		bool result = false;
-		bool flag = MyInfoManager.Instance.HaveFunction("premium_account") >= 0;
+    private bool DoCreator()
+    {
+        bool result = false;
+        bool flag = MyInfoManager.Instance.HaveFunction("premium_account") >= 0;
 
         //quickFilters
         bool changed = umiMapFilter.Draw(new Vector2(500f, 20f), new Rect(500f, 30f, 210f, 26f));
@@ -2090,142 +2090,114 @@ public class CreateRoomDialog : Dialog
         int num = visibleCount / 3;
 		if (visibleCount % 3 > 0)
 		{
-			num++;
-		}
-		bool flag2 = false;
-		Rect viewRect = new Rect(0f, 0f, crdMapSize.x * 3f + crdMapOffset.x * 2f, crdMapSize.y * (float)num);
-		if (num > 1)
-		{
-			viewRect.height += crdMapOffset.y * (float)(num - 1);
-		}
-		umiScrollPosition = GUI.BeginScrollView(crdUserMapRect, umiScrollPosition, viewRect);
+            num++;
+        }
+        bool flag2 = false;
+        Rect viewRect = new Rect(0f, 0f, crdMapSize.x * 3f + crdMapOffset.x * 2f, crdMapSize.y * (float)num);
+        if (num > 1)
+        {
+            viewRect.height += crdMapOffset.y * (float)(num - 1);
+        }
+        umiScrollPosition = GUI.BeginScrollView(crdUserMapRect, umiScrollPosition, viewRect);
         for (int i = 0; i < num; i++)
-		{
-			for (int j = 0; j < 3; j++)
-			{
-				int num2 = 3 * i + j;
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                int num2 = 3 * i + j;
                 if (num2 < visibleCount)
-				{
-                    num2 = visible[num2];   // <-- index into umi[]
-                    Texture2D texture2D = emptySlot;
-					//wrapped with try catch to catch that anoying nullpointer, this gets called like every frame but atleast the map loads
-                    try
+                {
+                    num2 = visible[num2];
+                    Texture2D texture2D = null;
+                    texture2D = ((umi[num2].Alias.Length <= 0) ? emptySlot : ((!(umi[num2].Thumbnail == null)) ? umi[num2].Thumbnail : nonAvailable));
+                    Rect rect = new Rect((float)j * (crdMapSize.x + crdMapOffset.x), (float)i * (crdMapSize.y + crdMapOffset.y), crdMapSize.x, crdMapSize.y);
+                    Rect position = new Rect(rect.x, rect.y, rect.width, rect.width);
+                    TextureUtil.DrawTexture(position, texture2D, ScaleMode.StretchToFill);
+                    if (GlobalVars.Instance.MyButton(rect, string.Empty, (!umi[num2].IsPremium) ? "BoxMapSelectBorder" : "BoxMapSelectBorderPremium") && (!umi[num2].IsPremium || flag))
                     {
-                        if (umi[num2] == null || num2 == 0)
+                        umiSlot = umi[num2].Slot;
+                        if (Time.time - lastClickTime > doubleClickTimeout)
                         {
-                            texture2D = emptySlot;
+                            lastClickTime = Time.time;
                         }
                         else
                         {
-                            if (umi[num2].Alias.Length <= 0 || umi[num2].regMap.Alias.Length <= 0)
-                            {
-                                texture2D = emptySlot;
-                            }
-                            else
-                            {
-                                texture2D = umi[num2].Thumbnail;
-                            }
-
-                            if (texture2D == null)
-                            {
-                                texture2D = nonAvailable;
-                            }
+                            flag2 = true;
                         }
                     }
-                    catch (NullReferenceException ex)
+                    if (umi[num2].Alias.Length > 0)
                     {
-                        Debug.LogError($"NullReferenceException encountered: {ex.Message}");
-                        texture2D = nonAvailable; // Assign a default value to ensure stability
+                        LabelUtil.TextOut(new Vector2(rect.x + crdAlias.x, rect.y + crdAlias.y), umi[num2].Alias, "MiniLabel", txtMainClr, GlobalVars.txtEmptyColor, TextAnchor.UpperLeft);
                     }
-                    Rect rect = new Rect((float)j * (crdMapSize.x + crdMapOffset.x), (float)i * (crdMapSize.y + crdMapOffset.y), crdMapSize.x, crdMapSize.y);
-					Rect position = new Rect(rect.x, rect.y, rect.width, rect.width);
-					TextureUtil.DrawTexture(position, texture2D, ScaleMode.StretchToFill);
-					if (GlobalVars.Instance.MyButton(rect, string.Empty, (!umi[num2].IsPremium) ? "BoxMapSelectBorder" : "BoxMapSelectBorderPremium") && (!umi[num2].IsPremium || flag))
-					{
-						umiSlot = umi[num2].Slot;
-						if (Time.time - lastClickTime > doubleClickTimeout)
-						{
-							lastClickTime = Time.time;
-						}
-						else
-						{
-							flag2 = true;
-						}
-					}
-					if (umi[num2].Alias.Length > 0)
-					{
-						LabelUtil.TextOut(new Vector2(rect.x + crdAlias.x, rect.y + crdAlias.y), umi[num2].Alias, "MiniLabel", txtMainClr, GlobalVars.txtEmptyColor, TextAnchor.UpperLeft);
-					}
-					bool flag3 = false;
-					if (umi[num2].IsPremium)
-					{
-						if (!flag)
-						{
-							flag3 = true;
-							TextureUtil.DrawTexture(new Rect(rect.x + (rect.width - (float)slotLock.width) / 2f, rect.y + (rect.height - (float)slotLock.height) / 2f - 13f, (float)slotLock.width, (float)slotLock.height), slotLock, ScaleMode.StretchToFill);
-						}
-						TextureUtil.DrawTexture(new Rect(rect.x + 2f, rect.y + 2f, (float)premiumIcon.width, (float)premiumIcon.height), premiumIcon);
-					}
-					if (!flag3 && umi[num2].Alias.Length <= 0)
-					{
-						TextureUtil.DrawTexture(new Rect(rect.x + (rect.width - (float)slotEmpty.width) / 2f, rect.y + (rect.height - (float)slotEmpty.height) / 2f - 13f, (float)slotEmpty.width, (float)slotEmpty.height), slotEmpty, ScaleMode.StretchToFill);
-					}
-					if (umiSlot == umi[num2].Slot)
-					{
-						TextureUtil.DrawTexture(rect, selectedMapFrame, ScaleMode.StretchToFill);
-					}
-				}
-			}
-		}
-		GUI.EndScrollView();
-		GUI.Box(crdHLineMapDiv, string.Empty, "DivideLine");
-		UserMapInfo userMapInfo = UserMapInfoManager.Instance.Get(umiSlot);
-		if (flag2 && userMapInfo != null)
-		{
-			result = ((userMapInfo.Alias.Length <= 0) ? CreateMapEditorNew(userMapInfo) : CreateMapEditorLoad(userMapInfo));
-		}
-		GUIContent content = new GUIContent(StringMgr.Instance.Get("CREATE_ROOM").ToUpper(), GlobalVars.Instance.iconBlock);
-		if ((GlobalVars.Instance.MyButton3(crdButtonOk, content, "BtnAction") || GlobalVars.Instance.IsReturnPressed()) && userMapInfo != null)
-		{
-			result = ((userMapInfo.Alias.Length <= 0) ? CreateMapEditorNew(userMapInfo) : CreateMapEditorLoad(userMapInfo));
-		}
-		bool enabled = GUI.enabled;
-		GUI.enabled = (userMapInfo != null && userMapInfo.Alias.Length <= 0);
-		string text = newMapName;
-		TextureUtil.DrawTexture(crdNewMapNamePoint, mapIcon, ScaleMode.StretchToFill);
-		LabelUtil.TextOut(crdNewMapName, StringMgr.Instance.Get("MAP_NAME"), "Label", txtMainClr, GlobalVars.txtEmptyColor, TextAnchor.UpperRight);
-		newMapName = GUI.TextField(crdNewMapNameTxtFld, newMapName);
-		if (newMapName.Length > maxMapName)
-		{
-			newMapName = text;
-		}
-		int num3 = skyboxes.Length / xCount;
-		if (skyboxes.Length % xCount > 0)
-		{
-			num3++;
-		}
-		TextureUtil.DrawTexture(crdSkyboxPoint, mapIcon, ScaleMode.StretchToFill);
-		LabelUtil.TextOut(crdSkyboxLabel, StringMgr.Instance.Get("SKYBOX"), "Label", txtMainClr, GlobalVars.txtEmptyColor, TextAnchor.LowerLeft);
-		Rect rect2 = new Rect(0f, 0f, (float)xCount * crdSkyboxSize.x, (float)num3 * crdSkyboxSize.y);
-		skyboxScrollPosition = GUI.BeginScrollView(crdSkyboxView, skyboxScrollPosition, rect2);
-		skybox = GUI.SelectionGrid(rect2, skybox, skyboxes, xCount, "SelRect");
-		GUI.EndScrollView();
-		num3 = landscapes.Length / xCount;
-		if (landscapes.Length % xCount > 0)
-		{
-			num3++;
-		}
-		TextureUtil.DrawTexture(crdLandscapePoint, mapIcon, ScaleMode.StretchToFill);
-		LabelUtil.TextOut(crdLandscapeLabel, StringMgr.Instance.Get("LANDSCAPE"), "Label", txtMainClr, GlobalVars.txtEmptyColor, TextAnchor.LowerLeft);
-		Rect rect3 = new Rect(0f, 0f, (float)xCount * crdLandscapeSize.x, (float)num3 * crdLandscapeSize.y);
-		landscapeScrollPosition = GUI.BeginScrollView(crdLandscapeView, landscapeScrollPosition, rect3);
-		landscape = GUI.SelectionGrid(rect3, landscape, landscapes, xCount, "SelRect");
-		GUI.EndScrollView();
-		GUI.enabled = enabled;
-		return result;
-	}
+                    bool flag3 = false;
+                    if (umi[num2].IsPremium)
+                    {
+                        if (!flag)
+                        {
+                            flag3 = true;
+                            TextureUtil.DrawTexture(new Rect(rect.x + (rect.width - (float)slotLock.width) / 2f, rect.y + (rect.height - (float)slotLock.height) / 2f - 13f, (float)slotLock.width, (float)slotLock.height), slotLock, ScaleMode.StretchToFill);
+                        }
+                        TextureUtil.DrawTexture(new Rect(rect.x + 2f, rect.y + 2f, (float)premiumIcon.width, (float)premiumIcon.height), premiumIcon);
+                    }
+                    if (!flag3 && umi[num2].Alias.Length <= 0)
+                    {
+                        TextureUtil.DrawTexture(new Rect(rect.x + (rect.width - (float)slotEmpty.width) / 2f, rect.y + (rect.height - (float)slotEmpty.height) / 2f - 13f, (float)slotEmpty.width, (float)slotEmpty.height), slotEmpty, ScaleMode.StretchToFill);
+                    }
+                    if (umiSlot == umi[num2].Slot)
+                    {
+                        TextureUtil.DrawTexture(rect, selectedMapFrame, ScaleMode.StretchToFill);
+                    }
+                }
+            }
+        }
+        GUI.EndScrollView();
+        GUI.Box(crdHLineMapDiv, string.Empty, "DivideLine");
+        UserMapInfo userMapInfo = UserMapInfoManager.Instance.Get(umiSlot);
+        if (flag2 && userMapInfo != null)
+        {
+            result = ((userMapInfo.Alias.Length <= 0) ? CreateMapEditorNew(userMapInfo) : CreateMapEditorLoad(userMapInfo));
+        }
+        GUIContent content = new GUIContent(StringMgr.Instance.Get("CREATE_ROOM").ToUpper(), GlobalVars.Instance.iconBlock);
+        if ((GlobalVars.Instance.MyButton3(crdButtonOk, content, "BtnAction") || GlobalVars.Instance.IsReturnPressed()) && userMapInfo != null)
+        {
+            result = ((userMapInfo.Alias.Length <= 0) ? CreateMapEditorNew(userMapInfo) : CreateMapEditorLoad(userMapInfo));
+        }
+        bool enabled = GUI.enabled;
+        GUI.enabled = (userMapInfo != null && userMapInfo.Alias.Length <= 0);
+        string text = newMapName;
+        TextureUtil.DrawTexture(crdNewMapNamePoint, mapIcon, ScaleMode.StretchToFill);
+        LabelUtil.TextOut(crdNewMapName, StringMgr.Instance.Get("MAP_NAME"), "Label", txtMainClr, GlobalVars.txtEmptyColor, TextAnchor.UpperRight);
+        newMapName = GUI.TextField(crdNewMapNameTxtFld, newMapName);
+        if (newMapName.Length > maxMapName)
+        {
+            newMapName = text;
+        }
+        int num3 = skyboxes.Length / xCount;
+        if (skyboxes.Length % xCount > 0)
+        {
+            num3++;
+        }
+        TextureUtil.DrawTexture(crdSkyboxPoint, mapIcon, ScaleMode.StretchToFill);
+        LabelUtil.TextOut(crdSkyboxLabel, StringMgr.Instance.Get("SKYBOX"), "Label", txtMainClr, GlobalVars.txtEmptyColor, TextAnchor.LowerLeft);
+        Rect rect2 = new Rect(0f, 0f, (float)xCount * crdSkyboxSize.x, (float)num3 * crdSkyboxSize.y);
+        skyboxScrollPosition = GUI.BeginScrollView(crdSkyboxView, skyboxScrollPosition, rect2);
+        skybox = GUI.SelectionGrid(rect2, skybox, skyboxes, xCount, "SelRect");
+        GUI.EndScrollView();
+        num3 = landscapes.Length / xCount;
+        if (landscapes.Length % xCount > 0)
+        {
+            num3++;
+        }
+        TextureUtil.DrawTexture(crdLandscapePoint, mapIcon, ScaleMode.StretchToFill);
+        LabelUtil.TextOut(crdLandscapeLabel, StringMgr.Instance.Get("LANDSCAPE"), "Label", txtMainClr, GlobalVars.txtEmptyColor, TextAnchor.LowerLeft);
+        Rect rect3 = new Rect(0f, 0f, (float)xCount * crdLandscapeSize.x, (float)num3 * crdLandscapeSize.y);
+        landscapeScrollPosition = GUI.BeginScrollView(crdLandscapeView, landscapeScrollPosition, rect3);
+        landscape = GUI.SelectionGrid(rect3, landscape, landscapes, xCount, "SelRect");
+        GUI.EndScrollView();
+        GUI.enabled = enabled;
+        return result;
+    }
 
-	private int GetRoomTypeIndex(Room.ROOM_TYPE roomType)
+    private int GetRoomTypeIndex(Room.ROOM_TYPE roomType)
 	{
 		for (int i = 0; i < roomTypes.Length; i++)
 		{

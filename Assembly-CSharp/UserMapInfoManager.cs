@@ -337,7 +337,7 @@ public class UserMapInfoManager : MonoBehaviour
 			}
 			b = (int)(b + 1);
 		}
-		int b2 = 1;
+		/*int b2 = 1;
 		while (num > 0)
 		{
 			UserMapInfo userMapInfo2 = Get(b2);
@@ -347,7 +347,7 @@ public class UserMapInfoManager : MonoBehaviour
 				listUMI.Add(b2, new UserMapInfo(b2, 1));
 			}
 			b2 = (int)(b2 + 1);
-		}
+		}*/
 	}
 
 	public void AddOrUpdate(int slot, string alias, int brickCount, DateTime lastModified, sbyte premium)

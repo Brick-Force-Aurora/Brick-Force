@@ -18,32 +18,24 @@ public class UserMapInfo
 
 	public RegMap regMap; //added to support editing of existing maps
 
-	public Texture2D Thumbnail
-	{
-		get
-		{
-            if (regMap == null)
-            {
-				Debug.LogError("REGMAP IS NULL");
-				return null;
-            }
-            if (regMap.Thumbnail != null)
-			{
-				return regMap.Thumbnail;
-			}
-			if (null == thumbnail && alias.Length > 0 && lastModified.Year > 1971)
-			{
-				ThumbnailDownloader.Instance.Enqueue(isUserMap: true, slot);
-			}
-			return thumbnail;
-		}
-		set
-		{
-			thumbnail = value;
-		}
-	}
+    public Texture2D Thumbnail
+    {
+        get
+        {
+            // registered map thumbnail if available
+            if (regMap != null && regMap.Thumbnail != null)
+                return regMap.Thumbnail;
 
-	public int Slot => slot;
+            // local slot thumbnail
+            if (thumbnail == null && alias.Length > 0 && lastModified.Year > 1971)
+                ThumbnailDownloader.Instance.Enqueue(isUserMap: true, slot);
+
+            return thumbnail;
+        }
+        set => thumbnail = value;
+    }
+
+    public int Slot => slot;
 
 	public string Alias
 	{
@@ -99,10 +91,11 @@ public class UserMapInfo
 	{
 		slot = _slot;
 		alias = string.Empty;
-		premium = _premium;
+        thumbnail = null;
+        premium = _premium;
 
-		if (slot > 0)
-			AssignRegMap(RegMapManager.Instance.Get(slot));
+		//if (slot > 0)
+			//AssignRegMap(RegMapManager.Instance.Get(slot));
 	}
 
 	public UserMapInfo(int _slot, string _alias, int _brickCount, DateTime _lastModified, sbyte _premium)
@@ -111,10 +104,11 @@ public class UserMapInfo
 		alias = _alias;
 		brickCount = _brickCount;
 		lastModified = _lastModified;
-		premium = _premium;
+        thumbnail = null;
+        premium = _premium;
 
-		if (slot > 0)
-			AssignRegMap(RegMapManager.Instance.Get(slot));
+		//if (slot > 0)
+			//AssignRegMap(RegMapManager.Instance.Get(slot));
 	}
 
 	//added to support editing of existing maps

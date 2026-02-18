@@ -231,15 +231,43 @@ namespace _Emulator
                 Debug.LogError("Couldn't cache map");
         }
 
-        public void CacheMapGenerate(int landscapeIndex, int skyboxIndex, string alias)
+        public void CacheMapFromSlot(UserMapInfo umi)
+        {
+            if (umi == null)
+            {
+                Debug.LogError("CacheMapFromSlot: umi is null");
+                return;
+            }
+
+            mapCached = true;
+
+            cachedMap.Clear();
+
+            // IMPORTANT: load local geometry file for this slot
+            // This uses UserMap.Load(int mapIndex) which loads downloaded{mapIndex}.geometry
+            if (!cachedMap.Load(umi.Slot))
+            {
+                Debug.LogWarning($"CacheMapFromSlot: No geometry for slot {umi.Slot}, starting empty map");
+                // If you want: keep cachedMap empty and continue
+            }
+
+            cachedUMI = umi;
+
+            // IMPORTANT: do NOT link any regMap here
+            cachedUMI.AssignRegMap(null);
+        }
+
+
+        public void CacheMapGenerate(int slot, int landscapeIndex, int skyboxIndex, string alias)
         {
             mapCached = true;
             cachedMap.Clear();
             cachedMap = MapGenerator.instance.Generate(landscapeIndex, skyboxIndex);
+
             DateTime time = DateTime.Now;
-            int hashId = MapGenerator.instance.GetHashIdForTime(time);
-            cachedMap.map = hashId;
-            cachedUMI = new UserMapInfo(hashId, alias, cachedMap.dic.Keys.Count, time, 0);
+
+            cachedMap.map = slot; // 1..12
+            cachedUMI = new UserMapInfo(slot, alias, cachedMap.dic.Keys.Count, time, 0);
         }
 
         public int GetNextBrickSeq()
