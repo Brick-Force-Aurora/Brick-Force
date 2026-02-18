@@ -274,7 +274,7 @@ namespace _Emulator
             Say((int)ExtensionOpcodes.opBulkBrickReq, mb);
         }
 
-        private void HandleCS_BULK_BRICK_ACK(MsgBody msg)
+        private void HandleBulkBrickAck(MsgBody msg)
         {
             msg.Read(out int playerSeq);
             msg.Read(out ushort count);
@@ -312,7 +312,7 @@ namespace _Emulator
             }
         }
 
-        private void HandleCS_BULK_BRICK_FAIL_ACK(MsgBody msg)
+        private void HandleBulkBrickFailAck(MsgBody msg)
         {
             msg.Read(out int val);
             Debug.LogError("Failed to process Bulkbrick " + val);

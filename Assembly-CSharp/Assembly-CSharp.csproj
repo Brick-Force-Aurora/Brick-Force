@@ -727,6 +727,9 @@
     <Compile Include="ZombieTimer.cs" />
     <Compile Include="ZombieVirus.cs" />
     <Compile Include="ZombieVsHumanManager.cs" />
+    <Compile Include="_Emulator\Command\CommandHandler.cs" />
+    <Compile Include="_Emulator\Command\Official\WhispherCommand.cs" />
+    <Compile Include="_Emulator\Command\Official\WhispherReplyCommand.cs" />
     <Compile Include="_Emulator\Config.cs" />
     <Compile Include="_Emulator\HooksNative.cs" />
     <Compile Include="_Emulator\Menu\ImGuiBackend.cs" />
