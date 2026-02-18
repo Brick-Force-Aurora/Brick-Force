@@ -40,6 +40,11 @@ namespace _Emulator
 
                 initialized = true;
             }
+            if (GameObject.Find("PerfOverlay") == null)
+            {
+                var go = new GameObject("PerfOverlay");
+                go.AddComponent<PerfOverlay>();
+            }
         }
 
         private float GetTableHeight()
