@@ -359,7 +359,7 @@ public class UserMapInfoManager : MonoBehaviour
 				item.Value.Alias = alias;
 				item.Value.BrickCount = brickCount;
 				item.Value.LastModified = lastModified;
-				item.Value.Thumbnail = null;
+				//item.Value.Thumbnail = null;
 				return;
 			}
 		}
