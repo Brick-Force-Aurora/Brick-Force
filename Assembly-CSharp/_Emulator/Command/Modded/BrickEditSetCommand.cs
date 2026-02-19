@@ -10,7 +10,7 @@
         public void Execute(CommandContext context)
         {
             context.Reader.ReadTokens(0, 1, out string[] tokens);
-            if (!context.IsInAuthorizedBuildRoom() || !tokens.AsBrick(0, out byte template))
+            if (!context.IsInAuthorizedBuildRoom() || !EditHelper.CheckSelection() || !tokens.AsBrick(0, out byte template))
             {
                 return;
             }

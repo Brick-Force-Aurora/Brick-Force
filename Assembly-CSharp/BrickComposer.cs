@@ -560,34 +560,27 @@ public class BrickComposer : WeaponFunction
 		}
 		*/
         if (!UserMapInfoManager.Instance.CheckAuth(showMessage: true) || tools == null)
-		{
-			return;
-		}
+        {
+            return;
+        }
+        BrickInst hitBrickInst = BrickManager.Instance.GetHitBrickInst(hitBrick.transform.gameObject, hitBrick.normal, hitBrick.point);
+		Vector3 pos = hitBrick.point;
+        if (hitBrickInst != null)
+        {
+			pos = new Vector3(hitBrickInst.PosX, hitBrickInst.PosY, hitBrickInst.PosZ);
+        }
 		ReplaceTool tool = tools.GetReplaceTool();
 		if (tool == null)
 		{
 			return;
         }
-        Brick currentBrick = PaletteManager.Instance.GetCurrentBrick();
-		if (currentBrick == null || !currentBrick.IsEnable(RoomManager.Instance.CurrentRoomType)) 
-		{
-			return;
-        }
-        Vector3 newBricksPos = GetNewBricksPos(currentBrick, hitBrick.normal, hitBrick.point);
-        byte newBricksRot = GetNewBricksRot(currentBrick, hitBrick.normal);
-        byte x = 0;
-        byte y = 0;
-        byte z = 0;
-		if (!BrickManager.Instance.ToCoord(newBricksPos, ref x, ref y, ref z))
-		{
-			return;
-		}
         if (custom_inputs.Instance.GetButtonDown("K_FIRE1"))
 		{
-			tool.SetPos1(x, y, z, newBricksRot);
+			tool.SetRotation(hitBrick.normal, GetRotFromCameraDir());
+			tool.SetPos1(pos);
 		} else if (custom_inputs.Instance.GetButtonDown("K_FIRE2"))
         {
-            tool.SetPos2(x, y, z);
+            tool.SetPos2(pos);
         }
 		// AURORA - End
 	}
@@ -996,8 +989,16 @@ public class BrickComposer : WeaponFunction
 		updateAutoFeverKey();
 		updateAutoBuildGun();
 		deltaTime += Time.deltaTime;
-		PaletteManager.Instance.CheckShortCut();
-		PaletteManager.Instance.CheckDragAndDrop();
+		// AURORA - Start: Fix palette changing while in chat
+		/*
+        PaletteManager.Instance.CheckShortCut();
+		*/
+        if (!battleChat.IsChatting)
+        {
+            PaletteManager.Instance.CheckShortCut();
+        }
+        // AURORA - End
+        PaletteManager.Instance.CheckDragAndDrop();
 		bool flag = false;
 		if (!Application.loadedLevelName.Contains("Tutor"))
 		{

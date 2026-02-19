@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using System.Reflection;
+using UnityEngine;
 
 namespace _Emulator
 {
@@ -14,7 +16,7 @@ namespace _Emulator
                 if (_editorTools == null)
                 {
                     GameObject main = GameObject.Find("Main");
-                    if (main == null)
+                    if (main != null)
                     {
                         _editorTools = main.GetComponent<EditorTools>();
                     }
@@ -36,6 +38,25 @@ namespace _Emulator
             }
         }
 
+        public static bool CheckSelection()
+        {
+            ReplaceTool tool = ReplaceTool;
+            if (tool == null) {
+                return false;
+            }
+            if (!tool.HasPos1)
+            {
+                Actor.Instance.SendChat("Please set Position 1 first.");
+                return false;
+            }
+            if (!tool.HasPos2)
+            {
+                Actor.Instance.SendChat("Please set Position 2 first.");
+                return false;
+            }
+            return true;
+        }
+
     }
 
     public static class EditHelperExtensions
@@ -50,13 +71,57 @@ namespace _Emulator
             return UserMapInfoManager.Instance.CheckAuth(true);
         }
 
-        public static bool AsBrick(this string[] tokens, int index, out byte template)
+        public static bool AsBrick(this string[] tokens, int index, out byte template, bool allowPalette = true)
         {
             if (tokens.Length <= index)
             {
-                return BrickCache.Instance.GetCurrentBrick(out template);
+                if (allowPalette)
+                {
+                    return BrickCache.Instance.GetCurrentBrick(out template);
+                }
+                Actor.Instance.SendChat("No brick provided in command");
+                template = 0;
+                return false;
             }
             return byte.TryParse(tokens[index], out template) || BrickCache.Instance.GetBrickByName(tokens[index], out template);
+        }
+
+        public static bool AddBrickBulk(this BrickManager brickManager, int seq, byte x, byte y, byte z, byte index, byte rotation, ref List<int> morphes)
+        {
+            return brickManager.userMap.AddBrickInst(seq, index, x, y, z, rotation, ref morphes) && brickManager.Create(seq, brickManager.userMap.GetMeshCode(seq), index, new Vector3(x, y, z), rotation, combineMesh: true);
+        }
+
+        public static void UpdateBrickChunksBulk(this BrickManager brickManager, ref List<int> morphes)
+        {
+            List<GameObject> modifiedChunks = new List<GameObject>();
+            foreach (int item in morphes)
+            {
+                brickManager.Morph(item, ref modifiedChunks);
+            }
+            foreach (GameObject item2 in modifiedChunks)
+            {
+                BrickChunk component = item2.GetComponent<BrickChunk>();
+                if (null != component)
+                {
+                    component.Merge();
+                }
+            }
+        }
+
+        public static bool DeleteBrickBulk(this BrickManager brickManager, int seq, ref List<int> morphes)
+        {
+            try
+            {
+                return brickManager.userMap.DelBrickInst(seq, ref morphes);
+            }
+            finally
+            {
+                if (brickManager.dicBrickCreators.ContainsKey(seq))
+                {
+                    Object.DestroyImmediate(brickManager.dicBrickCreators[seq]);
+                    brickManager.dicBrickCreators.Remove(seq);
+                }
+            }
         }
 
     }

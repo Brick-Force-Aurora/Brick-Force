@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using UnityEngine;
 
 namespace _Emulator
 {
@@ -23,8 +24,27 @@ namespace _Emulator
                     brickName = brick.brickName;
                 }
                 brickName = brickName.ToLower().Replace(' ', '_');
+                if (aliasToId.ContainsKey(brickName))
+                {
+                    if (!aliasToId.ContainsKey(brickName + "_1"))
+                    {
+                        aliasToId.Add(brickName + "_1", aliasToId[brickName]);
+                    }
+                    brickName = ResolveConflict(brickName);
+                }
                 aliasToId.Add(brickName, brick.index);
             }
+        }
+
+        private string ResolveConflict(string baseName)
+        {
+            string name = baseName;
+            int tries = 2;
+            while (aliasToId.ContainsKey(name))
+            {
+                name = baseName + '_' + (tries++);
+            }
+            return name;
         }
 
         internal void Init() { }
@@ -52,7 +72,7 @@ namespace _Emulator
             {
                 if (message)
                 {
-                    Actor.Instance.SendChat("No block selected in palette or provided in command");
+                    Actor.Instance.SendChat("No brick selected in palette or provided in command");
                 }
                 brickIndex = 0;
                 return false;

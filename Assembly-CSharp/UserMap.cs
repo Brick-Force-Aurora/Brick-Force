@@ -912,7 +912,7 @@ public class UserMap
 						byCoord.Code |= Brick.shadowCodeSet[(int)Brick.opposite[(int)dIR]];
 					}
 					morphes.Add(byCoord.Seq);
-					if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq)
+					if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
 					{
 						CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(byCoord.Seq, byCoord.Code);
 					}

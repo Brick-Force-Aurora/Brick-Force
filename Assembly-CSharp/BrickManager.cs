@@ -91,7 +91,7 @@ public class BrickManager : MonoBehaviour
 
 	private Dictionary<int, GameObject> dicBricks;
 
-	private Dictionary<int, GameObject> dicBrickCreators;
+	public Dictionary<int, GameObject> dicBrickCreators;
 
 	public UserMap userMap;
 
@@ -1415,7 +1415,7 @@ public class BrickManager : MonoBehaviour
 		}
 	}
 
-	private void Morph(int seq, ref List<GameObject> modifiedChunks)
+	public void Morph(int seq, ref List<GameObject> modifiedChunks)
 	{
 		if (dicBricks.ContainsKey(seq))
 		{
@@ -1470,7 +1470,7 @@ public class BrickManager : MonoBehaviour
 		}
 	}
 
-	private bool Create(int seq, ushort meshCode, byte index, Vector3 position, byte rot, bool combineMesh)
+	public bool Create(int seq, ushort meshCode, byte index, Vector3 position, byte rot, bool combineMesh)
 	{
 		if (!dicTBrick.ContainsKey(index))
 		{

@@ -732,12 +732,16 @@
     <Compile Include="_Emulator\BrickEdit\IOperation.cs" />
     <Compile Include="_Emulator\BrickEdit\OperationProcessor.cs" />
     <Compile Include="_Emulator\BrickEdit\Operation\DeleteOperation.cs" />
+    <Compile Include="_Emulator\BrickEdit\Operation\ReplaceOperation.cs" />
     <Compile Include="_Emulator\BrickEdit\Operation\SetOperation.cs" />
     <Compile Include="_Emulator\Command\Actor.cs" />
     <Compile Include="_Emulator\Command\CommandContext.cs" />
     <Compile Include="_Emulator\Command\CommandHandler.cs" />
     <Compile Include="_Emulator\Command\ICommand.cs" />
+    <Compile Include="_Emulator\Command\Modded\BrickEditPos2Command.cs" />
     <Compile Include="_Emulator\Command\Modded\BrickEditRemoveCommand.cs" />
+    <Compile Include="_Emulator\Command\Modded\BrickEditPos1Command.cs" />
+    <Compile Include="_Emulator\Command\Modded\BrickEditReplaceCommand.cs" />
     <Compile Include="_Emulator\Command\Modded\BrickEditSetCommand.cs" />
     <Compile Include="_Emulator\Command\Official\WhisperReplyCommand.cs" />
     <Compile Include="_Emulator\Command\Official\WhisperCommand.cs" />

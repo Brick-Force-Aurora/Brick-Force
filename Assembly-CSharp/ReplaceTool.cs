@@ -1,3 +1,5 @@
+using _Emulator;
+using Microsoft.SqlServer.Server;
 using System;
 using UnityEngine;
 
@@ -8,7 +10,11 @@ public class ReplaceTool : EditorTool
     private byte x1, y1, z1;
 	private byte x2, y2, z2;
 	private bool hasPos1 = false, hasPos2 = false;
-	private byte rotation;
+	private Vector3 rotationNormal;
+	private byte cameraRotation;
+
+    public bool HasPos1 { get { return hasPos1; } }
+    public bool HasPos2 { get { return hasPos2; } }
     // AURORA - End
 
     public ReplaceTool(EditorToolScript ets, Item i, BattleChat _battleChat)
@@ -45,61 +51,119 @@ public class ReplaceTool : EditorTool
     }
 
 	// AURORA - Start: Change Replace tool to Selection tool
-	public void SetPos1(byte x, byte y, byte z, byte rot)
+	public void SetRotation(Vector3 normal, byte rotation)
+	{
+		this.rotationNormal = normal;
+		this.cameraRotation = rotation;
+	}
+
+	public void SetPos1(Vector3 pos)
     {
-		x1 = x;
-		y1 = y;
-		z1 = z;
-		rotation = rot;
-		hasPos1 = true;
+        hasPos1 = ToCoords(pos, out x1, out y1, out z1);
+        SendPos1();
+    }
+
+    public void SetPos1(byte x, byte y, byte z)
+    {
+        hasPos1 = true;
+        x1 = x;
+        y1 = y;
+        z1 = z;
+        SendPos1();
+    }
+
+    private void SendPos1()
+    {
         GameObject main = GameObject.Find("Main");
         if (main != null)
         {
-            main.BroadcastMessage("OnChat", new ChatText(ChatText.CHAT_TYPE.SYSTEM, -1, "", $"[BrickEdit] Position 1 set to {x} {y} {z} ({GetBlockCount()} brick(s))"));
+            if (!hasPos1)
+            {
+                Actor.Instance.SendChat($"[BrickEdit] Position 1 cleared ({GetBlockCount()} brick(s))");
+                return;
+            }
+            Actor.Instance.SendChat($"[BrickEdit] Position 1 set to {x1} {y1} {z1} ({GetBlockCount()} brick(s))");
         }
+    }
+
+    public void SetPos2(Vector3 pos)
+    {
+        hasPos2 = ToCoords(pos, out x2, out y2, out z2);
+        SendPos2();
     }
 
     public void SetPos2(byte x, byte y, byte z)
     {
-		x2 = x;
-		y2 = y;
-		z2 = z;
         hasPos2 = true;
+        x2 = x;
+        y2 = y;
+        z2 = z;
+        SendPos2();
+    }
+
+    private void SendPos2()
+    {
         GameObject main = GameObject.Find("Main");
         if (main != null)
         {
-            main.BroadcastMessage("OnChat", new ChatText(ChatText.CHAT_TYPE.SYSTEM, -1, "", $"[BrickEdit] Position 2 set to {x} {y} {z} ({GetBlockCount()} brick(s))"));
+            if (!hasPos1)
+            {
+                Actor.Instance.SendChat($"[BrickEdit] Position 2 cleared ({GetBlockCount()} brick(s))");
+                return;
+            }
+            Actor.Instance.SendChat($"[BrickEdit] Position 2 set to {x2} {y2} {z2} ({GetBlockCount()} brick(s))");
         }
     }
 
-	public void GetRotation(out byte rotation)
+    private bool ToCoords(Vector3 pos, out byte x, out byte y, out byte z)
 	{
-		rotation = this.rotation;
+		if (pos.x < 0 || pos.y < 0 || pos.z < 0 || pos.x > 255 || pos.y > 255 || pos.z > 255)
+		{
+			x = 0; y = 0; z = 0;
+			return false;
+		}
+		x = (byte)Mathf.FloorToInt(pos.x);
+        y = (byte)Mathf.FloorToInt(pos.y);
+        z = (byte)Mathf.FloorToInt(pos.z);
+        return true;
 	}
 
-    public void GetPos1(out byte x, out byte y, out byte z)
+	public bool GetRotation(out byte rotation, byte brickIndex)
 	{
-		x = x1;
-		y = y1;
-		z = z1;
+		Brick brick = BrickManager.Instance.GetBrick(brickIndex);
+		if (brick == null)
+		{
+			rotation = 0;
+			return false;
+        }
+		rotation = 0;
+        if (brick.directionable)
+        {
+            rotation = (byte)((!(rotationNormal == Vector3.forward)) ? ((rotationNormal == Vector3.right) ? 1 : ((rotationNormal == Vector3.back) ? 2 : ((!(rotationNormal == Vector3.left)) ? cameraRotation : 3))) : 0);
+        }
+		return true;
     }
-
+    public void GetPos1(out byte x, out byte y, out byte z)
+    {
+        x = x1;
+        y = y1;
+        z = z1;
+    }
     public void GetPos2(out byte x, out byte y, out byte z)
     {
         x = x2;
         y = y2;
         z = z2;
     }
-
     public int GetBlockCount()
-	{
-		if (!hasPos1 || !hasPos2)
-		{
-			return 0;
-		}
-		int width = Math.Abs(x2 - x1) + 1;
-		int height = Math.Abs(y2 - y1) + 1;
-		int depth = Math.Abs(z2 - z1) + 1;
+    {
+        if (!hasPos1 || !hasPos2)
+        {
+            return 0;
+        }
+        int width = Math.Abs(x2 - x1) + 1;
+        int height = Math.Abs(y2 - y1) + 1;
+        int depth = Math.Abs(z2 - z1) + 1;
 		return width * height * depth;
     }
     // AURORA - End

@@ -17,7 +17,7 @@ namespace _Emulator
             tool.GetPos1(out x1, out y1, out z1);
             tool.GetPos2(out x2, out y2, out z2);
             this.template = template;
-            tool.GetRotation(out rotation);
+            tool.GetRotation(out rotation, template);
         }
 
         public bool HasNextStep()
@@ -30,7 +30,7 @@ namespace _Emulator
             executed = true;
             OperationData data = this.NewData();
             data.flag = data.flag.Set(OperationFlag.IncludeEmpty);
-            data.targetTemplate = this.template;
+            data.targetTemplate = template;
             data.targetRotation = rotation;
             byte minX = Math.Min(x1, x2);
             byte minY = Math.Min(y1, y2);
@@ -38,7 +38,7 @@ namespace _Emulator
             byte maxX = Math.Max(x1, x2);
             byte maxY = Math.Max(y1, y2);
             byte maxZ = Math.Max(z1, z2);
-            byte[] coordinates = new byte[(maxX - minX + 1) * (maxY - minY + 1) * (maxZ * minZ + 1)];
+            byte[] coordinates = new byte[(maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1) * 3];
             int index = 0;
             for (byte x = minX; x <= maxX; x++)
             {

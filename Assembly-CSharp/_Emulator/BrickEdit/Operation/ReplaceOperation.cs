@@ -1,17 +1,24 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 
 namespace _Emulator
 {
-    public class DeleteOperation : IOperation
+    public class ReplaceOperation : IOperation
     {
 
         public readonly byte x1, y1, z1, x2, y2, z2;
+        public readonly byte sourceTemplate, targetTemplate, rotation;
 
         private bool executed = false;
-        public DeleteOperation(ReplaceTool tool)
+        public ReplaceOperation(ReplaceTool tool, byte sourceTemplate, byte targetTemplate)
         {
             tool.GetPos1(out x1, out y1, out z1);
             tool.GetPos2(out x2, out y2, out z2);
+            this.sourceTemplate = sourceTemplate;
+            this.targetTemplate = targetTemplate;
+            tool.GetRotation(out rotation, targetTemplate);
         }
 
         public bool HasNextStep()
@@ -23,7 +30,10 @@ namespace _Emulator
         {
             executed = true;
             OperationData data = this.NewData();
-            data.flag = data.flag.Set(OperationFlag.Delete);
+            data.flag = data.flag.Set(OperationFlag.OnlySource);
+            data.sourceTemplate = sourceTemplate;
+            data.targetTemplate = targetTemplate;
+            data.targetRotation = rotation;
             byte minX = Math.Min(x1, x2);
             byte minY = Math.Min(y1, y2);
             byte minZ = Math.Min(z1, z2);
@@ -50,7 +60,7 @@ namespace _Emulator
 
         public void Completed(ulong successCount)
         {
-            Actor.Instance.SendChat($"Successfully deleted {successCount} brick(s)");
+            Actor.Instance.SendChat($"Successfully replaced {successCount} brick(s)");
         }
     }
 }

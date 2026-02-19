@@ -4475,6 +4475,8 @@ namespace _Emulator
                 }
             }
 
+            Debug.Log($"BULK_REQ: Trying to change {count} brick(s)");
+
             int playerSeq = msgRef.client.seq;
 
             // Pre-read coordinates (so if msg is malformed we fail before touching map)
@@ -4522,7 +4524,7 @@ namespace _Emulator
                         {
                             if (flag.IsSet(OperationFlag.OnlySource))
                             {
-                                if (flag.IsSet(OperationFlag.ExcludeSourceType) || brickInst.Template != sourceIndex || (!flag.IsSet(OperationFlag.SourceWithRotation) || brickInst.Rot != sourceRotation))
+                                if (flag.IsSet(OperationFlag.ExcludeSourceType) || brickInst.Template != sourceIndex || (flag.IsSet(OperationFlag.SourceWithRotation) && brickInst.Rot != sourceRotation))
                                 {
                                     results[i] = -3; // Skipped cause it doesn't match
                                     continue;
@@ -4531,11 +4533,11 @@ namespace _Emulator
                             {
                                 if (brickInst.Template == sourceIndex && (!flag.IsSet(OperationFlag.SourceWithRotation) || brickInst.Rot == sourceRotation))
                                 {
-                                    results[i] = -3; // Skipped cause it doesn't match
+                                    results[i] = -3; // Skipped cause it matches
                                     continue;
                                 }
                             }
-                            if (brickInst.Template == targetIndex && brickInst.Rot == targetRotation)
+                            if (!flag.IsSet(OperationFlag.Delete) && brickInst.Template == targetIndex && brickInst.Rot == targetRotation)
                             {
                                 results[i] = 2; // Unchanged
                                 continue;
@@ -4548,12 +4550,23 @@ namespace _Emulator
                                 continue;
                             }
                             newSeqs.Add(brickSeq);
+                            if (flag.IsSet(OperationFlag.Delete))
+                            {
+                                results[i] = 0; // Brick deleted
+                                continue;
+                            }
+                            // Deletion successful continue with adding replacement brick
                             result = 1;
                         } else
                         {
-                            if (!flag.IsSet(OperationFlag.IncludeEmpty) || flag.IsSet(OperationFlag.Delete))
+                            if (!flag.IsSet(OperationFlag.IncludeEmpty))
                             {
-                                results[i] = -3;
+                                results[i] = -3; // Skipped
+                                continue;
+                            }
+                            if (flag.IsSet(OperationFlag.Delete))
+                            {
+                                results[i] = 2; // Unchanged
                                 continue;
                             }
                             result = 0;
@@ -4563,7 +4576,7 @@ namespace _Emulator
                         brickInst = map.AddBrickInst(brickSeq, targetIndex, x, y, z, 0, targetRotation);
                         if (brickInst == null)
                         {
-                            results[i] = (sbyte) (-2 + result); // Failed
+                            results[i] = (sbyte) (-2 + result); // Failed, add result to account for partial replacement
                             continue;
                         }
                         newSeqs.Add(brickSeq);

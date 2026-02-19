@@ -9,7 +9,7 @@
 
         public void Execute(CommandContext context)
         {
-            if (!context.IsInAuthorizedBuildRoom())
+            if (!context.IsInAuthorizedBuildRoom() || !EditHelper.CheckSelection())
             {
                 return;
             }

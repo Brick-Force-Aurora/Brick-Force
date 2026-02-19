@@ -22,11 +22,21 @@ namespace _Emulator
             SteamFriendsManager.instance = coreObject.AddComponent<SteamFriendsManager>();
             SteamGUI.instance = coreObject.AddComponent<SteamGUI>();
             ImGuiBackend.instance = coreObject.AddComponent<ImGuiBackend>();
-            coreObject.AddComponent<OperationProcessor>();
             Object.DontDestroyOnLoad(coreObject);
             Config.instance = new Config();
             SetupBuildConfig();
+            SetupOperationProcessor();
             RegisterCommands();
+        }
+
+        private void SetupOperationProcessor()
+        {
+            if (GameObject.Find("BrickEdit") != null)
+            {
+                return;
+            }
+            GameObject brickEdit = new GameObject("BrickEdit");
+            OperationProcessor.Instance = brickEdit.AddComponent<OperationProcessor>();
         }
 
         private void RegisterCommands()
@@ -34,8 +44,12 @@ namespace _Emulator
             CommandHandler handler = CommandHandler.Instance;
             handler.Register("w", "whisper", new WhisperCommand());
             handler.Register("r", "reply", new WhisperReplyCommand());
+
             handler.Register("/set", new BrickEditSetCommand());
             handler.Register("/remove", "/del", "/delete", new BrickEditRemoveCommand());
+            handler.Register("/replace", new BrickEditReplaceCommand());
+            handler.Register("/pos1", new BrickEditPos1Command());
+            handler.Register("/pos2", new BrickEditPos2Command());
         }
 
         private void SetupBuildConfig()

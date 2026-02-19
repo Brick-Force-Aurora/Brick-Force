@@ -1,11 +1,8 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.RegularExpressions;
 using Steamworks;
 using UnityEngine;
-using static MyInfoManager;
 using static Room;
 using Debug = UnityEngine.Debug;
 
@@ -279,12 +276,9 @@ namespace _Emulator
             }
 
             mb.Write(count);
-
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < coords.Length; i++)
             {
-                mb.Write(coords[i * 3 + 0]);
-                mb.Write(coords[i * 3 + 1]);
-                mb.Write(coords[i * 3 + 2]);
+                mb.Write(coords[i]);
             }
 
             Say((int)ExtensionOpcodes.opBulkBrickReq, mb);
@@ -296,20 +290,30 @@ namespace _Emulator
         private void HandleBulkBrickAck(MsgBody msg)
         {
             msg.Read(out int playerSeq);
-            msg.Read(out ushort count);
-            msg.Read(out byte template);
-            msg.Read(out byte rot);
-            Brick brick = BrickManager.Instance.GetBrick(template);
-            if (brick == null)
+            msg.Read(out uint count);
+            msg.Read(out ushort flag);
+            msg.Read(out byte targetIndex);
+            msg.Read(out byte targetRotation);
+
+            if (!flag.IsSet(OperationFlag.Delete))
             {
-                return;
+                Brick targetBrick = BrickManager.Instance.GetBrick(targetIndex);
+                if (targetBrick == null)
+                {
+                    if (playerSeq == MyInfoManager.Instance.Seq)
+                    {
+                        OperationProcessor.Instance.NextBulkOperation(0);
+                    }
+                    return;
+                }
             }
 
             uint success = 0;
             MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates = true;
+            List<int> morphes = new List<int>((int)count);
+            bool changed = false;
             try
             {
-                List<int> morphes = new List<int>(32);
                 int brickSeq;
                 byte x, y, z;
                 sbyte result;
@@ -329,21 +333,37 @@ namespace _Emulator
                     {
                         continue;
                     }
+                    if (flag.IsSet(OperationFlag.Delete))
+                    {
+                        if (result != 0)
+                        {
+                            // This should never happen
+                            continue;
+                        }
+                        msg.Read(out brickSeq);
+                        changed |= BrickManager.Instance.DeleteBrickBulk(brickSeq, ref morphes);
+                        continue;
+                    }
                     if (result == -1 || result == 1)
                     {
                         msg.Read(out brickSeq);
-                        BrickManager.Instance.DelBrick(brickSeq, false);
+                        changed |= BrickManager.Instance.DeleteBrickBulk(brickSeq, ref morphes);
                         if (result == -1)
                         {
                             continue;
                         }
                     }
                     msg.Read(out brickSeq);
-                    BrickManager.Instance.AddBrick(brickSeq, template, new Vector3(x, y, z), rot);
+                    changed |= BrickManager.Instance.AddBrickBulk(brickSeq, x, y, z, targetIndex, targetRotation, ref morphes);
                 }
             }
             finally
             {
+                if (changed)
+                {
+                    BrickManager.Instance.UpdateBrickChunksBulk(ref morphes);
+                    morphes.Clear();
+                }
                 MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates = false;
                 if (playerSeq == MyInfoManager.Instance.Seq)
                 {

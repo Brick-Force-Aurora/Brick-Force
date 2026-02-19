@@ -126,12 +126,14 @@ namespace _Emulator
             }
             if (node == rootNode)
             {
-                return false;
+                Actor.Instance.SendChat($"Unknown command '{command}'");
+                return true;
             }
             reader.SkipWhitespace();
             if (node.Command == null)
             {
-                return false;
+                Actor.Instance.SendChat($"Unknown command '{command}'");
+                return true;
             }
             History.Log(command);
             try
@@ -141,11 +143,14 @@ namespace _Emulator
             }
             catch (IndexOutOfRangeException e)
             {
-                // Ignore this exception :)
+                Actor.Instance.SendChat($"Failed to execute command '{command}': {e.Message}");
                 Debug.LogWarning($"Command reader couldn't read: {e.Message}");
-            } catch (ArgumentException e)
+            }
+            catch (Exception e)
             {
-
+                Actor.Instance.SendChat($"Failed to execute command '{command}': {e.Message}");
+                Debug.LogWarning($"Failed to execute command '{command}':");
+                Debug.LogWarning(e);
             }
             return true;
         }
