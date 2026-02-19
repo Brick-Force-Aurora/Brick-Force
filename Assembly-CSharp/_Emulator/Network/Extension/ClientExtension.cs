@@ -3,8 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
-using _Emulator.Command;
-using _Emulator.Network;
 using Steamworks;
 using UnityEngine;
 using static MyInfoManager;
