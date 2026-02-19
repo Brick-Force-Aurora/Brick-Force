@@ -305,6 +305,7 @@ namespace _Emulator
                 return;
             }
 
+            uint success = 0;
             MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates = true;
             try
             {
@@ -320,7 +321,11 @@ namespace _Emulator
                     msg.Read(out z);
                     msg.Read(out result);
 
-                    if (result == -2 || result == 2)
+                    if (result >= 0)
+                    {
+                        success++;
+                    }
+                    if (result <= -2 || result == 2)
                     {
                         continue;
                     }
@@ -340,6 +345,10 @@ namespace _Emulator
             finally
             {
                 MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates = false;
+                if (playerSeq == MyInfoManager.Instance.Seq)
+                {
+                    OperationProcessor.Instance.NextBulkOperation(success);
+                }
             }
         }
 
@@ -347,6 +356,7 @@ namespace _Emulator
         {
             msg.Read(out int val);
             Debug.LogError("Failed to process Bulkbrick " + val);
+            OperationProcessor.Instance.NextBulkOperation(0);
         }
 
         private void HandleDisconnected(MsgBody msg)
