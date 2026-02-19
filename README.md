@@ -115,6 +115,8 @@
 - Axis Ratio: Ratio of your vertical and horizontal mouse sensitivity while in-game. The original Brick-Force setting is 2.25.
 - Crosshair Hue: Changes the colour of your in-game crosshair. Default is 120 (green).
 - USK Textures: Activates censored paintball gun textures from the later versions of the game.
+- Enable VSync: Disabled by default.
+- Limit FPS: -1 is no FPS limit and you can limit the FPS up to 400
 - Only Host Can Create Rooms: Limits room creation to the frist connected client.
 - Max Num Rooms: How many rooms can active at a time.
 - Max Num Connections: How many connections the server will accept.
@@ -126,6 +128,14 @@
 - Debug Ping: Log recurring server messages.
 - Debug Steam: Log Steamworks API related messages.
 
+## Performance View
+<img width="481" alt="performance" src="https://raw.githubusercontent.com/Brick-Force-Aurora/Brick-Force/master/.github/assets/performancegraph.png"/>
+
+- View the current fps (approx) and frame times
+- Simulation Speed
+- RAM usage
+- Frame time history graph
+
 ## Paths
 - Maps are located in Brick BrickForce_Data\Resources\Cache
 - Assembly-CSharp.dll is located in BrickForce_Data\Managed
@@ -134,12 +144,16 @@
 - F5: Inventory Editor
 - F6: Main Menu
 - F8: Debug Console
+- F9: Performance View
 
 ## BrickEdit
+Activate using Keybind T (default) or the last Tool in the action panel during Build Mode
 
 #### What is it?
 BrickEdit is basically what you might know from Minecraft as WorldEdit.
 It is a mass brick editing tool which you can use in Build Mode rooms.
+Shows a preview of the area you are about to edit.
+<img width="962" alt="BrickEditPreview" src="https://raw.githubusercontent.com/Brick-Force-Aurora/Brick-Force/master/.github/assets/brickeditpreview.png"/>
 
 #### Limitations
 - Can only process up to 4000 bricks per operation
@@ -155,21 +169,14 @@ It is a mass brick editing tool which you can use in Build Mode rooms.
 
 ## Limitations
 - There are still a lot of bugs, if you encounter any, open an Issue or head to our Discord.
-- Freefall, Defense and Defusion don't work.
 - No ingame progression.
-- No missions.
-- No Pick'n'Win.
 - No clans or friends.
-- Map Manager doesn't work.
 - Weapon upgrading doesn't work.
 - Performance needs improvement.
 - Temporary shop prices.
 - No user information persists apart from inventory and config.
-- Action panel untested.
 - Item stats are mostly backup values loaded from disk and are different from Infernum servers.
-- ~Most rare weapons and max up variants have empty stats and are therefore useless in game.~
-- Game languages need to be english, otherwise you will get stuck in the loading screen.
-- Can be changed under registry path HKEY_CURRENT_USER\SOFTWARE\EXE Games\BrickForce (set BfVoice & BfLanguage to 1 for english).
+- Most rare weapons and max up variants have empty stats and are therefore useless in game.
 
 ## How to develop
 - Clone the repository.
@@ -202,12 +209,6 @@ It is a mass brick editing tool which you can use in Build Mode rooms.
 - Other code is mostly reverse engineered (decompiled) from the original game and refined so it compiles as a VS project.
 - Therefore commercial use of this project is not recommended.
 
-## Troubleshooting
-
-- **Stuck in "Downloading Once..":** Most likely something is faulty in your config. To fix this issue go to the Registry Editor and go to the path: `Computer\HKEY_CURRENT_USER\SOFTWARE\EXE Games\BrickForce` and delete the `EXE Games` Folder. Now restart the game and it should work
-
-
-
 <!-- CONTRIBUTING -->
 ## Contributing
 
@@ -218,8 +219,6 @@ Contributions are what make the open source community such an amazing place to b
 3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
-
-
 
 <!-- LICENSE -->
 ## License
