@@ -1,8 +1,11 @@
 ﻿using _Emulator;
+using _Emulator.Network.Gamemodes;
 using Microsoft.SqlServer.Server;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using static LineTool;
 
 public class BrickEditTool : EditorTool
 {
@@ -35,20 +38,12 @@ public class BrickEditTool : EditorTool
         if (!battleChat.IsChatting && custom_inputs.Instance.GetButtonDown(editorToolScript.inputKey))
         {
             active = true;
-            return true;
-        }
-        if (!battleChat.IsChatting && custom_inputs.Instance.GetButtonDown(editorToolScript.inputKey))
-        {
-            GameObject gameObject = GameObject.Find("Me");
-            if (null != gameObject)
+            if (hasPos1 && hasPos2)
             {
-                LocalController component = gameObject.GetComponent<LocalController>();
-                if (null != component)
-                {
-                    component.addStatusMsg(StringMgr.Instance.Get("ITEM_USED_ALL"));
-                }
+                Debug.Log("BrickEditUpdate");
+                UpdateWireframePreview();
             }
-            return false;
+            return true;
         }
         return false;
     }
@@ -200,7 +195,7 @@ public class BrickEditTool : EditorTool
         invisible.Enqueue(dummy);
     }
 
-    private void ClearWireframePreview()
+    public void ClearWireframePreview()
     {
         if (wire == null) return;
         while (wire.Count > 0)
@@ -329,5 +324,10 @@ public class BrickEditTool : EditorTool
 
         if (usedPoints != null)
             usedPoints.Clear();
+    }
+
+    public override void OnClose()
+    {
+        ClearWireframePreview();
     }
 }

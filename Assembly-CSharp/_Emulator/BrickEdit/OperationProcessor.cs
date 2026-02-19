@@ -81,7 +81,7 @@ namespace _Emulator
             if (!current.HasNextStep())
             {
                 current.Completed(totalSuccess);
-                EditHelper.BrickEditTool.ClearPreview();
+                EditHelper.BrickEditTool.ClearWireframePreview();
                 current = null;
                 return;
             }
