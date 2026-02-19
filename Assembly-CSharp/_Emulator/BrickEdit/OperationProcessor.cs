@@ -91,7 +91,6 @@ namespace _Emulator
         private void StepCurrentOperation()
         {
             OperationData data = current.NextStep();
-            Debug.Log("Sending operation");
             if (ClientExtension.instance.SendBulkBrickRequest(data.flag, data.sourceTemplate, data.sourceRotation, data.targetTemplate, data.targetRotation, data.coordinates) == 0)
             {
                 NextBulkOperation(0);

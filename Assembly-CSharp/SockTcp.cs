@@ -2484,7 +2484,7 @@ public class SockTcp
 		return _sock.Connected;
 	}
 
-	public void Say(ushort id, MsgBody msgBody)
+	public void Say(ushort id, MsgBody msgBody, bool doChunked = true) // AURORA: Add 'doChunked', required so it can be put in the hook
 	{
 		if (_sock != null && _writeQueue != null)
 		{

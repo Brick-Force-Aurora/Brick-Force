@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using _Emulator.Network;
 using Steamworks;
 using UnityEngine;
 using static Room;
+using static WindowSystemManager;
 using Debug = UnityEngine.Debug;
 
 namespace _Emulator
@@ -18,6 +20,9 @@ namespace _Emulator
         public int lastKillLogId = -1;
         public float killLogRealiableTime = 0f;
         public bool isSteam = false;
+
+        public ChunkedBufferReceiver chunkedBufferReceiver = new ChunkedBufferReceiver();
+        public ChunkedBufferSender chunkedBufferSender = new ChunkedBufferSender();
 
         public readonly Version clientVersion;
         private ClientExtension()
@@ -119,9 +124,9 @@ namespace _Emulator
             }
         }
 
-        public void Say(ushort id, MsgBody msgBody)
+        public void Say(ushort id, MsgBody msgBody, bool doChunked = true)
         {
-            CSNetManager.Instance.Sock.Say(id, msgBody);
+            CSNetManager.Instance.Sock.Say(id, msgBody, doChunked);
         }
 
         public void UpdateLocalInventory()
@@ -165,7 +170,8 @@ namespace _Emulator
 
         public bool HandleMessage(Msg2Handle msg)
         {
-            //Debug.Log(msg._id);
+            if (ServerEmulator.instance.debugSend)
+                Debug.Log($"[Verbose/Client] Processing message ID: {msg._id}");
             bool result = true;
             switch (msg._id)
             {
@@ -216,11 +222,118 @@ namespace _Emulator
                     HandleBulkBrickFailAck(msg._msg);
                     break;
 
+                case ExtensionOpcodes.opBeginChunkedBufferAck:
+                    HandleBeginChunkedBuffer(msg._msg);
+                    break;
+                case ExtensionOpcodes.opChunkedBufferAck:
+                    HandleChunkedBuffer(msg._msg);
+                    break;
+                case ExtensionOpcodes.opEndChunkedBufferAck:
+                    HandleEndChunkedBuffer(msg._msg);
+                    break;
+                case ExtensionOpcodes.opEndChunkedBufferFailedAck:
+                    HandleEndChunkedBufferFailed(msg._msg);
+                    break;
+
+                case ExtensionOpcodes.opBeginChunkedBufferReq:
+                    HandleBeginChunkedBufferReceive(msg._msg);
+                    break;
+                case ExtensionOpcodes.opChunkedBufferReq:
+                    HandleChunkedBufferReceive(msg._msg);
+                    break;
+                case ExtensionOpcodes.opEndChunkedBufferReq:
+                    HandleEndChunkedBufferReceive(msg._msg);
+                    break;
+
                 default:
                     result = false;
                     break;
             }
             return result;
+        }
+
+        private void HandleBeginChunkedBufferReceive(MsgBody body)
+        {
+            MsgBody output = new MsgBody();
+            int opcode = chunkedBufferReceiver.Begin(body, ref output);
+            if (opcode == -1)
+            {
+                return;
+            }
+            Say((ushort)opcode, output, false);
+        }
+
+        private void HandleChunkedBufferReceive(MsgBody body)
+        {
+            MsgBody output = new MsgBody();
+            int opcode = chunkedBufferReceiver.ReceiveChunk(body, ref output);
+            if (opcode == -1)
+            {
+                return;
+            }
+            Say((ushort)opcode, output, false);
+        }
+
+        private void HandleEndChunkedBufferReceive(MsgBody body)
+        {
+            MsgBody output = new MsgBody();
+            ushort packedOpcode;
+            MsgBody packedBody;
+            int opcode = chunkedBufferReceiver.End(body, ref output, out packedOpcode, out packedBody);
+            if (opcode == -1)
+            {
+                return;
+            }
+            Say((ushort)opcode, output, false);
+            lock (CSNetManager.Instance.Sock)
+            {
+                CSNetManager.Instance.Sock._readQueue.Enqueue(new Msg2Handle(packedOpcode, packedBody));
+            }
+
+        }
+
+        private void HandleBeginChunkedBuffer(MsgBody body)
+        {
+            MsgBody output = new MsgBody();
+            int opcode = chunkedBufferSender.WriteChunk(body, ref output);
+            if (opcode == -1)
+            {
+                return;
+            }
+            Say((ushort) opcode, output, false);
+        }
+
+        private void HandleChunkedBuffer(MsgBody body)
+        {
+            MsgBody output = new MsgBody();
+            int opcode = chunkedBufferSender.WriteChunk(body, ref output);
+            if (opcode == -1)
+            {
+                return;
+            }
+            Say((ushort)opcode, output, false);
+        }
+
+        private void HandleEndChunkedBuffer(MsgBody body)
+        {
+            MsgBody output = new MsgBody();
+            int opcode = chunkedBufferSender.End(false, body, ref output);
+            if (opcode == -1)
+            {
+                return;
+            }
+            Say((ushort)opcode, output, false);
+        }
+
+        private void HandleEndChunkedBufferFailed(MsgBody body)
+        {
+            MsgBody output = new MsgBody();
+            int opcode = chunkedBufferSender.End(true, body, ref output);
+            if (opcode == -1)
+            {
+                return;
+            }
+            Say((ushort)opcode, output, false);
         }
 
         private void HandleConnected(MsgBody msg)
@@ -281,7 +394,7 @@ namespace _Emulator
                 mb.Write(coords[i]);
             }
 
-            Say((int)ExtensionOpcodes.opBulkBrickReq, mb);
+            Say(ExtensionOpcodes.opBulkBrickReq, mb);
 
             // Return changes count
             return count;
@@ -606,65 +719,6 @@ namespace _Emulator
 
             Say(ExtensionOpcodes.opDisconnectReq, body);
         }
-
-        public void SendBeginChunkedBuffer(ushort opcode, byte[] buffer)
-        {
-            const int maxBufferSize = 1000000000;
-            if (buffer.Length > maxBufferSize)
-            {
-                Debug.LogWarning("ClientExtension.SendBeginChunkedBuffer: Buffer was " + buffer.Length + " bytes");
-                return;
-            }
-
-            uint crc = CRC32.computeUnsigned(buffer);
-
-            MsgBody body = new MsgBody();
-            body.Write(opcode);
-            body.Write(buffer.Length);
-            body.Write(crc);
-
-            Debug.LogWarning("Begin");
-            Say(ExtensionOpcodes.opBeginChunkedBufferReq, body);
-            SendChunkedBuffer(opcode, buffer);
-            SendEndChunkedBuffer(opcode, crc);
-        }
-
-        public void SendChunkedBuffer(ushort opcode, byte[] buffer)
-        {
-            int chunkSize = 4096;
-            int chunkCount = Mathf.CeilToInt((float)buffer.Length / (float)chunkSize);
-            int processedCount = 0;
-
-            Debug.Log(chunkSize + " " + buffer.Length + " " + chunkCount);
-            for (int chunk = 0; chunk < chunkCount; chunk++)
-            {
-                int remaining = buffer.Length - processedCount;
-                if (remaining < chunkSize)
-                    chunkSize = remaining;
-
-                MsgBody body = new MsgBody();
-
-                byte[] next = new byte[chunkSize];
-                Array.Copy(buffer, processedCount, next, 0, chunkSize);
-                body.Write(opcode);
-                body.Write(chunk);
-                body.Write(next);
-                processedCount += chunkSize;
-
-                Debug.LogWarning("Send " + chunk + " " + chunkSize + " " + processedCount);
-                Say(ExtensionOpcodes.opChunkedBufferReq, body);
-            }
-        }
-
-        public void SendEndChunkedBuffer(ushort opcode, uint crc)
-        {
-            MsgBody body = new MsgBody();
-            body.Write(opcode);
-
-            Debug.LogWarning("End");
-            Say(ExtensionOpcodes.opEndChunkedBufferReq, body);
-        }
-
 
         public static Version GetGithubVersionOrUnknown()
         {

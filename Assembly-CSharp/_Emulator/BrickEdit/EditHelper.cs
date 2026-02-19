@@ -93,7 +93,7 @@ namespace _Emulator
         public static bool IsAllowedTarget(this byte template)
         {
             Brick brick = BrickManager.Instance.GetBrick(template);
-            if (brick == null || brick.maxInstancePerMap <= 0)
+            if (brick == null || brick.maxInstancePerMap > 0)
             {
                 Actor.Instance.SendChat("The provided target brick is not allowed to be used with BrickEdit.");
                 return false;

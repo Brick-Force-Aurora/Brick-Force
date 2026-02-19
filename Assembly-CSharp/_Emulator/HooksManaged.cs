@@ -484,8 +484,6 @@ namespace _Emulator
 
         public void hSockTcpRegisterReq(int slot, ushort modeMask, int regHow, int point, int downloadFee, byte[] thumbnail, string msgEval)
 		{
-			ClientExtension.instance.SendBeginChunkedBuffer(ExtensionOpcodes.opChunkedBufferThumbnailReq, thumbnail);
-
 			MsgBody msgBody = new MsgBody();
 			msgBody.Write(slot);
 			msgBody.Write(modeMask);
@@ -493,23 +491,39 @@ namespace _Emulator
 			msgBody.Write(point);
 			msgBody.Write(downloadFee);
 			msgBody.Write(msgEval);
-			CSNetManager.Instance.Sock.Say(51, msgBody);
+            msgBody.Write(thumbnail);
+            CSNetManager.Instance.Sock.Say(51, msgBody);
 		}
 
         public void hSockTcpSaveMapReq(int slot, byte[] thumbnail)
         {
-            ClientExtension.instance.SendBeginChunkedBuffer(ExtensionOpcodes.opChunkedBufferThumbnailReq, thumbnail);
-
             MsgBody msgBody = new MsgBody();
             msgBody.Write(slot);
+			msgBody.Write(thumbnail);
             CSNetManager.Instance.Sock.Say(39, msgBody);
         }
 
-		public void hSockTcpSay(ushort id, MsgBody msgBody)
+		public void hSockTcpSay(ushort id, MsgBody msgBody, bool doChunked = true)
 		{
+            if (doChunked && msgBody.Offset > 6144)
+            {
+                byte[] data = msgBody.Buffer;
+                if (data.Length != msgBody.Offset)
+                {
+                    data = new byte[msgBody.Offset];
+                    Array.Copy(msgBody.Buffer, 0, data, 0, data.Length);
+                }
+                msgBody = new MsgBody();
+                int opcode = ClientExtension.instance.chunkedBufferSender.Begin(id, data, ref msgBody);
+                if (opcode == -1)
+                {
+                    return;
+                }
+                id = (ushort)opcode;
+            }
             Msg4Send msg4Send = new Msg4Send(id, uint.MaxValue, uint.MaxValue, msgBody, CSNetManager.Instance.Sock.GetSendKey());
 
-			if (ClientExtension.instance.isSteam)
+            if (ClientExtension.instance.isSteam)
 			{
 				SteamNetworkingManager.instance.SendMessageToHost(msg4Send);
 			}

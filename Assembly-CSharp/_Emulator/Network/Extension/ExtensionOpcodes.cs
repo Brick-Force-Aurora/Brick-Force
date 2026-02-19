@@ -10,13 +10,15 @@
         public const int opCustomMessageAck = 1005;
         public const int opDisconnectReq = 1006;
         public const int opDisconnectAck = 1007;
+
         public const int opBeginChunkedBufferReq = 1008;
         public const int opChunkedBufferReq = 1009;
         public const int opEndChunkedBufferReq = 1010;
-        public const int opBeginChunkedBufferAck= 1011;
+        public const int opBeginChunkedBufferAck = 1011;
         public const int opChunkedBufferAck = 1012;
         public const int opEndChunkedBufferAck = 1013;
-        public const int opChunkedBufferThumbnailReq = 1014;
+        public const int opEndChunkedBufferFailedAck = 1014;
+
         public const int opRendezvousInfoSteamAck = 1015;
         public const int opEnterSteamAck = 1016;
         public const int opSlotDataSteamAck = 1017;

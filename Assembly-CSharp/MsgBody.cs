@@ -5,6 +5,7 @@ using System.Text;
 public class MsgBody
 {
 	private const int DEFAULT_BUFFER_SIZE = 8192;
+	private const int BUFFER_INCREASE = 2048;
 
 	private int _offset;
 
@@ -37,9 +38,9 @@ public class MsgBody
 		Array.Copy(src, offset, _buffer, 0, length);
 	}
 
-	private void ExpandBuffer()
+	private void ExpandBuffer(int requiredLength)
 	{
-		byte[] array = new byte[_buffer.Length * 2];
+		byte[] array = new byte[Math.Max(_buffer.Length + BUFFER_INCREASE, requiredLength)];
 		Array.Copy(_buffer, 0, array, 0, _buffer.Length);
 		_buffer = array;
 	}
@@ -60,7 +61,7 @@ public class MsgBody
 		bool result = true;
 		if (src.Length + _offset > _buffer.Length)
 		{
-			ExpandBuffer();
+			ExpandBuffer(src.Length + _offset);
 			result = false;
 		}
 		Array.Copy(src, 0, _buffer, _offset, src.Length);
@@ -140,7 +141,7 @@ public class MsgBody
 		bool result = true;
 		if (_offset + 1 > _buffer.Length)
 		{
-			ExpandBuffer();
+			ExpandBuffer(1);
 			result = false;
 		}
 		_buffer[_offset++] = (byte)val;
@@ -152,7 +153,7 @@ public class MsgBody
 		bool result = true;
 		if (_offset + 1 > _buffer.Length)
 		{
-			ExpandBuffer();
+			ExpandBuffer(1);
 			result = false;
 		}
 		_buffer[_offset++] = val;

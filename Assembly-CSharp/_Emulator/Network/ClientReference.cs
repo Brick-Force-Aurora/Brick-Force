@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using _Emulator.Network;
 using Steamworks;
 using Debug = UnityEngine.Debug;
 
@@ -41,7 +42,8 @@ namespace _Emulator
         public DummyData data;
         public MatchData matchData;
         public ChannelReference channel;
-        public ChunkedBuffer chunkedBuffer;
+        public ChunkedBufferReceiver chunkedBufferReceiver = new ChunkedBufferReceiver();
+        public ChunkedBufferSender chunkedBufferSender = new ChunkedBufferSender();
         public int lastOpenedChestSeq = -1;
         public bool isVersionSetUp = false;
 
@@ -63,6 +65,7 @@ namespace _Emulator
             buffer = new byte[8192];
             toleranceTime = 0f;
             isSteam = false;
+            SetupChunkedBuffers();
         }
 
         public ClientReference(CSteamID _steamID, string _name = "", int _seq = -1)
@@ -80,6 +83,13 @@ namespace _Emulator
             buffer = new byte[8192];
             toleranceTime = 0f;
             isSteam = true;
+            SetupChunkedBuffers();
+        }
+
+        private void SetupChunkedBuffers()
+        {
+            chunkedBufferReceiver.IsServer = true;
+            chunkedBufferSender.IsServer = true;
         }
 
         public bool Disconnect(bool send = true)

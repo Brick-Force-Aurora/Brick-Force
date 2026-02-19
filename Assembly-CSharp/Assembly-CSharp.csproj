@@ -760,9 +760,10 @@
     <Compile Include="_Emulator\Menu\Legacy\DebugConsole.cs" />
     <Compile Include="_Emulator\Maps\MapGenerator.cs" />
     <Compile Include="_Emulator\Menu\PerfOverlay.cs" />
+    <Compile Include="_Emulator\Network\ChunkedBufferSender.cs" />
+    <Compile Include="_Emulator\Network\ChunkedBufferReceiver.cs" />
     <Compile Include="_Emulator\Network\ChannelManager.cs" />
     <Compile Include="_Emulator\Network\ChannelReference.cs" />
-    <Compile Include="_Emulator\Network\ChunkedBuffer.cs" />
     <Compile Include="_Emulator\Network\Enum\EndGameCodes.cs" />
     <Compile Include="_Emulator\Network\Enum\MessageId.cs" />
     <Compile Include="_Emulator\Network\Enum\ResultCodes.cs" />
