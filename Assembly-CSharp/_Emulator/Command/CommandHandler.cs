@@ -1,4 +1,5 @@
-﻿using System;
+﻿using _Emulator.Command;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,14 +8,6 @@ using UnityEngine;
 
 namespace _Emulator
 {
-    public interface ICommand
-    {
-
-        void Execute(string name, CommandReader reader);
-
-        string Description();
-
-    }
 
     public class CommandHandler
     {
@@ -145,12 +138,15 @@ namespace _Emulator
             try
             {
                 Debug.Log($"Executing command '{command}'");
-                node.Command.Execute(fullCommand.ToString(), reader);
+                node.Command.Execute(new CommandContext(fullCommand.ToString(), reader));
             }
             catch (IndexOutOfRangeException e)
             {
                 // Ignore this exception :)
                 Debug.LogWarning($"Command reader couldn't read: {e.Message}");
+            } catch (ArgumentException e)
+            {
+
             }
             return true;
         }
@@ -378,6 +374,29 @@ namespace _Emulator
                 return string.Empty;
             }
             return buffer.Substring(index);
+        }
+
+        public void ReadTokens(int min, int max, out string[] tokens)
+        {
+            List<string> list = new List<string>();
+            for (int i = 0; i < max; i++)
+            {
+                if (SkipWhitespace().HasNext())
+                {
+                    list.Add(ReadToken());
+                    continue;
+                }
+                if (i >= min)
+                {
+                    break;
+                }
+                if (min == max)
+                {
+                    throw new ArgumentException("Not enough arguments, expected " + max);
+                }
+                throw new ArgumentException("Not enough arguments, expected " + min + " - " + max);
+            }
+            tokens = list.ToArray();
         }
 
         public string ReadToken()

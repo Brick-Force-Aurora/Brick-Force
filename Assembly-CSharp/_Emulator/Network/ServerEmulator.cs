@@ -4439,10 +4439,12 @@ namespace _Emulator
 
         private void HandleBulkBrickRequest(MsgReference msgRef)
         {
-            msgRef.msg._msg.Read(out long item);
-            msgRef.msg._msg.Read(out string code);
-            msgRef.msg._msg.Read(out byte brickIndex);
-            msgRef.msg._msg.Read(out byte commonRot);
+
+            msgRef.msg._msg.Read(out ushort flag);
+            msgRef.msg._msg.Read(out byte sourceIndex);
+            msgRef.msg._msg.Read(out byte sourceRotation);
+            msgRef.msg._msg.Read(out byte targetIndex);
+            msgRef.msg._msg.Read(out byte targetRotation);
             msgRef.msg._msg.Read(out ushort count);
 
             if (msgRef?.matchData?.cachedMap == null)
@@ -4451,13 +4453,27 @@ namespace _Emulator
                 SendBulkFail(msgRef, -6);
                 return;
             }
+            if (UserMapInfoManager.Instance.CheckAuth)
 
-            Brick b = BrickManager.Instance.GetBrick(brickIndex);
-            if (b == null)
+            if (!flag.IsSet(OperationFlag.Delete))
             {
-                Debug.LogWarning($"BULK_REQ: unknown brick index={brickIndex}");
-                SendBulkFail(msgRef, -6);
-                return;
+                Brick targetBrick = BrickManager.Instance.GetBrick(targetIndex);
+                if (targetBrick == null)
+                {
+                    Debug.LogWarning($"BULK_REQ: unknown brick index={targetIndex}");
+                    SendBulkFail(msgRef, -6);
+                    return;
+                }
+            }
+            if ((flag.IsSet(OperationFlag.OnlySource) && !flag.IsSet(OperationFlag.ExcludeSourceType)) || (!flag.IsSet(OperationFlag.OnlySource) && flag.IsSet(OperationFlag.ExcludeSourceType)))
+            {
+                Brick sourceBrick = BrickManager.Instance.GetBrick(sourceIndex);
+                if (sourceBrick == null)
+                {
+                    Debug.LogWarning($"BULK_REQ: unknown brick index={sourceIndex}");
+                    SendBulkFail(msgRef, -6);
+                    return;
+                }
             }
 
             int playerSeq = msgRef.client.seq;
@@ -4475,55 +4491,116 @@ namespace _Emulator
             }
 
             // Apply in one lock
-            ushort appliedCount = count;
-            int[] newSeqs = new int[count];
-            byte[] results = new byte[count]; // 0 ok, 1 occupied, 3 failed
-            Array.Clear(newSeqs, 0, newSeqs.Length);
+            List<int> newSeqs = new List<int>(count);
+            sbyte[] results = new sbyte[count];
+            // -3 | Skipped                 | Uses no sequence
+            // -2 | Failed                  | Uses no sequence
+            // -1 | Replace partial success | Uses 1 sequence
+            // 0  | Success                 | Uses 1 sequence
+            // 1  | Replace success         | Uses 2 sequences
+            // 2  | Success but unchanged   | Uses no sequence
             Array.Clear(results, 0, results.Length);
 
+            sbyte result;
             lock (dataLock)
             {
-                var map = msgRef.matchData.cachedMap;
-                List<int> morphes = new List<int>(32);
-
-                for (int i = 0; i < count; i++)
+                MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates = true;
+                try
                 {
-                    byte x = xs[i], y = ys[i], z = zs[i];
+                    List<int> morphes = new List<int>(32);
+                    var map = msgRef.matchData.cachedMap;
+                    int brickSeq;
+                    byte x, y, z;
 
-                    if (map.GetByCoord(x, y, z) != null)
+                    for (int i = 0; i < count; i++)
                     {
-                        results[i] = 1; // occupied
-                        continue;
-                    }
+                        x = xs[i];
+                        y = ys[i]; 
+                        z = zs[i];
 
-                    int newSeq = msgRef.matchData.GetNextBrickSeq();
-                    morphes.Clear();
-                    bool ok = map.AddBrickInst(newSeq, b.index, x, y, z, commonRot, ref morphes);
-                    if (!ok)
-                    {
-                        results[i] = 3; // failed
-                        continue;
-                    }
+                        BrickInst brickInst = map.GetByCoord(x, y, z);
+                        if (brickInst != null)
+                        {
+                            if (flag.IsSet(OperationFlag.OnlySource))
+                            {
+                                if (flag.IsSet(OperationFlag.ExcludeSourceType) || brickInst.Template != sourceIndex || (!flag.IsSet(OperationFlag.SourceWithRotation) || brickInst.Rot != sourceRotation))
+                                {
+                                    results[i] = -3; // Skipped cause it doesn't match
+                                    continue;
+                                }
+                            } else if (flag.IsSet(OperationFlag.ExcludeSourceType))
+                            {
+                                if (brickInst.Template == sourceIndex && (!flag.IsSet(OperationFlag.SourceWithRotation) || brickInst.Rot == sourceRotation))
+                                {
+                                    results[i] = -3; // Skipped cause it doesn't match
+                                    continue;
+                                }
+                            }
+                            if (brickInst.Template == targetIndex && brickInst.Rot == targetRotation)
+                            {
+                                results[i] = 2; // Unchanged
+                                continue;
+                            }
+                            morphes.Clear();
+                            brickSeq = brickInst.Seq;
+                            if (!map.DelBrickInst(brickSeq, ref morphes))
+                            {
+                                results[i] = -2; // Failed
+                                continue;
+                            }
+                            newSeqs.Add(brickSeq);
+                            result = 1;
+                        } else
+                        {
+                            if (!flag.IsSet(OperationFlag.IncludeEmpty) || flag.IsSet(OperationFlag.Delete))
+                            {
+                                results[i] = -3;
+                                continue;
+                            }
+                            result = 0;
+                        }
 
-                    newSeqs[i] = newSeq;
-                    results[i] = 0;
+                        brickSeq = msgRef.matchData.GetNextBrickSeq();
+                        brickInst = map.AddBrickInst(brickSeq, targetIndex, x, y, z, 0, targetRotation);
+                        if (brickInst == null)
+                        {
+                            results[i] = (sbyte) (-2 + result); // Failed
+                            continue;
+                        }
+                        newSeqs.Add(brickSeq);
+                        results[i] = result; // Success
+                    }
+                } finally
+                {
+                    MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates = false;
                 }
             }
 
             // Broadcast one ACK to room
             MsgBody mb = new MsgBody();
             mb.Write(playerSeq);
-            mb.Write(appliedCount);
+            mb.Write(count);
+            mb.Write(flag);
+            mb.Write(targetIndex);
+            mb.Write(targetRotation);
 
+            int seqIdx = 0;
             for (int i = 0; i < count; i++)
             {
                 mb.Write(xs[i]);
                 mb.Write(ys[i]);
                 mb.Write(zs[i]);
-                mb.Write(newSeqs[i]);
-                mb.Write(results[i]);
-                mb.Write(b.index);
-                mb.Write(commonRot);
+                result = results[i];
+                mb.Write(result);
+                if (result == -2 || result == 2)
+                {
+                    continue;
+                }
+                mb.Write(newSeqs[seqIdx++]);
+                if (result == 1)
+                {
+                    mb.Write(newSeqs[seqIdx++]);
+                }
             }
 
             Say(new MsgReference(

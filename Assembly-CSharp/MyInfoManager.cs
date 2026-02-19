@@ -224,6 +224,8 @@ public class MyInfoManager : MonoBehaviour
 
 	private bool IsGuiOn = true;
 
+	public bool AuroraTemporarilyDisableBrickNetworkUpdates = false;
+
 	private bool IsStraightMovement;
 
 	private bool IsInvisibilityOn;

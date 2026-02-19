@@ -3,9 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using _Emulator.Command;
 using _Emulator.Network;
 using Steamworks;
 using UnityEngine;
+using static MyInfoManager;
 using static Room;
 using Debug = UnityEngine.Debug;
 
@@ -255,14 +257,28 @@ namespace _Emulator
             Say(ExtensionOpcodes.opVersionCheckReq, body);
         }
 
-        public void SendBulkBrickRequest(long item, string code, byte brickIndex, byte rot, List<byte> coords, int count)
+        public uint SendBulkBrickRequest(ushort flag, byte brickIndex, byte rot, byte[] coords)
         {
+            if (coords.Length == 0)
+            {
+                // Cancel request cause no coordinates
+                return 0;
+            }
+
             MsgBody mb = new MsgBody();
-            mb.Write(item);
-            mb.Write(code);
+            mb.Write(flag);
             mb.Write(brickIndex);
             mb.Write(rot);
-            mb.Write((ushort)count);
+
+            float countRes = coords.Length / 3;
+            uint count = (uint) Mathf.FloorToInt(countRes);
+            if (count != countRes || count == 0)
+            {
+                // Cancel request cause invalid coordinate count
+                return 0;
+            }
+
+            mb.Write(count);
 
             for (int i = 0; i < count; i++)
             {
@@ -272,43 +288,58 @@ namespace _Emulator
             }
 
             Say((int)ExtensionOpcodes.opBulkBrickReq, mb);
+
+            // Return changes count
+            return count;
         }
 
         private void HandleBulkBrickAck(MsgBody msg)
         {
             msg.Read(out int playerSeq);
             msg.Read(out ushort count);
-
-            int successCount = 0;
-
-            for (int i = 0; i < count; i++)
+            msg.Read(out byte template);
+            msg.Read(out byte rot);
+            Brick brick = BrickManager.Instance.GetBrick(template);
+            if (brick == null)
             {
-                msg.Read(out byte x);
-                msg.Read(out byte y);
-                msg.Read(out byte z);
-                msg.Read(out int newSeq);
-                msg.Read(out byte result);
-                msg.Read(out byte template);
-                msg.Read(out byte rot);
+                return;
+            }
 
-                // result: 0 = ok, non-zero = not placed
-                if (result != 0 || newSeq <= 0)
-                    continue;
+            MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates = true;
+            try
+            {
+                List<int> morphes = new List<int>(32);
+                int brickSeq;
+                byte x, y, z;
+                sbyte result;
 
-                MyInfoManager.Instance.IsModified = true;
-
-                Brick brick = BrickManager.Instance.GetBrick(template);
-                if (brick != null)
+                for (int i = 0; i < count; i++)
                 {
-                    BrickManager.Instance.AddBrickCreator(
-                        newSeq,
-                        template,
-                        new Vector3((float)(int)x, (float)(int)y, (float)(int)z),
-                        rot
-                    );
-                }
+                    msg.Read(out x);
+                    msg.Read(out y);
+                    msg.Read(out z);
+                    msg.Read(out result);
 
-                successCount++;
+                    if (result == -2 || result == 2)
+                    {
+                        continue;
+                    }
+                    if (result == -1 || result == 1)
+                    {
+                        msg.Read(out brickSeq);
+                        BrickManager.Instance.DelBrick(brickSeq, false);
+                        if (result == -1)
+                        {
+                            continue;
+                        }
+                    }
+                    msg.Read(out brickSeq);
+                    BrickManager.Instance.AddBrick(brickSeq, template, new Vector3(x, y, z), rot);
+                }
+            }
+            finally
+            {
+                MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates = false;
             }
         }
 
@@ -335,7 +366,7 @@ namespace _Emulator
                 if (CSNetManager.Instance.Sock != null)
                     CSNetManager.Instance.Sock.Close();
                 BuildOption.Instance.Exit();
-                BuildOption.Instance.StartCoroutine(ShowDialogOnExit(message));
+                Actor.Instance.ShowDelayedMessage(message);
             }
             else
             {
@@ -347,12 +378,6 @@ namespace _Emulator
                     SteamLobbyManager.instance.LeaveCurrentLobbyAndShutdown();
                 }
             }
-        }
-
-        public static IEnumerator ShowDialogOnExit(string message)
-        {
-            yield return new WaitForSeconds(0.05f);
-            MessageBoxMgr.Instance.AddMessage(message);
         }
 
         private void HandleRendezvousInfoSteam(MsgBody msg)

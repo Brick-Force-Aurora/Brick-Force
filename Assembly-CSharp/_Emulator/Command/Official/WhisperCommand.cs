@@ -15,12 +15,12 @@ namespace _Emulator
             return "Whisper to another player";
         }
 
-        public void Execute(string name, CommandReader reader)
+        public void Execute(CommandContext context)
         {
             IsWhisper = true;
-            string nickName = reader.ReadToken();
+            string nickName = context.Reader.ReadToken();
             GlobalVars.Instance.whisperNickTo = nickName;
-            ExecuteWhisper(nickName, reader.SkipWhitespace().GetUnread());
+            ExecuteWhisper(nickName, context.Reader.SkipWhitespace().GetUnread());
         }
 
         internal static void ExecuteWhisper(string nickName, string message)

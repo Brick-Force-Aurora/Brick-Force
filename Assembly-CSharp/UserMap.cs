@@ -677,8 +677,8 @@ public class UserMap
 						{
 							byCoord.Code |= Brick.shadowCodeSet[0];
 							morphes.Add(byCoord.Seq);
-							if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq)
-							{
+							if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
+                            {
 								CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(byCoord.Seq, byCoord.Code);
 							}
 						}
@@ -687,8 +687,8 @@ public class UserMap
 					{
 						byCoord.Code &= Brick.shadowCodeReset[0];
 						morphes.Add(byCoord.Seq);
-						if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq)
-						{
+						if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
+                        {
 							CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(byCoord.Seq, byCoord.Code);
 						}
 					}
@@ -707,8 +707,8 @@ public class UserMap
 								{
 									byCoord.Code |= Brick.shadowCodeSet[(int)Brick.opposite[(int)dIR]];
 									morphes.Add(byCoord.Seq);
-									if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq)
-									{
+									if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
+                                    {
 										CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(byCoord.Seq, byCoord.Code);
 									}
 								}
@@ -717,8 +717,8 @@ public class UserMap
 							{
 								byCoord.Code &= Brick.shadowCodeReset[(int)Brick.opposite[(int)dIR]];
 								morphes.Add(byCoord.Seq);
-								if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq)
-								{
+								if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
+                                {
 									CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(byCoord.Seq, byCoord.Code);
 								}
 							}
@@ -745,8 +745,8 @@ public class UserMap
 		if (brick.meshOptimize)
 		{
 			brickInst.Code = CalcMeshAndShadowCode(seq, x, y, z);
-			if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq)
-			{
+			if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
+            {
 				CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(brickInst.Seq, brickInst.Code);
 			}
 			for (Brick.DIR dIR = Brick.DIR.TOP; dIR <= Brick.DIR.RIGHT; dIR++)
@@ -757,7 +757,7 @@ public class UserMap
 					byCoord.Code &= Brick.meshCodeReset[(int)Brick.opposite[(int)dIR]];
 					byCoord.Code &= Brick.shadowCodeReset[(int)Brick.opposite[(int)dIR]];
 					morphes.Add(byCoord.Seq);
-					if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq)
+					if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
 					{
 						CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(byCoord.Seq, byCoord.Code);
 					}

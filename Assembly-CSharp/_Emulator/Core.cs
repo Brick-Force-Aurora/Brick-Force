@@ -22,6 +22,7 @@ namespace _Emulator
             SteamFriendsManager.instance = coreObject.AddComponent<SteamFriendsManager>();
             SteamGUI.instance = coreObject.AddComponent<SteamGUI>();
             ImGuiBackend.instance = coreObject.AddComponent<ImGuiBackend>();
+            coreObject.AddComponent<OperationProcessor>();
             Object.DontDestroyOnLoad(coreObject);
             Config.instance = new Config();
             SetupBuildConfig();
@@ -33,6 +34,7 @@ namespace _Emulator
             CommandHandler handler = CommandHandler.Instance;
             handler.Register("w", "whisper", new WhisperCommand());
             handler.Register("r", "reply", new WhisperReplyCommand());
+            handler.Register("/set", new BrickEditSetCommand());
         }
 
         private void SetupBuildConfig()

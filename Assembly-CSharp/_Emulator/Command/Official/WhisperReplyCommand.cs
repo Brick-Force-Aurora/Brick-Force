@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Remoting.Contexts;
 using System.Text;
 
 namespace _Emulator
@@ -12,10 +13,10 @@ namespace _Emulator
             return "Reply whisper to another player";
         }
 
-        public void Execute(string name, CommandReader reader)
+        public void Execute(CommandContext context)
         {
             WhisperCommand.IsWhisper = true;
-            WhisperCommand.ExecuteWhisper(GlobalVars.Instance.whisperNickFrom, reader.SkipWhitespace().GetUnread());
+            WhisperCommand.ExecuteWhisper(GlobalVars.Instance.whisperNickFrom, context.Reader.SkipWhitespace().GetUnread());
         }
     }
 }

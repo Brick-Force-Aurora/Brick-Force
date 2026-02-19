@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using _Emulator.Command;
 using Steamworks;
 using UnityEngine;
 
@@ -215,7 +216,7 @@ namespace _Emulator
                 if (IsInLobby())
                 {
                     BuildOption.Instance.Exit();
-                    BuildOption.Instance.StartCoroutine(ClientExtension.ShowDialogOnExit(message));
+                    Actor.Instance.ShowDelayedMessage(message);
                 }
 
                 LeaveCurrentLobby();
