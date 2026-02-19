@@ -727,7 +727,18 @@
     <Compile Include="ZombieTimer.cs" />
     <Compile Include="ZombieVirus.cs" />
     <Compile Include="ZombieVsHumanManager.cs" />
+    <Compile Include="_Emulator\BrickEdit\BrickCache.cs" />
+    <Compile Include="_Emulator\BrickEdit\EditHelper.cs" />
+    <Compile Include="_Emulator\BrickEdit\IOperation.cs" />
+    <Compile Include="_Emulator\BrickEdit\OperationProcessor.cs" />
+    <Compile Include="_Emulator\BrickEdit\Operation\DeleteOperation.cs" />
+    <Compile Include="_Emulator\BrickEdit\Operation\SetOperation.cs" />
+    <Compile Include="_Emulator\Command\Actor.cs" />
+    <Compile Include="_Emulator\Command\CommandContext.cs" />
     <Compile Include="_Emulator\Command\CommandHandler.cs" />
+    <Compile Include="_Emulator\Command\ICommand.cs" />
+    <Compile Include="_Emulator\Command\Modded\BrickEditRemoveCommand.cs" />
+    <Compile Include="_Emulator\Command\Modded\BrickEditSetCommand.cs" />
     <Compile Include="_Emulator\Command\Official\WhisperReplyCommand.cs" />
     <Compile Include="_Emulator\Command\Official\WhisperCommand.cs" />
     <Compile Include="_Emulator\Config.cs" />
@@ -848,9 +859,7 @@
   <ItemGroup>
     <EmbeddedResource Include="_Emulator\DATA\TreasureChests.json" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="_Emulator\Command\Modded\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>

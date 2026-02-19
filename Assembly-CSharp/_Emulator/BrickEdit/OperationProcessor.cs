@@ -1,6 +1,4 @@
-﻿using _Emulator.BrickEdit;
-using _Emulator.Command;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
@@ -20,8 +18,10 @@ namespace _Emulator
     public struct OperationData
     {
         public ushort flag;
-        public byte template;
-        public byte rotation;
+        public byte sourceTemplate;
+        public byte sourceRotation;
+        public byte targetTemplate;
+        public byte targetRotation;
         public byte[] coordinates;
     }
 
@@ -116,7 +116,7 @@ namespace _Emulator
                 return;
             }
             OperationData data = current.NextStep();
-            ClientExtension.instance.SendBulkBrickRequest(data.flag, data.template, data.rotation, data.coordinates);
+            ClientExtension.instance.SendBulkBrickRequest(data.flag, data.sourceTemplate, data.sourceRotation, data.targetTemplate, data.targetRotation, data.coordinates);
         }
 
         public bool IsAuthorized()
@@ -149,8 +149,10 @@ namespace _Emulator
         {
             OperationData data = new OperationData();
             data.flag = 0;
-            data.template = 0;
-            data.rotation = 0;
+            data.sourceTemplate = 0;
+            data.sourceRotation = 0;
+            data.targetTemplate = 0;
+            data.targetRotation = 0;
             data.coordinates = EmptyByteArray;
             return data;
         }

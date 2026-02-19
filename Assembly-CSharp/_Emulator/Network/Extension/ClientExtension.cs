@@ -257,7 +257,7 @@ namespace _Emulator
             Say(ExtensionOpcodes.opVersionCheckReq, body);
         }
 
-        public uint SendBulkBrickRequest(ushort flag, byte brickIndex, byte rot, byte[] coords)
+        public uint SendBulkBrickRequest(ushort flag, byte sourceTemplate, byte sourceRotation, byte targetTemplate, byte targetRotation, byte[] coords)
         {
             if (coords.Length == 0)
             {
@@ -267,8 +267,10 @@ namespace _Emulator
 
             MsgBody mb = new MsgBody();
             mb.Write(flag);
-            mb.Write(brickIndex);
-            mb.Write(rot);
+            mb.Write(sourceTemplate);
+            mb.Write(sourceRotation);
+            mb.Write(targetTemplate);
+            mb.Write(targetRotation);
 
             float countRes = coords.Length / 3;
             uint count = (uint) Mathf.FloorToInt(countRes);

@@ -4445,7 +4445,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out byte sourceRotation);
             msgRef.msg._msg.Read(out byte targetIndex);
             msgRef.msg._msg.Read(out byte targetRotation);
-            msgRef.msg._msg.Read(out ushort count);
+            msgRef.msg._msg.Read(out uint count);
 
             if (msgRef?.matchData?.cachedMap == null)
             {
@@ -4453,7 +4453,6 @@ namespace _Emulator
                 SendBulkFail(msgRef, -6);
                 return;
             }
-            if (UserMapInfoManager.Instance.CheckAuth)
 
             if (!flag.IsSet(OperationFlag.Delete))
             {
@@ -4491,7 +4490,7 @@ namespace _Emulator
             }
 
             // Apply in one lock
-            List<int> newSeqs = new List<int>(count);
+            List<int> newSeqs = new List<int>((int) count);
             sbyte[] results = new sbyte[count];
             // -3 | Skipped                 | Uses no sequence
             // -2 | Failed                  | Uses no sequence
@@ -4592,7 +4591,7 @@ namespace _Emulator
                 mb.Write(zs[i]);
                 result = results[i];
                 mb.Write(result);
-                if (result == -2 || result == 2)
+                if (result <= -2 || result == 2)
                 {
                     continue;
                 }

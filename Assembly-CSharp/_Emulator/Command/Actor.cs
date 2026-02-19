@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 
-namespace _Emulator.Command
+namespace _Emulator
 {
     public class Actor
     {

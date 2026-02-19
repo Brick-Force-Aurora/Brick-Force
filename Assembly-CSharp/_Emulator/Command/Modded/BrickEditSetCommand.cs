@@ -1,13 +1,6 @@
-﻿using _Emulator.BrickEdit;
-using _Emulator.Command;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace _Emulator
+﻿namespace _Emulator
 {
-    public class BrickEditSet : ICommand
+    public class BrickEditSetCommand : ICommand
     {
         public string Description()
         {

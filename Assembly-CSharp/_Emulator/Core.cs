@@ -35,6 +35,7 @@ namespace _Emulator
             handler.Register("w", "whisper", new WhisperCommand());
             handler.Register("r", "reply", new WhisperReplyCommand());
             handler.Register("/set", new BrickEditSetCommand());
+            handler.Register("/remove", "/del", "/delete", new BrickEditRemoveCommand());
         }
 
         private void SetupBuildConfig()
