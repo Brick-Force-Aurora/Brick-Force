@@ -40,11 +40,13 @@ public class EditorTools : MonoBehaviour
 		editorToolScripts[0].desc = ConsumableManager.Instance.Get("build_tool");
 		editorToolScripts[1].desc = ConsumableManager.Instance.Get("line_tool");
 		editorToolScripts[2].desc = ConsumableManager.Instance.Get("replace_tool");
-		editorTool = new EditorTool[editorToolScripts.Length];
-		for (int i = 0; i < editorToolScripts.Length; i++)
+        // AURORA - Start: Added 1 to length
+        editorTool = new EditorTool[editorToolScripts.Length+1];
+        // AURORA - End
+        for (int i = 0; i < editorToolScripts.Length; i++)
 		{
-			Item i2 = null;
-			long num = MyInfoManager.Instance.HaveFunction(editorToolScripts[i].desc.name);
+            Item i2 = null;
+            long num = MyInfoManager.Instance.HaveFunction(editorToolScripts[i].desc.name);
 			if (num >= 0)
 			{
 				i2 = MyInfoManager.Instance.GetItemBySequence(num);
@@ -61,8 +63,18 @@ public class EditorTools : MonoBehaviour
 			{
 				editorTool[i] = new ReplaceTool(editorToolScripts[i], i2, battleChat);
 			}
-		}
-		editorTool[0].Activate(activate: true);
+        }
+        // AURORA - Start: Added BrickEditTool
+        EditorToolScript ets = new EditorToolScript();
+        ets.desc = new ConsumableDesc();
+        ets.desc.name = "brick_edit";
+        ets.inputKey = "K_SHOOTER5";
+		ets.desc.enable = editorToolScripts[0].desc.enable;
+        ets.desc.actionClip = editorToolScripts[0].desc.actionClip;
+        ets.desc.errorClip = editorToolScripts[0].desc.errorClip;
+        editorTool[3] = new BrickEditTool(ets, dummy, battleChat);
+        // AURORA - End
+        editorTool[0].Activate(activate: true);
 	}
 
 	private void Update()
@@ -98,6 +110,20 @@ public class EditorTools : MonoBehaviour
 		}
 		return null;
     }
+
+    // AURORA - Start: Added BrickEditTool
+    public BrickEditTool GetBrickEditTool()
+    {
+        for (int i = 0; i < editorTool.Length; i++)
+        {
+            if (editorTool[i].IsActive && editorTool[i].Name == "brick_edit")
+            {
+                return (BrickEditTool)editorTool[i];
+            }
+        }
+        return null;
+    }
+    // AURORA - End
 
     public ReplaceTool GetReplaceTool()
     {

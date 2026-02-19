@@ -25,7 +25,7 @@ namespace _Emulator
             }
         }
 
-        public static ReplaceTool ReplaceTool
+        public static BrickEditTool BrickEditTool
         {
             get
             {
@@ -34,13 +34,13 @@ namespace _Emulator
                 {
                     return null;
                 }
-                return editorTools.GetReplaceTool();
+                return editorTools.GetBrickEditTool();
             }
         }
 
         public static bool CheckSelection()
         {
-            ReplaceTool tool = ReplaceTool;
+            BrickEditTool tool = BrickEditTool;
             if (tool == null) {
                 return false;
             }

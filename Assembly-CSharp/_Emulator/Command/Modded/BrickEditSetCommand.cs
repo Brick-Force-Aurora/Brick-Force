@@ -18,7 +18,7 @@
             {
                 return;
             }
-            OperationProcessor.Instance.Enqueue(new SetOperation(EditHelper.ReplaceTool, template));
+            OperationProcessor.Instance.Enqueue(new SetOperation(EditHelper.BrickEditTool, template));
         }
     }
 }

@@ -535,8 +535,6 @@ public class BrickComposer : WeaponFunction
 
 	private void CheckFire1Replace()
 	{
-        // AURORA - Start: Switch 'Replace tool' to 'Selection tool'.
-        /*
 		if (custom_inputs.Instance.GetButtonDown("K_FIRE1") && UserMapInfoManager.Instance.CheckAuth(showMessage: true))
 		{
 			Brick brick = PaletteManager.Instance.GetCurrentBrick();
@@ -558,34 +556,39 @@ public class BrickComposer : WeaponFunction
 				}
 			}
 		}
-		*/
+	}
+
+    // AURORA - Start: Added BrickEdit Tool
+    private void CheckFire1BrickEdit()
+    {
         if (!UserMapInfoManager.Instance.CheckAuth(showMessage: true) || tools == null)
         {
             return;
         }
         BrickInst hitBrickInst = BrickManager.Instance.GetHitBrickInst(hitBrick.transform.gameObject, hitBrick.normal, hitBrick.point);
-		Vector3 pos = hitBrick.point;
+        Vector3 pos = hitBrick.point;
         if (hitBrickInst != null)
         {
-			pos = new Vector3(hitBrickInst.PosX, hitBrickInst.PosY, hitBrickInst.PosZ);
+            pos = new Vector3(hitBrickInst.PosX, hitBrickInst.PosY, hitBrickInst.PosZ);
         }
-		ReplaceTool tool = tools.GetReplaceTool();
-		if (tool == null)
-		{
-			return;
+        BrickEditTool tool = tools.GetBrickEditTool();
+        if (tool == null)
+        {
+            return;
         }
         if (custom_inputs.Instance.GetButtonDown("K_FIRE1"))
-		{
-			tool.SetRotation(hitBrick.normal, GetRotFromCameraDir());
-			tool.SetPos1(pos);
-		} else if (custom_inputs.Instance.GetButtonDown("K_FIRE2"))
+        {
+            tool.SetRotation(hitBrick.normal, GetRotFromCameraDir());
+            tool.SetPos1(pos);
+        }
+        else if (custom_inputs.Instance.GetButtonDown("K_FIRE2"))
         {
             tool.SetPos2(pos);
         }
-		// AURORA - End
-	}
+    }
+    // AURORA - End
 
-	private void CheckFire1(bool forceDown = false)
+    private void CheckFire1(bool forceDown = false)
 	{
 		string key = (!GlobalVars.Instance.switchLRBuild) ? "K_FIRE1" : "K_FIRE2";
 		if ((custom_inputs.Instance.GetButtonDown(key) || forceDown) && UserMapInfoManager.Instance.CheckAuth(showMessage: true))
@@ -1120,8 +1123,13 @@ public class BrickComposer : WeaponFunction
 			case "replace_tool":
 				_CheckReplaceTool();
 				break;
-			}
-		}
+            // AURORA - Start: Added Brick Edit Tool
+            case "brick_edit":
+                _CheckBrickEditTool();
+                break;
+            // AURORA - End
+            }
+        }
 	}
 
 	private void _PreCheckBuildTool()
@@ -1156,7 +1164,14 @@ public class BrickComposer : WeaponFunction
 		CheckFire1Replace();
 	}
 
-	private void CheckFireUp()
+    // AURORA - Start: Added Brick Edit Tool
+    private void _CheckBrickEditTool()
+    {
+        CheckFire1BrickEdit();
+    }
+    // AURORA - End
+
+    private void CheckFireUp()
 	{
 		if (!GlobalVars.Instance.switchLRBuild)
 		{

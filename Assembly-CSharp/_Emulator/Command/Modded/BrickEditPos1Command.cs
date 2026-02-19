@@ -34,7 +34,7 @@ namespace _Emulator
                     coordinates[i] = (byte)Math.Min(Math.Max(value, 0), 255);
                 }
             }
-            ReplaceTool tool = EditHelper.ReplaceTool;
+            BrickEditTool tool = EditHelper.BrickEditTool;
             if (tool == null)
             {
                 return;

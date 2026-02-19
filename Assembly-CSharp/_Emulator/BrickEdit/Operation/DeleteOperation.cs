@@ -8,7 +8,7 @@ namespace _Emulator
         public readonly byte x1, y1, z1, x2, y2, z2;
 
         private bool executed = false;
-        public DeleteOperation(ReplaceTool tool)
+        public DeleteOperation(BrickEditTool tool)
         {
             tool.GetPos1(out x1, out y1, out z1);
             tool.GetPos2(out x2, out y2, out z2);

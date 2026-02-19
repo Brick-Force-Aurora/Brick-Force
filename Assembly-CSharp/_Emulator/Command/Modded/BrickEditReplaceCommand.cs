@@ -18,7 +18,7 @@
             {
                 return;
             }
-            OperationProcessor.Instance.Enqueue(new ReplaceOperation(EditHelper.ReplaceTool, sourceTemplate, targetTemplate));
+            OperationProcessor.Instance.Enqueue(new ReplaceOperation(EditHelper.BrickEditTool, sourceTemplate, targetTemplate));
         }
     }
 }

@@ -728,6 +728,7 @@
     <Compile Include="ZombieVirus.cs" />
     <Compile Include="ZombieVsHumanManager.cs" />
     <Compile Include="_Emulator\BrickEdit\BrickCache.cs" />
+    <Compile Include="_Emulator\BrickEdit\BrickEditTool.cs" />
     <Compile Include="_Emulator\BrickEdit\EditHelper.cs" />
     <Compile Include="_Emulator\BrickEdit\IOperation.cs" />
     <Compile Include="_Emulator\BrickEdit\OperationProcessor.cs" />

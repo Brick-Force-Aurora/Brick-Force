@@ -12,7 +12,7 @@ namespace _Emulator
         public readonly byte sourceTemplate, targetTemplate, rotation;
 
         private bool executed = false;
-        public ReplaceOperation(ReplaceTool tool, byte sourceTemplate, byte targetTemplate)
+        public ReplaceOperation(BrickEditTool tool, byte sourceTemplate, byte targetTemplate)
         {
             tool.GetPos1(out x1, out y1, out z1);
             tool.GetPos2(out x2, out y2, out z2);

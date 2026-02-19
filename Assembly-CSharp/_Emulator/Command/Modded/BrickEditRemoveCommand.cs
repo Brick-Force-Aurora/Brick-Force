@@ -13,7 +13,7 @@
             {
                 return;
             }
-            OperationProcessor.Instance.Enqueue(new DeleteOperation(EditHelper.ReplaceTool));
+            OperationProcessor.Instance.Enqueue(new DeleteOperation(EditHelper.BrickEditTool));
         }
     }
 }
