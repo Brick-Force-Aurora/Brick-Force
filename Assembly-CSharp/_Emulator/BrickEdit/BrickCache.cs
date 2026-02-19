@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace _Emulator
@@ -12,29 +13,36 @@ namespace _Emulator
                 return instance_;
             } }
 
+        private readonly Dictionary<string, int> limits = new Dictionary<string, int>() {
+                { "decorative_armor", 200 },
+                { "blue_banner", 100 },
+                { "red_banner", 100 },
+                { "blue_team_spawner", 8 },
+                { "red_team_spawner", 8 },
+                { "deathmatch_spawner", 16 },
+                { "flag_spawn_point", 1 },
+                { "blue_flag_capture_point", 1 },
+                { "red_flag_capture_point", 1 },
+                { "bomb_site", 2 },
+                { "entrance_portal", 1 },
+                { "monster_path", 50 },
+                { "exit_portal", 1 },
+                { "turret", 2 },
+                { "vulcan_turret", 2 },
+                { "gravity_down", 2 },
+                { "gravity_down_fragile", 2 },
+                { "gravity_up", 2 },
+                { "gravity_up_fragile", 2 },
+                { "wooden_door", 50 },
+                { "red_portal", 2 },
+                { "blue_portal", 2 },
+                { "green_portal", 2 },
+                { "train_car", 2 },
+        };
+
         private readonly Dictionary<string, byte> aliasToId = new Dictionary<string, byte>();
 
-        private BrickCache() {
-            StringMgr stringMgr = StringMgr.Instance;
-            foreach (Brick brick in BrickManager.Instance.bricks)
-            {
-                string brickName = stringMgr.Get(brick.brickAlias, LangOptManager.LANG_OPT.ENGLISH);
-                if (brickName.Length == 0)
-                {
-                    brickName = brick.brickName;
-                }
-                brickName = brickName.ToLower().Replace(' ', '_');
-                if (aliasToId.ContainsKey(brickName))
-                {
-                    if (!aliasToId.ContainsKey(brickName + "_1"))
-                    {
-                        aliasToId.Add(brickName + "_1", aliasToId[brickName]);
-                    }
-                    brickName = ResolveConflict(brickName);
-                }
-                aliasToId.Add(brickName, brick.index);
-            }
-        }
+        private BrickCache() {}
 
         private string ResolveConflict(string baseName)
         {
@@ -47,7 +55,36 @@ namespace _Emulator
             return name;
         }
 
-        internal void Init() { }
+        internal void Init() {
+            aliasToId.Clear();
+            StringMgr stringMgr = StringMgr.Instance;
+            foreach (Brick brick in BrickManager.Instance.bricks)
+            {
+                string brickName = stringMgr.Get(brick.brickAlias, LangOptManager.LANG_OPT.ENGLISH);
+                if (brickName.Length == 0)
+                {
+                    brickName = brick.brickName;
+                }
+                brickName = brickName.ToLower().Replace(' ', '_').Replace("(", "").Replace(")", "");
+                if (limits.ContainsKey(brickName))
+                {
+                    brick.maxInstancePerMap = limits[brickName];
+                } else
+                {
+                    brick.maxInstancePerMap = -1;
+                }
+                if (aliasToId.ContainsKey(brickName))
+                {
+                    Debug.Log("Duplicated brick: " + brickName);
+                    if (!aliasToId.ContainsKey(brickName + "_1"))
+                    {
+                        aliasToId.Add(brickName + "_1", aliasToId[brickName]);
+                    }
+                    brickName = ResolveConflict(brickName);
+                }
+                aliasToId.Add(brickName, brick.index);
+            }
+        }
 
         public bool GetBrickByName(string name, out byte brickIndex, bool message = true)
         {
@@ -67,13 +104,27 @@ namespace _Emulator
 
         public bool GetCurrentBrick(out byte brickIndex, bool message = true)
         {
-            Brick brick = PaletteManager.Instance.GetCurrentBrick();
+            Brick brick = PaletteManager.Instance.palette[PaletteManager.Instance.currentPalette];
             if (brick == null)
             {
                 if (message)
                 {
                     Actor.Instance.SendChat("No brick selected in palette or provided in command");
                 }
+                brickIndex = 0;
+                return false;
+            }
+            brickIndex = brick.index;
+            return true;
+        }
+
+        public bool GetBrickFromPalette(byte paletteIndex, out byte brickIndex)
+        {
+            paletteIndex = (byte) (Math.Max(Math.Min(paletteIndex, PaletteManager.Instance.palette.Length), 1) - 1);
+            Brick brick = PaletteManager.Instance.palette[PaletteManager.Instance.currentPalette];
+            if (brick == null)
+            {
+                Actor.Instance.SendChat($"No brick selected in palette index {paletteIndex}");
                 brickIndex = 0;
                 return false;
             }

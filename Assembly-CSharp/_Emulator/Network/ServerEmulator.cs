@@ -2419,15 +2419,21 @@ namespace _Emulator
             if (debugHandle)
                 Debug.Log("HandleAddBrickRequest from: " + msgRef.client.GetIdentifier());
 
-            msgRef.msg._msg.Read(out byte brick);
+            msgRef.msg._msg.Read(out byte brickIndex);
             msgRef.msg._msg.Read(out byte x);
             msgRef.msg._msg.Read(out byte y);
             msgRef.msg._msg.Read(out byte z);
             msgRef.msg._msg.Read(out byte rot);
 
+            Brick brick = BrickManager.Instance.GetBrick(brickIndex);
+            if (brick == null || (brick.maxInstancePerMap > 0 && matchData.cachedMap.CountLimitedBrick(brickIndex) >= brick.maxInstancePerMap))
+            {
+                return;
+            }
+
             int seq = matchData.GetNextBrickSeq();
             List<int> morphes = new List<int>();
-            BrickInst brickInst = matchData.cachedMap.AddBrickInst(seq, brick, x, y, z, 0, rot);
+            BrickInst brickInst = matchData.cachedMap.AddBrickInst(seq, brickIndex, x, y, z, 0, rot);
             if (brickInst != null)
             {
                 SendAddBrick(msgRef.client, brickInst);
@@ -4450,7 +4456,7 @@ namespace _Emulator
             if (msgRef?.matchData?.cachedMap == null)
             {
                 Debug.LogError("BULK_REQ: matchData/cachedMap null");
-                SendBulkFail(msgRef, -6);
+                SendBulkFail(msgRef, -1);
                 return;
             }
 
@@ -4459,8 +4465,13 @@ namespace _Emulator
                 Brick targetBrick = BrickManager.Instance.GetBrick(targetIndex);
                 if (targetBrick == null)
                 {
-                    Debug.LogWarning($"BULK_REQ: unknown brick index={targetIndex}");
-                    SendBulkFail(msgRef, -6);
+                    Debug.LogWarning($"BULK_REQ: unknown target brick index={targetIndex}");
+                    SendBulkFail(msgRef, 0x0);
+                    return;
+                }
+                if (targetBrick.maxInstancePerMap > 0)
+                {
+                    SendBulkFail(msgRef, 0x20);
                     return;
                 }
             }
@@ -4469,8 +4480,8 @@ namespace _Emulator
                 Brick sourceBrick = BrickManager.Instance.GetBrick(sourceIndex);
                 if (sourceBrick == null)
                 {
-                    Debug.LogWarning($"BULK_REQ: unknown brick index={sourceIndex}");
-                    SendBulkFail(msgRef, -6);
+                    Debug.LogWarning($"BULK_REQ: unknown source brick index={sourceIndex}");
+                    SendBulkFail(msgRef, 0x1);
                     return;
                 }
             }

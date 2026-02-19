@@ -33,6 +33,7 @@
 - Use any item you want, synced with players in your lobby.
 - Tracks team score, kills, assists, deaths and score during matches.
 - Tracks usable and destroyable bricks like glass, crates, cannons and trains.
+- Custom editing tools for Build Mode.
 - Configure rooms and switch teams for easy match setup.
 - Players sync movement, hits, shots, deaths, respawns and playerstates.
 - Various bug fixes over the original game.
@@ -134,6 +135,24 @@
 - F6: Main Menu
 - F8: Debug Console
 
+## BrickEdit
+
+#### What is it?
+BrickEdit is basically what you might know from Minecraft as WorldEdit.
+It is a mass brick editing tool which you can use in Build Mode rooms.
+
+#### Limitations
+- Can only process up to 4000 bricks per operation
+
+#### Commands
+<sup>`(required) [optional] <variable>`</sup>
+
+- `//set [<PALETTE_INDEX/BRICK_NAME>]` - Sets the provided brick in the current selection.
+- `//replace (<PALETTE_INDEX/BRICK_NAME>) [<PALETTE_INDEX/BRICK_NAME>]` - Replaces the first provided brick with the second provided brick in the current sleection.
+- `//del` - Deletes all bricks in the current selection.
+- `//pos1` - Sets the first selection position.
+- `//pos2` - Sets the second selection position.
+
 ## Limitations
 - There are still a lot of bugs, if you encounter any, open an Issue or head to our Discord.
 - Freefall, Defense and Defusion don't work.
@@ -147,7 +166,6 @@
 - Temporary shop prices.
 - No user information persists apart from inventory and config.
 - Action panel untested.
-- Build Mode: No Swappie or Streamliner.
 - Item stats are mostly backup values loaded from disk and are different from Infernum servers.
 - ~Most rare weapons and max up variants have empty stats and are therefore useless in game.~
 - Game languages need to be english, otherwise you will get stuck in the loading screen.

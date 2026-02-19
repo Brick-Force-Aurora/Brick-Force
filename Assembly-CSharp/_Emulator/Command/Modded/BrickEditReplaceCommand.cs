@@ -14,6 +14,10 @@
             {
                 return;
             }
+            if (!targetTemplate.IsAllowedTarget())
+            {
+                return;
+            }
             OperationProcessor.Instance.Enqueue(new ReplaceOperation(EditHelper.ReplaceTool, sourceTemplate, targetTemplate));
         }
     }

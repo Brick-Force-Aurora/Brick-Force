@@ -44,9 +44,9 @@ public class PaletteManager : MonoBehaviour
 
 	private Vector2 pospal1 = Vector2.zero;
 
-	private Brick[] palette;
+	public Brick[] palette;
 
-	private int currentPalette;
+	public int currentPalette;
 
 	private Texture[] paletteIcons;
 

@@ -83,7 +83,22 @@ namespace _Emulator
                 template = 0;
                 return false;
             }
-            return byte.TryParse(tokens[index], out template) || BrickCache.Instance.GetBrickByName(tokens[index], out template);
+            if (byte.TryParse(tokens[index], out byte paletteIndex))
+            {
+                return BrickCache.Instance.GetBrickFromPalette(paletteIndex, out template);
+            }
+            return BrickCache.Instance.GetBrickByName(tokens[index], out template);
+        }
+
+        public static bool IsAllowedTarget(this byte template)
+        {
+            Brick brick = BrickManager.Instance.GetBrick(template);
+            if (brick == null || brick.maxInstancePerMap <= 0)
+            {
+                Actor.Instance.SendChat("The provided target brick is not allowed to be used with BrickEdit.");
+                return false;
+            }
+            return true;
         }
 
         public static bool AddBrickBulk(this BrickManager brickManager, int seq, byte x, byte y, byte z, byte index, byte rotation, ref List<int> morphes)

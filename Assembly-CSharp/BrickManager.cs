@@ -1,3 +1,4 @@
+using _Emulator;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -651,7 +652,9 @@ public class BrickManager : MonoBehaviour
 			}
 		}
 		Object.DontDestroyOnLoad(this);
-	}
+
+        BrickCache.Instance.Init(); // AURORA: Initialize brick cache
+    }
 
 	public SpawnerDesc GetAwardSpawner4TeamMatch(Brick.SPAWNER_TYPE spawnerType, int rank)
 	{
