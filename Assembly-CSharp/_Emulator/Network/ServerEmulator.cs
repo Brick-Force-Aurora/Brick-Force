@@ -34,7 +34,8 @@ namespace _Emulator
         public bool debugPing = false;
         public bool serverCreated = false;
         public bool isSteam = false;
-        public ChannelManager channelManager = new ChannelManager();
+        public bool hasHost = false;
+        public EmulatorChannelManager channelManager = new EmulatorChannelManager();
         private float killLogTimer = 0f;
         public List<KeyValuePair<int, RegMap>> regMaps = new List<KeyValuePair<int, RegMap>>();
         private bool waitForShutDown = false;
@@ -49,6 +50,7 @@ namespace _Emulator
         {
             RegisterHandlers();
             isSteam = false;
+            hasHost = false;
             try
             {
                 if (serverSocket == null)
@@ -76,6 +78,7 @@ namespace _Emulator
         {
             RegisterHandlers();
             isSteam = true;
+            hasHost = false;
             serverCreated = true;
             Debug.Log("Server set to Steam");
 
@@ -433,7 +436,7 @@ namespace _Emulator
         public void ShutdownInit()
         {
             channelManager.Shutdown();
-            channelManager = new ChannelManager();
+            channelManager = new EmulatorChannelManager();
             //matchData = new MatchData();
             curSeq = 0;
             SendDisconnect(null, SendType.Broadcast);
@@ -515,7 +518,7 @@ namespace _Emulator
                     ShutdownFinally();
 
                 killLogTimer += Time.deltaTime;
-                HandleDeadClients();
+                HandleClientUpdates();
                 HandleMessages();
                 SendMessages();
             }
@@ -545,7 +548,7 @@ namespace _Emulator
                 }
 
                 channelManager.Shutdown();
-                channelManager = new ChannelManager();
+                channelManager = new EmulatorChannelManager();
             }
             catch { }
 
@@ -560,28 +563,39 @@ namespace _Emulator
             SendCustomMessage("Reset By Host");
         }
 
-        private void HandleDeadClients()
+        private void HandleClientUpdates()
         {
+            float time = Time.time, delta = Time.deltaTime;
+            ClientReference clientRef;
             for (int i = clientList.Count - 1; i >= 0; i--)
             {
-                ClientReference clientRef = clientList[i];
+                clientRef = clientList[i];
                 if (clientRef.isHost) { continue; }
-                if (Time.time - clientRef.lastHeartBeatTime > 10f)
+                // Handle client heartbeat
+                if (clientRef.didHeartBeat)
                 {
-                    SendDisconnect(clientRef);
-                    clientRef.Disconnect(true);
+                    clientRef.lastHeartBeatTime = time;
+                    clientRef.didHeartBeat = false;
+                } else if (time - clientRef.lastHeartBeatTime > 15f)
+                {
+                    if (ServerEmulator.instance.debugHandle)
+                        Debug.Log("[Disconnect] Client timed out: " + clientRef.GetIdentifier());
+                    clientRef.Disconnect(false);
                     continue;
                 }
+                // Handle dead clients
                 if (clientRef.seq == -1)
                 {
-                    clientRef.toleranceTime += Time.deltaTime;
-                    if (clientRef.toleranceTime >= 10f)
-                {
-                        SendDisconnect(clientRef);
-                        clientRef.Disconnect(false);
+                    if (clientRef.loginToleranceTime < 5f)
+                    {
+                        clientRef.loginToleranceTime += delta;
                         continue;
+                    }
+                    clientRef.Disconnect(false);
+                    if (ServerEmulator.instance.debugHandle)
+                        Debug.Log("[Disconnect] Client login timed out: " + clientRef.GetIdentifier());
+                    continue;
                 }
-            }
             }
         }
 
@@ -896,7 +910,7 @@ namespace _Emulator
         private void HandleHeartbeat(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out int gmFunction);
-            msgRef.client.lastHeartBeatTime = Time.time;
+            msgRef.client.didHeartBeat = true;
         }
 
         private void HandleLoginRequest(MsgReference msgRef)
@@ -916,9 +930,8 @@ namespace _Emulator
             msgRef.msg._msg.Read(out string macAddress);
 
             msgRef.client.name = id;
-            msgRef.client.seq = curSeq;
+            msgRef.client.seq = curSeq++;
             msgRef.client.port = 6000 + msgRef.client.seq;
-            curSeq++;
 
             ChannelReference channel = channelManager.GetDefaultChannel();
             channel.AddClient(msgRef.client);
@@ -1222,6 +1235,8 @@ namespace _Emulator
                     SendKillCount(matchData.clientList[i]);
                     SendDeathCount(matchData.clientList[i]);
                 }
+                BND.SendBnDStatus(msgRef.client);
+                SendTimer(msgRef.client);
                 msgRef.client.isBreakingInto = true;
             }
 
@@ -1337,6 +1352,7 @@ namespace _Emulator
                 matchData.buildPhaseTime = buildTime;
                 matchData.battlePhaseTime = destroyTime;
                 matchData.repeat = repeat;
+                matchData.CacheMap(regMaps.Find(x => x.Value.Map == param4).Value, new UserMapInfo(0, 0));
 
                 // Initialize BND-specific fields
                 /*matchData.currentPhase = MatchData.BnDPhase.Build;
@@ -1399,6 +1415,28 @@ namespace _Emulator
             matchData.room.isDropItem = false;//Convert.ToBoolean(itemPickup);
             matchData.room.CurMapAlias = whereAlias;
             matchData.room.Type = (Room.ROOM_TYPE)type;
+
+            if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.BUNGEE)
+            {
+                matchData.CacheMap(regMaps.Find(x => x.Value.Map == nWhere).Value, new UserMapInfo(0, 0));
+            }
+
+            if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.BND)
+            {
+                // Unpack the timer configuration for Build and Destroy phases
+                int buildTime, destroyTime, repeat;
+                BND.UnpackTimerOption(timeLimit, out buildTime, out destroyTime, out repeat);
+
+                matchData.buildPhaseTime = buildTime;
+                matchData.battlePhaseTime = destroyTime;
+                matchData.repeat = repeat;
+                matchData.CacheMap(regMaps.Find(x => x.Value.Map == nWhere).Value, new UserMapInfo(0, 0));
+
+                // Initialize BND-specific fields
+                /*matchData.currentPhase = MatchData.BnDPhase.Build;
+                matchData.currentRound = 1;
+                matchData.remainTime = buildTime; // Start with Build phase time*/
+            }
 
             if (debugHandle)
                 Debug.Log("HandleRoomConfig from: " + msgRef.client.GetIdentifier());
@@ -3284,16 +3322,25 @@ namespace _Emulator
         {
             MsgBody body = new MsgBody();
 
+            ROOM_TYPE roomType = matchData.room.type;
+
             body.Write(matchData.room.map);
             body.Write(matchData.room.CurMapAlias);
-            if ((ROOM_TYPE) matchData.room.type == ROOM_TYPE.MISSION)
+
+            if (roomType == ROOM_TYPE.MISSION)
             {
                 body.Write(matchData.room.goal); // core HP
             } else
             {
                 body.Write(matchData.room.weaponOption);
             }
-            body.Write(matchData.room.timelimit);
+            if (roomType == ROOM_TYPE.BND)
+            {
+                body.Write(BND.PackTimerOptions(matchData.buildPhaseTime, matchData.battlePhaseTime, matchData.repeat));
+            } else
+            {
+                body.Write(matchData.room.timelimit);
+            }
             body.Write(matchData.room.goal);
             body.Write(matchData.room.isBreakInto);
             body.Write(matchData.isBalance);

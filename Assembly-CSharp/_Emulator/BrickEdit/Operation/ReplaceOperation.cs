@@ -20,6 +20,18 @@ namespace _Emulator
             this.targetTemplate = targetTemplate;
             tool.GetRotation(out rotation, targetTemplate);
         }
+        public ReplaceOperation(BrickEditTool tool, byte x1, byte y1, byte z1, byte x2, byte y2, byte z2, byte sourceTemplate, byte targetTemplate)
+        {
+            this.x1 = x1;
+            this.y1 = y1;
+            this.z1 = z1;
+            this.x2 = x2;
+            this.y2 = y2;
+            this.z2 = z2;
+            this.sourceTemplate = sourceTemplate;
+            this.targetTemplate = targetTemplate;
+            tool.GetRotation(out rotation, targetTemplate);
+        }
 
         public bool HasNextStep()
         {

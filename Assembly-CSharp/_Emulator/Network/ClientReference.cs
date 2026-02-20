@@ -23,7 +23,9 @@ namespace _Emulator
         public byte[] buffer;
         public CSteamID steamID = CSteamID.Nil;
         public bool isSteam = false;
+        public volatile bool didHeartBeat = false;
         public float lastHeartBeatTime;
+        public float loginToleranceTime = 0f;
         public string name;
         public int seq;
         public bool isLoaded;
@@ -34,7 +36,6 @@ namespace _Emulator
         public int score = 0;
         public bool isZombie = false;
         public bool isBreakingInto;
-        public float toleranceTime;
         public ClientStatus clientStatus;
         public BrickManDesc.STATUS status;
         public SlotData slot;
@@ -60,10 +61,15 @@ namespace _Emulator
             data = new DummyData();
             ip = socket.RemoteEndPoint.ToString().Split(':')[0];
             isLoaded = false;
-            isHost = ServerEmulator.instance.clientList.Count == 0;
+            isHost = false;
+            // First person to join with 127.0.0.1 is host
+            if (!ServerEmulator.instance.hasHost && ip.Equals("127.0.0.1"))
+            {
+                ServerEmulator.instance.hasHost = true;
+                isHost = true;
+            }
             isVersionSetUp = false;
             buffer = new byte[8192];
-            toleranceTime = 0f;
             isSteam = false;
             SetupChunkedBuffers();
         }
@@ -78,10 +84,9 @@ namespace _Emulator
             status = BrickManDesc.STATUS.PLAYER_WAITING;
             data = new DummyData();
             isLoaded = false;
-            isHost = ServerEmulator.instance.clientList.Count == 0;
+            isHost = SteamManager.Initialized && SteamLobbyManager.instance.IsCurrentOwner(_steamID);
             isVersionSetUp = false;
             buffer = new byte[8192];
-            toleranceTime = 0f;
             isSteam = true;
             SetupChunkedBuffers();
         }

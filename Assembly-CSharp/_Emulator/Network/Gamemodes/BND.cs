@@ -50,6 +50,12 @@ namespace _Emulator.Network.Gamemodes
 
             ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_BND_SHIFT_PHASE_ACK, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
         }
+
+        public static int PackTimerOptions(int build, int battle, int rpt)
+        {
+            return (rpt & 0xFF) | (((battle / 60) & 0xFF) << 8) | (((build / 60) & 0xFF) << 16);
+        }
+
         public static void UnpackTimerOption(int packed, out int build, out int battle, out int rpt)
         {
             // Extract `rpt` (last 8 bits)
@@ -106,6 +112,13 @@ namespace _Emulator.Network.Gamemodes
             if (ServerEmulator.instance.debugSend)
                 Debug.Log("Broadcasted SendBNDMatchEnd for room no: " + matchData.room.No);
         }
+
+        internal static void SendBnDStatus(ClientReference client)
+        {
+            MsgBody body = new MsgBody();
+            body.Write(client.matchData.isBuildPhase);
+            ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_BND_STATUS_ACK, body, client));
+        }
         internal static void SendBnDScore(MatchData matchData)
         {
             MsgBody body = new MsgBody();
@@ -117,5 +130,6 @@ namespace _Emulator.Network.Gamemodes
             if (ServerEmulator.instance.debugSend)
                 Debug.Log("Broadcasted SendTeamScore for room no: " + matchData.room.No);
         }
+
     }
 }

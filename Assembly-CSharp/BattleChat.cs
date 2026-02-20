@@ -375,8 +375,9 @@ public class BattleChat : MonoBehaviour
                     command = CommandInterpreter.Instance.GetNextCommand(command
                     */
                     command = CommandHandler.Instance.History.Next(command);
+                    cursorToEnd = true;
                     // AURORA - End
-					if (command.Length > 0)
+                    if (command.Length > 0)
 					{
 						message = command;
 					}
@@ -390,6 +391,7 @@ public class BattleChat : MonoBehaviour
 				command2 = CommandInterpreter.Instance.GetPrevCommand(command2);
                 */
 				command2 = CommandHandler.Instance.History.Previous(command2);
+				cursorToEnd = true;
                 // AURORA - End
                 if (command2.Length > 0)
 				{

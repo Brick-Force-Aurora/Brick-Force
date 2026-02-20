@@ -37,6 +37,7 @@ namespace _Emulator
             }
             GameObject brickEdit = new GameObject("BrickEdit");
             OperationProcessor.Instance = brickEdit.AddComponent<OperationProcessor>();
+            BulkChangeProcessor.Instance = brickEdit.AddComponent<BulkChangeProcessor>();
         }
 
         private void RegisterCommands()
@@ -46,9 +47,13 @@ namespace _Emulator
             handler.Register("r", "reply", new WhisperReplyCommand());
 
             // BrickEdit commands
+            handler.Register("/set hollow", new BrickEditSetHollowCommand());
             handler.Register("/set", new BrickEditSetCommand());
+            handler.Register("/remove near", "/del near", "/delete near", new BrickEditRemoveNearCommand());
             handler.Register("/remove", "/del", "/delete", new BrickEditRemoveCommand());
+            handler.Register("/replace near", new BrickEditReplaceNearCommand());
             handler.Register("/replace", new BrickEditReplaceCommand());
+            handler.Register("/sel", "/selection", new BrickEditSelectionCommand());
             handler.Register("/pos1", new BrickEditPos1Command());
             handler.Register("/pos2", new BrickEditPos2Command());
         }
@@ -59,6 +64,8 @@ namespace _Emulator
             BuildOption.Instance.Props.UseP2pHolePunching = true;
             BuildOption.Instance.Props.isDuplicateExcuteAble = true;
         }
+
+
 
         public static void SetBalancedItemProperties()
         {

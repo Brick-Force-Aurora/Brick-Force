@@ -4,7 +4,7 @@
     {
         public string Description()
         {
-            return "Sets all bricks within the selection of the Swappie tool to the provided brick";
+            return "Sets all bricks within the selection of the selection tool to the provided brick";
         }
 
         public void Execute(CommandContext context)

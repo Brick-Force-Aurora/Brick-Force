@@ -1111,7 +1111,7 @@ public class BrickComposer : WeaponFunction
 	{
 		if (CanFire())
 		{
-			string text = (!(null == tools)) ? tools.GetActiveEditorTool() : "build_tool";
+			string text = tools != null ? tools.GetActiveEditorTool() : "build_tool";
 			switch (text)
 			{
 			case "build_tool":

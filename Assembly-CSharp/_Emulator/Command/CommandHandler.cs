@@ -70,7 +70,7 @@ namespace _Emulator
             string lastToken;
             StringBuilder fullCommand = new StringBuilder();
             CommandNode node = rootNode, tmp;
-            while (reader.HasNext())
+            while (reader.SkipWhitespace().HasNext())
             {
                 lastToken = reader.ReadToken();
                 tmp = node.Node(lastToken);
@@ -107,7 +107,7 @@ namespace _Emulator
             string lastToken;
             StringBuilder fullCommand = new StringBuilder();
             CommandNode node = rootNode, tmp;
-            while (reader.HasNext())
+            while (reader.SkipWhitespace().HasNext())
             {
                 lastToken = reader.ReadToken();
                 tmp = node.Node(lastToken);
@@ -172,14 +172,11 @@ namespace _Emulator
 
         private string[] ToNodePath(string commandPath)
         {
-            List<string> path = commandPath.Split(' ').ToList();
-            for (int i = 0; i < path.Count; i++)
+            CommandReader reader = new CommandReader(commandPath);
+            List<string> path = new List<string>();
+            while (reader.SkipWhitespace().HasNext())
             {
-                if (path[i].Length == 0)
-                {
-                    path.RemoveAt(i--);
-                    continue;
-                }
+                path.Add(reader.ReadToken());
             }
             return path.ToArray();
         }
@@ -266,7 +263,7 @@ namespace _Emulator
             }
             CommandReader reader = new CommandReader(command);
             StringBuilder builder = new StringBuilder();
-            while (reader.HasNext())
+            while (reader.SkipWhitespace().HasNext())
             {
                 if (builder.Length != 0)
                 {
@@ -294,15 +291,16 @@ namespace _Emulator
             CommandNode node = this;
             for (int i = 0; i < path.Length; i++)
             {
-                if (!commands.ContainsKey(path[i]))
+                if (!node.commands.ContainsKey(path[i]))
                 {
-                    commands[path[i]] = new CommandNode();
+                    node.commands[path[i]] = new CommandNode();
                 }
-                node = commands[path[i]];
+                node = node.commands[path[i]];
             }
             if (node.Command != null)
             {
-                throw new ArgumentException($"Command with path '{path}' already exists");
+                string stringifiedPath = string.Join(" ", path);
+                throw new ArgumentException($"Command with path '{stringifiedPath}' already exists");
             }
             node.Command = command;
         }

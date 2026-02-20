@@ -27,5 +27,8 @@
         public const int opBulkBrickReq = 1020;
         public const int opBulkBrickAck = 1021;
         public const int opBulkBrickFailAck = 1022;
+
+        public const int opAmIConnectedReq = 1023;
+        public const int opAmIConnectedAck = 1024;
     }
 }

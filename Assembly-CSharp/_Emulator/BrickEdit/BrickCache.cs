@@ -29,15 +29,16 @@ namespace _Emulator
                 { "exit_portal", 1 },
                 { "turret", 2 },
                 { "vulcan_turret", 2 },
-                { "gravity_down", 2 },
-                { "gravity_down_fragile", 2 },
-                { "gravity_up", 2 },
-                { "gravity_up_fragile", 2 },
+                { "gravity_down", 10 },
+                { "gravity_down_fragile", 10 },
+                { "gravity_up", 10 },
+                { "gravity_up_fragile", 10 },
                 { "wooden_door", 50 },
                 { "red_portal", 2 },
                 { "blue_portal", 2 },
                 { "green_portal", 2 },
                 { "train_car", 2 },
+                { "red_brick_2", 1000 }, // Some kind of barrier
         };
 
         private readonly Dictionary<string, byte> aliasToId = new Dictionary<string, byte>();
@@ -120,8 +121,8 @@ namespace _Emulator
 
         public bool GetBrickFromPalette(byte paletteIndex, out byte brickIndex)
         {
-            paletteIndex = (byte) (Math.Max(Math.Min(paletteIndex, PaletteManager.Instance.palette.Length), 1) - 1);
-            Brick brick = PaletteManager.Instance.palette[PaletteManager.Instance.currentPalette];
+            paletteIndex = (byte) Math.Max(Math.Min(paletteIndex, PaletteManager.Instance.palette.Length), 0);
+            Brick brick = PaletteManager.Instance.palette[paletteIndex];
             if (brick == null)
             {
                 Actor.Instance.SendChat($"No brick selected in palette index {paletteIndex}");

@@ -1,10 +1,10 @@
 ﻿namespace _Emulator
 {
-    public class BrickEditSetCommand : ICommand
+    public class BrickEditSetHollowCommand : ICommand
     {
         public string Description()
         {
-            return "Sets all bricks within the selection of the selection tool to the provided brick";
+            return "Sets all bricks on the edge of the selection of the selection tool to the provided brick";
         }
 
         public void Execute(CommandContext context)
@@ -18,7 +18,7 @@
             {
                 return;
             }
-            OperationProcessor.Instance.Enqueue(new SetOperation(EditHelper.BrickEditTool, template));
+            OperationProcessor.Instance.Enqueue(new SetHollowOperation(EditHelper.BrickEditTool, template));
         }
     }
 }

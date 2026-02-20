@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class EditorTools : MonoBehaviour
@@ -42,6 +43,21 @@ public class EditorTools : MonoBehaviour
 		editorToolScripts[2].desc = ConsumableManager.Instance.Get("replace_tool");
         // AURORA - Start: Added 1 to length
         editorTool = new EditorTool[editorToolScripts.Length+1];
+		EditorToolScript[] tmp = editorToolScripts;
+        editorToolScripts = new EditorToolScript[editorToolScripts.Length+1];
+		Array.Copy(tmp, 0, editorToolScripts, 0, tmp.Length);
+        EditorToolScript ets = new EditorToolScript();
+        ets.inputKey = "K_SHOOTER5";
+        ets.desc = new ConsumableDesc();
+        ets.desc.name = "brick_edit";
+        ets.desc.enable = editorToolScripts[0].desc.enable;
+        ets.desc.passive = editorToolScripts[0].desc.passive;
+        ets.desc.actionClip = editorToolScripts[0].desc.actionClip;
+        ets.desc.errorClip = editorToolScripts[0].desc.errorClip;
+		ets.desc.cooltime = editorToolScripts[0].desc.cooltime;
+		ets.desc.disableByRoomType = editorToolScripts[0].desc.disableByRoomType;
+        editorToolScripts[editorToolScripts.Length - 1] = ets;
+        tmp = null;
         // AURORA - End
         for (int i = 0; i < editorToolScripts.Length; i++)
 		{
@@ -54,7 +70,8 @@ public class EditorTools : MonoBehaviour
 			if (editorToolScripts[i].desc.name == "build_tool")
 			{
 				editorTool[i] = new BuildTool(editorToolScripts[i], battleChat);
-			}
+				editorTool[i].Activate(activate: true);
+            }
 			else if (editorToolScripts[i].desc.name == "line_tool")
 			{
 				editorTool[i] = new LineTool(editorToolScripts[i], i2, dummy, battleChat);
@@ -62,19 +79,13 @@ public class EditorTools : MonoBehaviour
 			else if (editorToolScripts[i].desc.name == "replace_tool")
 			{
 				editorTool[i] = new ReplaceTool(editorToolScripts[i], i2, battleChat);
-			}
+                // AURORA - Start: Added BrickEditTool
+            } else if (editorToolScripts[i].desc.name == "brick_edit")
+            {
+                editorTool[i] = new BrickEditTool(editorToolScripts[i], dummy, battleChat);
+            }
+            // AURORA - End
         }
-        // AURORA - Start: Added BrickEditTool
-        EditorToolScript ets = new EditorToolScript();
-        ets.desc = new ConsumableDesc();
-        ets.desc.name = "brick_edit";
-        ets.inputKey = "K_SHOOTER5";
-		ets.desc.enable = editorToolScripts[0].desc.enable;
-        ets.desc.actionClip = editorToolScripts[0].desc.actionClip;
-        ets.desc.errorClip = editorToolScripts[0].desc.errorClip;
-        editorTool[3] = new BrickEditTool(ets, dummy, battleChat);
-        // AURORA - End
-        editorTool[0].Activate(activate: true);
 	}
 
 	private void Update()

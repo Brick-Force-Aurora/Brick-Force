@@ -9,6 +9,8 @@ using static LineTool;
 
 public class BrickEditTool : EditorTool
 {
+    public static BrickEditTool Tool { get; private set; }
+
     private byte x1, y1, z1;
     private byte x2, y2, z2;
     private bool hasPos1 = false, hasPos2 = false;
@@ -31,6 +33,7 @@ public class BrickEditTool : EditorTool
         wire = new Queue<GameObject>();
         invisible = new Queue<GameObject>();
         usedPoints = new HashSet<int>();
+        Tool = this;
     }
 
     public override bool Update()
@@ -40,7 +43,6 @@ public class BrickEditTool : EditorTool
             active = true;
             if (hasPos1 && hasPos2)
             {
-                Debug.Log("BrickEditUpdate");
                 UpdateWireframePreview();
             }
             return true;
@@ -67,20 +69,17 @@ public class BrickEditTool : EditorTool
         y1 = y;
         z1 = z;
         SendPos1();
+        UpdateWireframePreview();
     }
 
     private void SendPos1()
     {
-        GameObject main = GameObject.Find("Main");
-        if (main != null)
+        if (!hasPos1)
         {
-            if (!hasPos1)
-            {
-                Actor.Instance.SendChat($"[BrickEdit] Position 1 cleared ({GetBlockCount()} brick(s))");
-                return;
-            }
-            Actor.Instance.SendChat($"[BrickEdit] Position 1 set to {x1} {y1} {z1} ({GetBlockCount()} brick(s))");
+            Actor.Instance.SendChat($"[BrickEdit] Position 1 cleared ({GetBlockCount()} brick(s))");
+            return;
         }
+        Actor.Instance.SendChat($"[BrickEdit] Position 1 set to {x1} {y1} {z1} ({GetBlockCount()} brick(s))");
     }
 
     public void SetPos2(Vector3 pos)
@@ -102,16 +101,12 @@ public class BrickEditTool : EditorTool
 
     private void SendPos2()
     {
-        GameObject main = GameObject.Find("Main");
-        if (main != null)
+        if (!hasPos1)
         {
-            if (!hasPos1)
-            {
-                Actor.Instance.SendChat($"[BrickEdit] Position 2 cleared ({GetBlockCount()} brick(s))");
-                return;
-            }
-            Actor.Instance.SendChat($"[BrickEdit] Position 2 set to {x2} {y2} {z2} ({GetBlockCount()} brick(s))");
+            Actor.Instance.SendChat($"[BrickEdit] Position 2 cleared ({GetBlockCount()} brick(s))");
+            return;
         }
+        Actor.Instance.SendChat($"[BrickEdit] Position 2 set to {x2} {y2} {z2} ({GetBlockCount()} brick(s))");
     }
 
     private bool ToCoords(Vector3 pos, out byte x, out byte y, out byte z)
@@ -129,6 +124,11 @@ public class BrickEditTool : EditorTool
 
     public bool GetRotation(out byte rotation, byte brickIndex)
     {
+        if (rotationNormal == null)
+        {
+            rotation = 0;
+            return false;
+        }
         Brick brick = BrickManager.Instance.GetBrick(brickIndex);
         if (brick == null)
         {
@@ -164,6 +164,14 @@ public class BrickEditTool : EditorTool
         int height = Math.Abs(y2 - y1) + 1;
         int depth = Math.Abs(z2 - z1) + 1;
         return width * height * depth;
+    }
+
+    public void ClearSelection()
+    {
+        Actor.Instance.SendChat($"[BrickEdit] Selection cleared");
+        hasPos1 = false; 
+        hasPos2 = false;
+        ClearWireframePreview();
     }
 
     private GameObject PopDummy(Vector3 pos)
@@ -313,18 +321,6 @@ public class BrickEditTool : EditorTool
         Draw3DLine(minX, maxY, minZ, minX, maxY, maxZ);
         Draw3DLine(maxX, minY, minZ, maxX, minY, maxZ);
         Draw3DLine(maxX, maxY, minZ, maxX, maxY, maxZ);
-    }
-
-    public void ClearPreview()
-    {
-        if (wire != null)
-        {
-            while (wire.Count > 0)
-                PushDummy(wire.Dequeue());
-        }
-
-        if (usedPoints != null)
-            usedPoints.Clear();
     }
 
     public override void OnClose()

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using _Emulator.Network;
 using Steamworks;
 using UnityEngine;
@@ -21,6 +22,8 @@ namespace _Emulator
         public float killLogRealiableTime = 0f;
         public bool isSteam = false;
 
+        public float lastAnswer = 0f;
+
         public ChunkedBufferReceiver chunkedBufferReceiver = new ChunkedBufferReceiver();
         public ChunkedBufferSender chunkedBufferSender = new ChunkedBufferSender();
 
@@ -33,6 +36,7 @@ namespace _Emulator
 
         public void LoadServer()
         {
+            lastAnswer = Time.time;
             CSNetManager.Instance.BfServer = hostIP;
             CSNetManager.Instance.BfPort = 5000;
             GameObject gameObject = GameObject.Find("Main");
@@ -58,6 +62,7 @@ namespace _Emulator
         {
             if (SteamManager.Initialized)
             {
+                lastAnswer = Time.time;
                 isSteam = true;
                 GameObject gameObject = GameObject.Find("Main");
                 if (null != gameObject)
@@ -170,6 +175,7 @@ namespace _Emulator
 
         public bool HandleMessage(Msg2Handle msg)
         {
+            lastAnswer = Time.time;
             if (ServerEmulator.instance.debugSend)
                 Debug.Log($"[Verbose/Client] Processing message ID: {msg._id}");
             bool result = true;
@@ -402,6 +408,7 @@ namespace _Emulator
 
         private void HandleBulkBrickAck(MsgBody msg)
         {
+            // Possibly make this async then?
             msg.Read(out int playerSeq);
             msg.Read(out uint count);
             msg.Read(out ushort flag);
@@ -420,19 +427,20 @@ namespace _Emulator
                     return;
                 }
             }
-
             uint success = 0;
             MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates = true;
-            List<int> morphes = new List<int>((int)count);
-            bool changed = false;
+            List<int> morphes = new List<int>((int)count), brickAddMorphes = new List<int>(2);
+            List<BulkChange> changes = new List<BulkChange>(morphes.Count);
             try
             {
                 int brickSeq;
                 byte x, y, z;
                 sbyte result;
+                UserMap userMap = BrickManager.Instance.userMap;
 
                 for (int i = 0; i < count; i++)
                 {
+                    brickAddMorphes.Clear();
                     msg.Read(out x);
                     msg.Read(out y);
                     msg.Read(out z);
@@ -454,29 +462,28 @@ namespace _Emulator
                             continue;
                         }
                         msg.Read(out brickSeq);
-                        changed |= BrickManager.Instance.DeleteBrickBulk(brickSeq, ref morphes);
+                        BrickManager.Instance.DeleteBrickBulk(brickSeq, ref morphes);
                         continue;
                     }
                     if (result == -1 || result == 1)
                     {
                         msg.Read(out brickSeq);
-                        changed |= BrickManager.Instance.DeleteBrickBulk(brickSeq, ref morphes);
+                        BrickManager.Instance.DeleteBrickBulk(brickSeq, ref morphes);
                         if (result == -1)
                         {
                             continue;
                         }
                     }
                     msg.Read(out brickSeq);
-                    changed |= BrickManager.Instance.AddBrickBulk(brickSeq, x, y, z, targetIndex, targetRotation, ref morphes);
+                    userMap.AddBrickInst(brickSeq, targetIndex, x, y, z, targetRotation, ref brickAddMorphes);
+                    changes.Add(new BulkChange(brickSeq, targetIndex, targetRotation, userMap.GetMeshCode(brickSeq), x, y, z, brickAddMorphes.ToArray()));
                 }
             }
             finally
             {
-                if (changed)
-                {
-                    BrickManager.Instance.UpdateBrickChunksBulk(ref morphes);
-                    morphes.Clear();
-                }
+                BulkChangeProcessor.Instance.Push(ref morphes, ref changes);
+                changes.Clear();
+                morphes.Clear();
                 MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates = false;
                 if (playerSeq == MyInfoManager.Instance.Seq)
                 {

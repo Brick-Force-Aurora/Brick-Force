@@ -4,12 +4,12 @@ using System.Text;
 
 namespace _Emulator
 {
-    class ChannelManager
+    class EmulatorChannelManager
     {
         //public static ChannelManager instance = new ChannelManager();
         public List<ChannelReference> channels;
 
-        public ChannelManager()
+        public EmulatorChannelManager()
         {
             channels = new List<ChannelReference>();
             SetupDefaultChannels();

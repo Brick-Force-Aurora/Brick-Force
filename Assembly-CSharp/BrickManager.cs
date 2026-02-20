@@ -1455,17 +1455,7 @@ public class BrickManager : MonoBehaviour
 						component.HitPoint = hitPoint;
 					}
 					dicBricks[seq] = gameObject;
-					bool flag = false;
-					foreach (GameObject modifiedChunk in modifiedChunks)
-					{
-						if (modifiedChunk == gameObject2)
-						{
-							flag = true;
-							break;
-						}
-					}
-					if (!flag)
-					{
+					if (!modifiedChunks.Contains(gameObject2)) {
 						modifiedChunks.Add(gameObject2);
 					}
 				}
