@@ -57,6 +57,7 @@ public class BrickEditTool : EditorTool
     {
         hasPos1 = ToCoords(pos, out x1, out y1, out z1);
         SendPos1();
+        UpdateWireframePreview();
     }
 
     public void SetPos1(byte x, byte y, byte z)
