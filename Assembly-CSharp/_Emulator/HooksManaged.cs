@@ -127,6 +127,18 @@ namespace _Emulator
         static MethodInfo hMyInfoManagerBuyItemInfo = typeof(HooksManaged).GetMethod("hMyInfoManagerBuyItem", BindingFlags.Public | BindingFlags.Instance);
         static ManagedHook MyInfoManagerBuyItemHook;
 
+        static MethodInfo oSockTcpUserMapReq = typeof(SockTcp).GetMethod("SendCS_USER_MAP_REQ", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hSockTcpUserMapReq = typeof(HooksManaged).GetMethod("hUserMapReq", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook SockTcpUserMapReqHook;
+
+        static MethodInfo oSockTcpResetUserMapSlotReq= typeof(SockTcp).GetMethod("SendCS_RESET_USER_MAP_SLOTS_REQ", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hSockTcpResetUserMapSlotReq = typeof(HooksManaged).GetMethod("hResetUserMapSlotReq", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook SockTcpResetUserMapSlotReqHook;
+
+        static MethodInfo oSockTcpMyDownloadMapReq = typeof(SockTcp).GetMethod("SendCS_MY_DOWNLOAD_MAP_REQ", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hSockTcpMyDownloadMapReq = typeof(HooksManaged).GetMethod("hMyDownloadMapReq", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook SockTcpMyDownloadMapReqHook;
+
         private void hP2PManagerHandshake()
         {
             if (MyInfoManager.Instance.Status == 3 || MyInfoManager.Instance.Status == 4)
@@ -495,6 +507,121 @@ namespace _Emulator
             CSNetManager.Instance.Sock.Say(51, msgBody);
 		}
 
+        public void hUserMapReq(int page)
+        {
+            /*MsgBody msgBody = new MsgBody();
+            msgBody.Write(page);
+            Say(429, msgBody);*/
+            const int firstId = 33;
+            const int slotCount = 12;
+
+            for (int id = firstId; id < firstId + slotCount; id++)
+            {
+                string alias = "";
+                int brickCount = -1;
+                DateTime lastModified = DateTime.MinValue;
+                sbyte premium = 0;
+
+                var umi = new UserMapInfo(id, premium);
+                if (umi.LoadCache())
+                {
+                    umi.VerifySavedData();
+                    alias = umi.Alias;
+                    brickCount = umi.BrickCount;
+                    lastModified = umi.LastModified;
+                    premium = umi.Premium;
+                }
+
+                if (!string.IsNullOrEmpty(alias) && lastModified.Year > 1971)
+                {
+                    UserMapInfoManager.Instance.AddOrUpdate(id, alias, brickCount, lastModified, premium);
+                }
+                else
+                {
+                    UserMapInfoManager.Instance.AddOrUpdate(id, alias, brickCount, DateTime.MinValue, premium);
+                }
+            }
+            return;
+        }
+
+        public void hResetUserMapSlotReq(int slot, long item, string itemCode)
+        {
+            /*MsgBody msgBody = new MsgBody();
+            msgBody.Write(slot);
+            msgBody.Write(item);
+            msgBody.Write(itemCode);
+            Say(405, msgBody);*/
+
+            int result = 0;
+            if (slot < 33 || slot > 44)
+            {
+                MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("FAIL_TO_RESET_MAP_SLOT"));
+            }
+            else
+            {
+                try
+                {
+                    // Keep this EXACTLY consistent with wherever your client actually stores these files.
+                    string cacheDir = Path.Combine(Application.dataPath, "Resources/Cache");
+
+                    string geom = Path.Combine(cacheDir, "downloaded" + slot + ".geometry");
+                    string umi = Path.Combine(cacheDir, "downloaded" + slot + ".umi.cache");
+
+                    if (File.Exists(geom)) File.Delete(geom);
+                    if (File.Exists(umi)) File.Delete(umi);
+                    UserMapInfo userMapInfo = UserMapInfoManager.Instance.Get((byte)slot);
+                    if (userMapInfo != null && userMapInfo.Alias.Length > 0)
+                    {
+                        string msg2 = string.Format(StringMgr.Instance.Get("RESET_MAP_SLOT_SUCCESS"), userMapInfo.Alias);
+                        SystemMsgManager.Instance.ShowMessage(msg2);
+                    }
+                    UserMapInfoManager.Instance.Remove((byte)slot);
+                    UserMapInfoManager.Instance.ValidateEmpty();
+                }
+                catch (Exception ex)
+                {
+                    result = 1;
+                    Debug.LogError("Local ResetUserMapSlot failed: " + ex);
+                }
+            }
+        }
+
+        public void hMyDownloadMapReq(int prevPage, int nextPage, int indexer, ushort modeMask)
+        {
+            List<KeyValuePair<int, RegMap>> regMaps = RegMapManager.Instance.dicRegMap.ToList();
+            DownloadMapFrame downloadMapFrame = null;
+            GameObject gameObject = GameObject.Find("Main");
+            if (null != gameObject)
+            {
+                Lobby component = gameObject.GetComponent<Lobby>();
+                if (null != component)
+                {
+                    downloadMapFrame = component.myMapFrm.downloadMapFrm;
+                }
+            }
+            if (downloadMapFrame != null && regMaps.Count > 0)
+            {
+                downloadMapFrame.BeginMapList(1);
+            }
+
+            foreach (var item in regMaps)
+            {
+                if (downloadMapFrame != null)
+                {
+                    if (item.Key == 0 && downloadMapFrame != null)
+                    {
+                        downloadMapFrame.firstIndexer = item.Value.Map;
+                    }
+                    if (item.Key == regMaps.Count - 1)
+                    {
+                        downloadMapFrame.lastIndexer = item.Value.Map;
+                    }
+                }
+                RegMapManager.Instance.SetDownload(item.Value.Map, download: true);
+            }
+            downloadMapFrame?.EndMapList();
+        }
+
         public void hSockTcpSaveMapReq(int slot, byte[] thumbnail)
         {
             MsgBody msgBody = new MsgBody();
@@ -813,6 +940,12 @@ namespace _Emulator
             ScreenSetResolutionHook.ApplyHook();
             MyInfoManagerBuyItemHook = new ManagedHook(oMyInfoManagerBuyItemInfo, hMyInfoManagerBuyItemInfo);
             MyInfoManagerBuyItemHook.ApplyHook();
+            SockTcpUserMapReqHook = new ManagedHook(oSockTcpUserMapReq, hSockTcpUserMapReq);
+            SockTcpUserMapReqHook.ApplyHook();
+            SockTcpResetUserMapSlotReqHook = new ManagedHook(oSockTcpResetUserMapSlotReq, hSockTcpResetUserMapSlotReq);
+            SockTcpResetUserMapSlotReqHook.ApplyHook();
+            SockTcpMyDownloadMapReqHook = new ManagedHook(oSockTcpMyDownloadMapReq, hSockTcpMyDownloadMapReq);
+            SockTcpMyDownloadMapReqHook.ApplyHook();
         }
     }
 }

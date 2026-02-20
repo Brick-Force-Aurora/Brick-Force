@@ -737,13 +737,13 @@ namespace _Emulator
             _handlers[(int)MessageId.CS_DELEGATE_MASTER_REQ] = HandleDelegateMasterRequest;
             _handlers[(int)MessageId.CS_TC_LEAVE_REQ] = HandleCS_TC_LEAVE_REQ;
             _handlers[(int)MessageId.CS_INFLICTED_DAMAGE_REQ] = HandleInflictedDamage;
-            _handlers[(int)MessageId.CS_RESET_USER_MAP_SLOTS_REQ] = HandleResetUserMapSlot;
+            //_handlers[(int)MessageId.CS_RESET_USER_MAP_SLOTS_REQ] = HandleResetUserMapSlot;
             _handlers[(int)MessageId.CS_WEAPON_CHANGE_REQ] = HandleWeaponChangeRequest;
             _handlers[(int)MessageId.CS_SET_WEAPON_SLOT_REQ] = HandleSetWeaponSlotRequest;
             _handlers[(int)MessageId.CS_CLEAR_WEAPON_SLOTS_REQ] = HandleClearWeaponSlots;
             _handlers[(int)MessageId.CS_MY_DOWNLOAD_MAP_REQ] = HandleRequestDownloadedMaps;
             _handlers[(int)MessageId.CS_MY_REGISTER_MAP_REQ] = HandleRequestRegisteredMaps;
-            _handlers[(int)MessageId.CS_USER_MAP_REQ] = HandleRequestUserMaps;
+            //_handlers[(int)MessageId.CS_USER_MAP_REQ] = HandleRequestUserMaps;
             _handlers[(int)MessageId.CS_ALL_MAP_REQ] = HandleRequestAllMaps;
             _handlers[(int)MessageId.CS_OPEN_DOOR_REQ] = HandleOpenDoorRequest;
             _handlers[(int)MessageId.CS_CLOSE_DOOR_REQ] = HandleCloseDoorRequest;
@@ -929,7 +929,7 @@ namespace _Emulator
             SendInventoryRequest(msgRef.client);
             SendLogin(msgRef.client, channel.channel.Id);
             SendPlayerInfo(msgRef.client);
-            SendAllDownloadedMaps(msgRef.client);
+            //SendAllDownloadedMaps(msgRef.client);
             //SendUserMapSlots(msgRef.client);
             //SendAllUserMaps(msgRef.client);
         }
