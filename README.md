@@ -155,9 +155,6 @@ It is a mass brick editing tool which you can use in Build Mode rooms.
 Shows a preview of the area you are about to edit.
 <img width="962" alt="BrickEditPreview" src="https://raw.githubusercontent.com/Brick-Force-Aurora/Brick-Force/master/.github/assets/brickeditpreview.png"/>
 
-#### Limitations
-- Can only process up to 4000 bricks per operation
-
 #### Commands
 <sup>`(required) [optional] <variable>`</sup>
 
