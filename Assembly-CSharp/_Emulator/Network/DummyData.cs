@@ -2,7 +2,7 @@
 
 namespace _Emulator
 {
-    class DummyData
+    public class DummyData
     {
         public int xp = 9400000;
         public int forcePoints = 100000000;

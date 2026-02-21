@@ -6,9 +6,38 @@ using Debug = UnityEngine.Debug;
 
 namespace _Emulator.Network.Gamemodes
 {
-    internal static class Zombie
+    public class PlayZombie : IGameMode
     {
-        internal static void HandleZombieStatusRequest(MsgReference msgRef)
+        private readonly ServerEmulator emulator;
+
+        public PlayZombie(ServerEmulator emulator)
+        {
+            this.emulator = emulator;
+        }
+
+        public void RegisterNetworkHandlers(Action<MessageId, Action<MsgReference>> register, Action<ExtensionOpcodes, Action<MsgReference>> registerCustom)
+        {
+            register(MessageId.CS_ZOMBIE_INFECTION_REQ, HandleZombieInfectionRequest);
+            register(MessageId.CS_ZOMBIE_INFECT_REQ, HandleZombieInfectRequest);
+            register(MessageId.CS_ZOMBIE_MODE_SCORE_REQ, HandleZombieScoreRequest);
+            register(MessageId.CS_ZOMBIE_STATUS_REQ, HandleZombieStatusRequest);
+            register(MessageId.CS_ZOMBIE_OBSERVER_REQ, HandleZombieObserverRequest);
+        }
+
+        public void HandleRoomCreation(ClientReference clientRef, MatchData match, Room room, int[] parameters)
+        {
+            room.goal = parameters[0];
+            room.timelimit = parameters[1];
+            room.weaponOption = parameters[2];
+            room.map = parameters[3];
+            room.isBreakInto = Convert.ToBoolean(parameters[4]);
+            match.isBalance = Convert.ToBoolean(parameters[5]);
+            room.isWanted = Convert.ToBoolean(parameters[6]);
+            room.isDropItem = Convert.ToBoolean(parameters[7]);
+            match.useBuildGun = false;
+        }
+
+        public void HandleZombieStatusRequest(MsgReference msgRef)
         {
             if (msgRef.client.seq != msgRef.matchData.masterSeq)
             {
@@ -82,7 +111,7 @@ namespace _Emulator.Network.Gamemodes
             ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_ZOMBIE_STATUS_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
 
-        internal static void HandleZombieObserverRequest(MsgReference msgRef)
+        public void HandleZombieObserverRequest(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out int seq); //MyInfoManager.Instance.Seq
             MatchData data = msgRef.client.matchData;
@@ -106,7 +135,7 @@ namespace _Emulator.Network.Gamemodes
             // No Response
         }
 
-        internal static void HandleZombieInfectionRequest(MsgReference msgRef)
+        public void HandleZombieInfectionRequest(MsgReference msgRef)
         {
             MatchData data = msgRef.matchData;
             //Debug.LogWarning("InfectionRequest current status: " + data.zombieStatus);
@@ -211,7 +240,7 @@ namespace _Emulator.Network.Gamemodes
             }
         }
 
-        internal static void HandleZombieInfectRequest(MsgReference msgRef)
+        public void HandleZombieInfectRequest(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out int brickMan);
             msgRef.msg._msg.Read(out int zombie);
@@ -242,7 +271,7 @@ namespace _Emulator.Network.Gamemodes
             }
         }
 
-        public static void SendZombieRoundEnd(MsgReference msgRef, MatchData data)
+        public void SendZombieRoundEnd(MsgReference msgRef, MatchData data)
         {
             Debug.LogWarning($"Send RoundEnd client {msgRef.client.GetIdentifier()} data: {data.ToString()}");
 
@@ -277,7 +306,7 @@ namespace _Emulator.Network.Gamemodes
             ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_ROUND_END_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
 
-        internal static void HandleZombieScoreRequest(MsgReference msgRef)
+        public void HandleZombieScoreRequest(MsgReference msgRef)
         {
             // Ensure debug logging is only performed if debugSend is enabled
             if (ServerEmulator.instance.debugSend)
@@ -295,15 +324,15 @@ namespace _Emulator.Network.Gamemodes
             ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_ZOMBIE_MODE_SCORE_ACK, msg, null, SendType.BroadcastRoom, msgRef.matchData.channel, msgRef.matchData));
         }
 
-        internal static void HandleZombieMatchEnd(MatchData matchData)
+        public void HandleMatchEnd(MatchData matchData)
         {
             matchData.room.Status = Room.ROOM_STATUS.WAITING;
             SendZombieMatchEnd(matchData);
             matchData.Reset();
-            ServerEmulator.instance.SendRoom(null, matchData, SendType.BroadcastRoom);
+            ServerEmulator.instance.SendUpdateRoom(matchData);
         }
 
-        private static void SendZombieMatchEnd(MatchData matchData)
+        private void SendZombieMatchEnd(MatchData matchData)
         {
             MsgBody body = new MsgBody();
 

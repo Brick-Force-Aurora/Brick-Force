@@ -5468,28 +5468,28 @@ public class SockTcp
 
 	private void HandleCS_ADD_ROOM_ACK(MsgBody msg)
 	{
-		msg.Read(out int val);
-		msg.Read(out int val2);
-		msg.Read(out string val3);
-		msg.Read(out bool val4);
-		msg.Read(out int val5);
-		msg.Read(out int val6);
-		msg.Read(out int val7);
-		msg.Read(out int val8);
-		msg.Read(out string val9);
-		msg.Read(out int val10);
-		msg.Read(out int val11);
-		msg.Read(out int val12);
-		msg.Read(out int val13);
-		msg.Read(out int val14);
-		msg.Read(out int val15);
-		msg.Read(out int val16);
-		msg.Read(out bool val17);
-		msg.Read(out bool val18);
-		msg.Read(out bool val19);
-		msg.Read(out int val20);
-		msg.Read(out int val21);
-		RoomManager.Instance.AddOrUpdateRoom(val, (Room.ROOM_STATUS)val5, val6, val7, val4, val8, val9, val10, val11, val12, val13, val14, val15, val16, val17, val2, val3, val18, val19, val20, val21);
+		msg.Read(out int no);
+		msg.Read(out int type);
+		msg.Read(out string title);
+		msg.Read(out bool isLocked);
+		msg.Read(out int status);
+		msg.Read(out int currentPlayers);
+		msg.Read(out int maxPlayers);
+		msg.Read(out int map);
+		msg.Read(out string mapAlias);
+		msg.Read(out int goal);
+		msg.Read(out int timeLimit);
+		msg.Read(out int weaponOption);
+		msg.Read(out int ping);
+		msg.Read(out int score1);
+		msg.Read(out int score2);
+		msg.Read(out int country);
+		msg.Read(out bool breakInto);
+		msg.Read(out bool dropItem);
+		msg.Read(out bool wanted);
+		msg.Read(out int squad);
+		msg.Read(out int squadCounter);
+		RoomManager.Instance.AddOrUpdateRoom(no, (Room.ROOM_STATUS)status, currentPlayers, maxPlayers, isLocked, map, mapAlias, goal, timeLimit, weaponOption, ping, score1, score2, country, breakInto, type, title, dropItem, wanted, squad, squadCounter);
 	}
 
 	private void HandleCS_MASTER_ACK(MsgBody msg)
@@ -5512,34 +5512,34 @@ public class SockTcp
 
 	private void HandleCS_UPDATE_ROOM_ACK(MsgBody msg)
 	{
-		msg.Read(out int val);
-		msg.Read(out int val2);
-		msg.Read(out int val3);
-		msg.Read(out int val4);
-		msg.Read(out bool val5);
-		msg.Read(out int val6);
-		msg.Read(out string val7);
-		msg.Read(out int val8);
-		msg.Read(out int val9);
-		msg.Read(out int val10);
-		msg.Read(out int val11);
-		msg.Read(out int val12);
-		msg.Read(out int val13);
-		msg.Read(out int val14);
-		msg.Read(out bool val15);
-		msg.Read(out int val16);
-		msg.Read(out string val17);
-		msg.Read(out bool val18);
-		msg.Read(out bool val19);
-		msg.Read(out int val20);
-		msg.Read(out int val21);
-		RoomManager.Instance.AddOrUpdateRoom(val, (Room.ROOM_STATUS)val2, val3, val4, val5, val6, val7, val8, val9, val10, val11, val12, val13, val14, val15, val16, val17, val18, val19, val20, val21);
+		msg.Read(out int no);
+		msg.Read(out int status);
+		msg.Read(out int currentPlayers);
+		msg.Read(out int maxPlayers);
+		msg.Read(out bool isLocked);
+		msg.Read(out int map);
+		msg.Read(out string mapAlias);
+		msg.Read(out int goal);
+		msg.Read(out int timeLimit);
+		msg.Read(out int weaponOption);
+		msg.Read(out int ping);
+		msg.Read(out int score1);
+		msg.Read(out int score2);
+		msg.Read(out int country);
+		msg.Read(out bool breakInto);
+		msg.Read(out int type);
+		msg.Read(out string title);
+		msg.Read(out bool dropItem);
+		msg.Read(out bool wanted);
+		msg.Read(out int squad);
+		msg.Read(out int squadCounter);
+		RoomManager.Instance.AddOrUpdateRoom(no, (Room.ROOM_STATUS)status, currentPlayers, maxPlayers, isLocked, map, mapAlias, goal, timeLimit, weaponOption, ping, score1, score2, country, breakInto, type, title, dropItem, wanted, squad, squadCounter);
 	}
 
 	private void HandleCS_DEL_ROOM_ACK(MsgBody msg)
 	{
-		msg.Read(out int val);
-		RoomManager.Instance.DelRoom(val);
+		msg.Read(out int no);
+		RoomManager.Instance.DelRoom(no);
 	}
 
 	private void HandleCS_PALETTE_ACK(MsgBody msg)
@@ -10764,61 +10764,61 @@ public class SockTcp
 
 	private void HandleCS_ROOM_LIST_ACK(MsgBody msg)
 	{
-		msg.Read(out int val);
+		msg.Read(out int roomCount);
 		RoomManager.Instance.ClearRooms();
-		for (int i = 0; i < val; i++)
+		for (int i = 0; i < roomCount; i++)
 		{
-			msg.Read(out int val2);
-			msg.Read(out int val3);
-			msg.Read(out string val4);
-			msg.Read(out bool val5);
-			msg.Read(out int val6);
-			msg.Read(out int val7);
-			msg.Read(out int val8);
-			msg.Read(out int val9);
-			msg.Read(out string val10);
-			msg.Read(out int val11);
-			msg.Read(out int val12);
-			msg.Read(out int val13);
-			msg.Read(out int val14);
-			msg.Read(out int val15);
-			msg.Read(out int val16);
-			msg.Read(out int val17);
-			msg.Read(out bool val18);
-			msg.Read(out bool val19);
-			msg.Read(out bool val20);
-			msg.Read(out int val21);
-			msg.Read(out int val22);
-			RoomManager.Instance.AddOrUpdateRoom(val2, (Room.ROOM_STATUS)val6, val7, val8, val5, val9, val10, val11, val12, val13, val14, val15, val16, val17, val18, val3, val4, val19, val20, val21, val22);
+			msg.Read(out int no);
+			msg.Read(out int type);
+			msg.Read(out string title);
+			msg.Read(out bool isLocked);
+			msg.Read(out int status);
+			msg.Read(out int currentPlayers);
+			msg.Read(out int maxPlayers);
+			msg.Read(out int map);
+			msg.Read(out string mapAlias);
+			msg.Read(out int goal);
+			msg.Read(out int timeLimit);
+			msg.Read(out int waeponOption);
+			msg.Read(out int ping);
+			msg.Read(out int score1);
+			msg.Read(out int score2);
+			msg.Read(out int country);
+			msg.Read(out bool breakInto);
+			msg.Read(out bool dropItem);
+			msg.Read(out bool wanted);
+			msg.Read(out int squad);
+			msg.Read(out int squadCounter);
+			RoomManager.Instance.AddOrUpdateRoom(no, (Room.ROOM_STATUS)status, currentPlayers, maxPlayers, isLocked, map, mapAlias, goal, timeLimit, waeponOption, ping, score1, score2, country, breakInto, type, title, dropItem, wanted, squad, squadCounter);
 		}
 		RoomManager.Instance.RefreshRoomList();
 	}
 
 	private void HandleCS_ROOM_ACK(MsgBody msg)
 	{
-		msg.Read(out int val);
-		msg.Read(out int val2);
-		msg.Read(out string val3);
-		msg.Read(out bool val4);
-		msg.Read(out int val5);
-		msg.Read(out int val6);
-		msg.Read(out int val7);
-		msg.Read(out int val8);
-		msg.Read(out string val9);
-		msg.Read(out int val10);
-		msg.Read(out int val11);
-		msg.Read(out int val12);
-		msg.Read(out int val13);
-		msg.Read(out int val14);
-		msg.Read(out int val15);
-		msg.Read(out int val16);
-		msg.Read(out bool val17);
-		msg.Read(out bool val18);
-		msg.Read(out bool val19);
-		msg.Read(out int val20);
-		msg.Read(out int val21);
-		RoomManager.Instance.AddOrUpdateRoom(val, (Room.ROOM_STATUS)val5, val6, val7, val4, val8, val9, val10, val11, val12, val13, val14, val15, val16, val17, val2, val3, val18, val19, val20, val21);
-		if (RoomManager.Instance.GetRoom(val) == null)
+		msg.Read(out int no);
+		msg.Read(out int type);
+		msg.Read(out string title);
+		msg.Read(out bool isLoacked);
+		msg.Read(out int status);
+		msg.Read(out int currentPlayers);
+		msg.Read(out int maxPlayers);
+		msg.Read(out int map);
+		msg.Read(out string mapAlias);
+		msg.Read(out int goal);
+		msg.Read(out int timeLimit);
+		msg.Read(out int weaponOption);
+		msg.Read(out int ping);
+		msg.Read(out int score1);
+		msg.Read(out int score2);
+		msg.Read(out int country);
+		msg.Read(out bool breakInto);
+		msg.Read(out bool dropItem);
+		msg.Read(out bool wanted);
+		msg.Read(out int squad);
+		msg.Read(out int squadCounter);
+		RoomManager.Instance.AddOrUpdateRoom(no, (Room.ROOM_STATUS)status, currentPlayers, maxPlayers, isLoacked, map, mapAlias, goal, timeLimit, weaponOption, ping, score1, score2, country, breakInto, type, title, dropItem, wanted, squad, squadCounter);
+		if (RoomManager.Instance.GetRoom(no) == null)
 		{
 			RoomManager.Instance.RefreshRoomList();
 		}

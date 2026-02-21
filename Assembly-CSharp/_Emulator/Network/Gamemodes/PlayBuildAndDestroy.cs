@@ -6,21 +6,51 @@ using Debug = UnityEngine.Debug;
 
 namespace _Emulator.Network.Gamemodes
 {
-    internal class BND
+    public class PlayBuildAndDestroy : IGameMode
     {
-        internal static void HandleBNDScoreRequest(MsgReference msgRef)
+        private readonly ServerEmulator emulator;
+
+        public PlayBuildAndDestroy(ServerEmulator emulator)
+        {
+            this.emulator = emulator;
+        }
+
+        public void RegisterNetworkHandlers(Action<MessageId, Action<MsgReference>> register, Action<ExtensionOpcodes, Action<MsgReference>> registerCustom)
+        {
+            register(MessageId.CS_BND_SCORE_REQ, HandleBNDScoreRequest);
+            register(MessageId.CS_BND_SHIFT_PHASE_REQ, HandleBNDShiftPhaseRequest);
+        }
+
+        public void HandleRoomCreation(ClientReference clientRef, MatchData match, Room room, int[] parameters)
+        {
+            room.goal = parameters[0];
+            room.timelimit = parameters[1];
+            room.weaponOption = parameters[2];
+            room.map = parameters[3];
+            room.isBreakInto = Convert.ToBoolean(parameters[4]);
+            match.isBalance = Convert.ToBoolean(parameters[5]);
+            match.useBuildGun = Convert.ToBoolean(parameters[6]);
+            room.isDropItem = Convert.ToBoolean(parameters[7]);
+
+            UnpackTimerOption(room.timelimit, out int buildTime, out int battleTime, out int repeats);
+            match.buildPhaseTime = buildTime;
+            match.battlePhaseTime = battleTime;
+            match.repeat = repeats;
+        }
+
+        public void HandleBNDScoreRequest(MsgReference msgRef)
         {
             MatchData data = msgRef.matchData;
             MsgBody msg = new MsgBody();
             msg.Write(data.redScore); // red score
             msg.Write(data.blueScore); // blue score
-            if (ServerEmulator.instance.debugHandle)
+            if (emulator.debugHandle)
                 Debug.Log("HandleBNDScoreReq from: " + msgRef.client.GetIdentifier() + " RedScore: " + data.redScore + " BluScore: " + data.blueScore);
 
-            ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_BND_SCORE_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+            emulator.Say(new MsgReference(MessageId.CS_BND_SCORE_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
 
-        internal static void HandleBNDShiftPhaseRequest(MsgReference msgRef)
+        public void HandleBNDShiftPhaseRequest(MsgReference msgRef)
         {
             Debug.LogWarning("recieved Shift Phase Req");
             msgRef.msg._msg.Read(out int repeat);
@@ -38,7 +68,7 @@ namespace _Emulator.Network.Gamemodes
             SendShiftPhase(msgRef.client, repeat, isBuildPhase);
         }
 
-        private static void SendShiftPhase(ClientReference client, int repeat, bool isBuildPhase)
+        private void SendShiftPhase(ClientReference client, int repeat, bool isBuildPhase)
         {
             MatchData matchData = client.matchData;
             matchData.ResetForNewRound();
@@ -48,37 +78,17 @@ namespace _Emulator.Network.Gamemodes
             body.Write(repeat);
             body.Write(isBuildPhase);
 
-            ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_BND_SHIFT_PHASE_ACK, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
+            emulator.Say(new MsgReference(MessageId.CS_BND_SHIFT_PHASE_ACK, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
         }
 
-        public static int PackTimerOptions(int build, int battle, int rpt)
-        {
-            return (rpt & 0xFF) | (((battle / 60) & 0xFF) << 8) | (((build / 60) & 0xFF) << 16);
-        }
-
-        public static void UnpackTimerOption(int packed, out int build, out int battle, out int rpt)
-        {
-            // Extract `rpt` (last 8 bits)
-            rpt = packed & 0xFF;
-
-            // Extract `battle` (middle 8 bits)
-            battle = (packed >> 8) & 0xFF;
-
-            // Extract `build` (first 8 bits)
-            build = (packed >> 16) & 0xFF;
-
-            // Convert back to seconds
-            build *= 60;
-            battle *= 60;
-        }
-        internal static void HandleBNDMatchEnd(MatchData matchData)
+        public void HandleMatchEnd(MatchData matchData)
         {
             matchData.room.Status = Room.ROOM_STATUS.WAITING;
             SendBNDMatchEnd(matchData);
             matchData.Reset();
-            ServerEmulator.instance.SendRoom(null, matchData, SendType.BroadcastRoom);
+            emulator.SendUpdateRoom(matchData);
         }
-        static void SendBNDMatchEnd(MatchData matchData)
+        public void SendBNDMatchEnd(MatchData matchData)
         {
             for (int team = 0; team < 2; team++)
             {
@@ -106,29 +116,50 @@ namespace _Emulator.Network.Gamemodes
                     body.Write(matchData.clientList[i].data.xp);
                     body.Write((long)0); //buff
                 }
-                ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_BND_MODE_END_ACK, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam));
+                emulator.Say(new MsgReference(MessageId.CS_BND_MODE_END_ACK, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam));
             }
 
-            if (ServerEmulator.instance.debugSend)
+            if (emulator.debugSend)
                 Debug.Log("Broadcasted SendBNDMatchEnd for room no: " + matchData.room.No);
         }
 
-        internal static void SendBnDStatus(ClientReference client)
+        public void SendBnDStatus(ClientReference client)
         {
             MsgBody body = new MsgBody();
             body.Write(client.matchData.isBuildPhase);
-            ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_BND_STATUS_ACK, body, client));
+            emulator.Say(new MsgReference(MessageId.CS_BND_STATUS_ACK, body, client));
         }
-        internal static void SendBnDScore(MatchData matchData)
+        public void SendBnDScore(MatchData matchData)
         {
             MsgBody body = new MsgBody();
             body.Write(matchData.redScore);
             body.Write(matchData.blueScore);
 
-            ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_BND_SCORE_ACK, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
+            emulator.Say(new MsgReference(MessageId.CS_BND_SCORE_ACK, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
-            if (ServerEmulator.instance.debugSend)
+            if (emulator.debugSend)
                 Debug.Log("Broadcasted SendTeamScore for room no: " + matchData.room.No);
+        }
+
+        public static int PackTimerOptions(int build, int battle, int rpt)
+        {
+            return (rpt & 0xFF) | (((battle / 60) & 0xFF) << 8) | (((build / 60) & 0xFF) << 16);
+        }
+
+        public static void UnpackTimerOption(int packed, out int build, out int battle, out int rpt)
+        {
+            // Extract `rpt` (last 8 bits)
+            rpt = packed & 0xFF;
+
+            // Extract `battle` (middle 8 bits)
+            battle = (packed >> 8) & 0xFF;
+
+            // Extract `build` (first 8 bits)
+            build = (packed >> 16) & 0xFF;
+
+            // Convert back to seconds
+            build *= 60;
+            battle *= 60;
         }
 
     }

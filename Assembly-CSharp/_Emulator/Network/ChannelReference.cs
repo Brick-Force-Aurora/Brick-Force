@@ -4,7 +4,7 @@ using System.Text;
 
 namespace _Emulator
 {
-    class ChannelReference
+    public class ChannelReference
     {
         public Channel channel;
         public List<MatchData> matches;

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace _Emulator.Network
+namespace _Emulator
 {
     public enum MessageId : ushort
     {

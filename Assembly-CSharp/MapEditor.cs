@@ -10,9 +10,9 @@ public class MapEditor : MonoBehaviour
 
 	public Texture2D editMark;
 
-	private float deltaTime;
+	public float deltaTime;
 
-	private bool delayLoad = true;
+	public bool delayLoad = true;
 
 	private BattleChat battleChat;
 

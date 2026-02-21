@@ -109,13 +109,6 @@ namespace _Emulator
                 }
                 return;
             }
-            // We have to requeue removal morphs to ensure all colliders and rendered meshes are removed
-            if (removalMorphs.Count > 0)
-            {
-                pendingMorphs.AddRange(removalMorphs);
-                removalMorphs.Clear();
-                return;
-            }
             // Then we apply new bricks
             if (pendingChanges.Count > 0)
             {
@@ -132,6 +125,13 @@ namespace _Emulator
                     brickManager.Create(change.sequence, change.code, change.index, change.position, change.rotation, false);
                     pendingMorphs.AddRange(change.morphes);
                 }
+                return;
+            }
+            // We have to requeue removal morphs to ensure all colliders and rendered meshes are removed
+            if (removalMorphs.Count > 0)
+            {
+                pendingMorphs.AddRange(removalMorphs);
+                removalMorphs.Clear();
                 return;
             }
         }

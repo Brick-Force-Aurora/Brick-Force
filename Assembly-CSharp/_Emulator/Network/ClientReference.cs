@@ -7,7 +7,7 @@ using Debug = UnityEngine.Debug;
 
 namespace _Emulator
 {
-    class ClientReference
+    public class ClientReference
     {
         public enum ClientStatus
         {
@@ -25,7 +25,7 @@ namespace _Emulator
         public bool isSteam = false;
         public volatile bool didHeartBeat = false;
         public float lastHeartBeatTime;
-        public float loginToleranceTime = 0f;
+        public float loginToleranceTime;
         public string name;
         public int seq;
         public bool isLoaded;
@@ -53,6 +53,7 @@ namespace _Emulator
         public ClientReference(Socket _socket, string _name = "", int _seq = -1)
         {
             lastHeartBeatTime = float.MaxValue;
+            loginToleranceTime = 0f;
             socket = _socket;
             name = _name;
             seq = _seq;
@@ -77,6 +78,7 @@ namespace _Emulator
         public ClientReference(CSteamID _steamID, string _name = "", int _seq = -1)
         {
             lastHeartBeatTime = float.MaxValue;
+            loginToleranceTime = 0f;
             steamID = _steamID;
             name = _name;
             seq = _seq;

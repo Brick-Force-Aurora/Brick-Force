@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace _Emulator
 {
-    class Inventory
+    public class Inventory
     {
         public int seq;
         public List<Item> equipment;

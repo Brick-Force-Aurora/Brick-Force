@@ -199,6 +199,24 @@ namespace _Emulator
             y2 = (byte)Math.Min(Math.Max(maxY, 0), 255);
             z2 = (byte)Math.Min(Math.Max(maxZ, 0), 255);
         }
+        public static void CacheBrick(this UserMap userMap, int seq, byte template, byte x, byte y, byte z, ushort meshCode, byte rot)
+        {
+            userMap.CalcCRC(seq, template);
+            userMap.AddBrickInst(seq, template, x, y, z, meshCode, rot);
+        }
+
+        public static void UpdateScript(this UserMap userMap, int seq, string alias, bool enableOnAwake, bool visibleOnAwake, string commands)
+        {
+            BrickInst brickInst = userMap.Get(seq);
+            if (brickInst != null)
+            {
+                Brick brick = BrickManager.Instance.GetBrick(brickInst.Template);
+                if (brick != null && brick.function == Brick.FUNCTION.SCRIPT)
+                {
+                    brickInst.UpdateScript(alias, enableOnAwake, visibleOnAwake, commands);
+                }
+            }
+        }
 
     }
 }

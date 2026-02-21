@@ -4,7 +4,7 @@ using System.Text;
 
 namespace _Emulator
 {
-    class EmulatorChannelManager
+    public class EmulatorChannelManager
     {
         //public static ChannelManager instance = new ChannelManager();
         public List<ChannelReference> channels;

@@ -1,34 +1,38 @@
 ﻿namespace _Emulator
 {
-    class ExtensionOpcodes
+    public enum ExtensionOpcodes : ushort
     {
-        public const int opConnectedAck = 1000;
-        public const int opSlotDataAck = 1001;
-        public const int opPostLoadInitAck = 1002;
-        public const int opInventoryReq = 1003;
-        public const int opInventoryAck = 1004;
-        public const int opCustomMessageAck = 1005;
-        public const int opDisconnectReq = 1006;
-        public const int opDisconnectAck = 1007;
+        opConnectedAck = 1000,
+        opSlotDataAck = 1001,
+        opPostLoadInitAck = 1002,
+        opInventoryReq = 1003,
+        opInventoryAck = 1004,
+        opCustomMessageAck = 1005,
+        opDisconnectReq = 1006,
+        opDisconnectAck = 1007,
 
-        public const int opBeginChunkedBufferReq = 1008;
-        public const int opChunkedBufferReq = 1009;
-        public const int opEndChunkedBufferReq = 1010;
-        public const int opBeginChunkedBufferAck = 1011;
-        public const int opChunkedBufferAck = 1012;
-        public const int opEndChunkedBufferAck = 1013;
-        public const int opEndChunkedBufferFailedAck = 1014;
+        opBeginChunkedBufferReq = 1008,
+        opChunkedBufferReq = 1009,
+        opEndChunkedBufferReq = 1010,
+        opBeginChunkedBufferAck = 1011,
+        opChunkedBufferAck = 1012,
+        opEndChunkedBufferAck = 1013,
+        opEndChunkedBufferFailedAck = 1014,
 
-        public const int opRendezvousInfoSteamAck = 1015;
-        public const int opEnterSteamAck = 1016;
-        public const int opSlotDataSteamAck = 1017;
-        public const int opVersionCheckReq = 1018;
-        public const int opVersionCheckAck = 1019;
-        public const int opBulkBrickReq = 1020;
-        public const int opBulkBrickAck = 1021;
-        public const int opBulkBrickFailAck = 1022;
+        opRendezvousInfoSteamAck = 1015,
+        opEnterSteamAck = 1016,
+        opSlotDataSteamAck = 1017,
+        opVersionCheckReq = 1018,
+        opVersionCheckAck = 1019,
+        opBulkBrickReq = 1020,
+        opBulkBrickAck = 1021,
+        opBulkBrickFailAck = 1022,
 
-        public const int opAmIConnectedReq = 1023;
-        public const int opAmIConnectedAck = 1024;
+        opAmIConnectedReq = 1023,
+        opAmIConnectedAck = 1024,
+
+        opRequestUserSlotMapAck = 1025,
+        opRequestUserSlotMapSuccessReq = 1026,
+        opRequestUserSlotMapFailedReq = 1027,
     }
 }

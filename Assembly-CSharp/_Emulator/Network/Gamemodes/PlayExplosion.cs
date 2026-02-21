@@ -6,10 +6,38 @@ using Debug = UnityEngine.Debug;
 
 namespace _Emulator.Network.Gamemodes
 {
-    //Also known as Blast Mode
-    internal static class Defusion
+    //Also known as BlastMode / Defusion
+    public class PlayExplosion : IGameMode
     {
-        internal static void HandleBombInstallRequest(MsgReference msgRef)
+        private readonly ServerEmulator emulator;
+
+        public PlayExplosion(ServerEmulator emulator)
+        {
+            this.emulator = emulator;
+        }
+
+        public void RegisterNetworkHandlers(Action<MessageId, Action<MsgReference>> register, Action<ExtensionOpcodes, Action<MsgReference>> registerCustom)
+        {
+            register(MessageId.CS_BM_INSTALL_BOMB_REQ, HandleBombInstallRequest);
+            register(MessageId.CS_BM_UNINSTALL_BOMB_REQ, HandleBombUninstallRequest);
+            register(MessageId.CS_BM_BLAST_REQ, HandleBombBlastRequest);
+            register(MessageId.CS_BLAST_MODE_SCORE_REQ, HandleScoreRequest);
+        }
+
+        public void HandleRoomCreation(ClientReference clientRef, MatchData match, Room room, int[] parameters)
+        {
+            room.goal = parameters[0];
+            room.timelimit = parameters[1];
+            room.weaponOption = parameters[2];
+            room.map = parameters[3];
+            room.isBreakInto = Convert.ToBoolean(parameters[4]);
+            match.isBalance = Convert.ToBoolean(parameters[5]);
+            room.isWanted = Convert.ToBoolean(parameters[6]);
+            room.isDropItem = Convert.ToBoolean(parameters[7]);
+            match.useBuildGun = false;
+        }
+
+        public void HandleBombInstallRequest(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out int bomb);
             msgRef.msg._msg.Read(out int x);
@@ -30,7 +58,7 @@ namespace _Emulator.Network.Gamemodes
             msg.Write(nz);
             ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_BM_INSTALL_BOMB_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
-        internal static void HandleBombUninstallRequest(MsgReference msgRef)
+        public void HandleBombUninstallRequest(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out int bomb);
             MatchData data = msgRef.matchData;
@@ -55,7 +83,7 @@ namespace _Emulator.Network.Gamemodes
                 data.ResetForNewRound();
             }
         }
-        internal static void HandleBombBlastRequest(MsgReference msgRef)
+        public void HandleBombBlastRequest(MsgReference msgRef)
         {
             MatchData data = msgRef.matchData;
             MsgBody msg = new MsgBody();
@@ -82,17 +110,17 @@ namespace _Emulator.Network.Gamemodes
                 data.ResetForNewRound();
             }
         }
-        internal static void HandleScoreRequest(MsgReference msgRef)
+        public void HandleScoreRequest(MsgReference msgRef)
         {
 
         }
 
-        internal static void HandleMatchEnd(MatchData matchData)
+        public void HandleMatchEnd(MatchData matchData)
         {
             matchData.room.Status = Room.ROOM_STATUS.WAITING;
             SendMatchEnd(matchData);
             matchData.Reset();
-            ServerEmulator.instance.SendRoom(null, matchData, SendType.BroadcastRoom);
+            ServerEmulator.instance.SendUpdateRoom(matchData);
         }
 
         static void SendMatchEnd(MatchData matchData)
@@ -135,7 +163,7 @@ namespace _Emulator.Network.Gamemodes
                 Debug.Log("Broadcasted SendDefusionMatchEnd for room no: " + matchData.room.No);
         }
 
-        internal static void SendScore(MatchData matchData)
+        public void SendScore(MatchData matchData)
         {
             MsgBody body = new MsgBody();
             body.Write(matchData.redScore);
@@ -147,7 +175,7 @@ namespace _Emulator.Network.Gamemodes
                 Debug.Log("Broadcasted SendDefusionScore for room no: " + matchData.room.No);
         }
 
-        public static void HandleRoundEnd(MsgReference msgRef, sbyte roundCode)
+        public void HandleRoundEnd(MsgReference msgRef, sbyte roundCode)
         {
             MatchData data = msgRef.matchData;
             MsgBody msg = new MsgBody();

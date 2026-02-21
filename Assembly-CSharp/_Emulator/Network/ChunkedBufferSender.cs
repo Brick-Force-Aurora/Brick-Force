@@ -98,7 +98,7 @@ namespace _Emulator.Network
             output.Write(subId);
             output.Write((uint) data.Length);
             output.Write(buffer.crc);
-            return ExtensionOpcodes.opBeginChunkedBufferReq;
+            return (int)ExtensionOpcodes.opBeginChunkedBufferReq;
         }
 
         public int WriteChunk(MsgBody input, ref MsgBody output)
@@ -115,14 +115,14 @@ namespace _Emulator.Network
             output.Write(subId);
             if (buffer.chunkId == buffer.chunkCount)
             {
-                return ExtensionOpcodes.opEndChunkedBufferReq;
+                return (int)ExtensionOpcodes.opEndChunkedBufferReq;
             }
             ushort chunkId = buffer.chunkId++;
             output.Write(chunkId);
             byte[] data = new byte[Math.Min(buffer.data.Length - chunkId * ChunkedBufferReceiver.MAX_CHUNK_LENGTH, ChunkedBufferReceiver.MAX_CHUNK_LENGTH)];
             Array.Copy(buffer.data, chunkId * ChunkedBufferReceiver.MAX_CHUNK_LENGTH, data, 0, data.Length);
             output.Write(data);
-            return ExtensionOpcodes.opChunkedBufferReq;
+            return (int)ExtensionOpcodes.opChunkedBufferReq;
         }
 
         public int End(bool crcFailed, MsgBody input, ref MsgBody output)
@@ -143,7 +143,7 @@ namespace _Emulator.Network
                 output.Write(subId);
                 output.Write((uint)buffer.data.Length);
                 output.Write(buffer.crc);
-                return ExtensionOpcodes.opBeginChunkedBufferReq;
+                return (int)ExtensionOpcodes.opBeginChunkedBufferReq;
             }
             buffers.Remove(buffer);
             return -1;

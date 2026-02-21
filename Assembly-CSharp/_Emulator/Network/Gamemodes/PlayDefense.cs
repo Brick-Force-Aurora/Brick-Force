@@ -6,17 +6,42 @@ using UnityEngine;
 
 namespace _Emulator.Network.Gamemodes
 {
-    internal static class DefenseGamemode
+    public class PlayDefense : IGameMode
     {
-        internal static void HandleMatchEnd(MatchData matchData)
+        private readonly ServerEmulator emulator;
+
+        public PlayDefense(ServerEmulator emulator)
+        {
+            this.emulator = emulator;
+        }
+
+        public void RegisterNetworkHandlers(Action<MessageId, Action<MsgReference>> register, Action<ExtensionOpcodes, Action<MsgReference>> registerCustom)
+        {
+
+        }
+
+        public void HandleRoomCreation(ClientReference clientRef, MatchData match, Room room, int[] parameters)
+        {
+            room.goal = parameters[0];
+            room.timelimit = parameters[1];
+            room.weaponOption = parameters[2];
+            room.map = parameters[3];
+            room.isBreakInto = Convert.ToBoolean(parameters[4]);
+            match.isBalance = Convert.ToBoolean(parameters[5]);
+            room.isWanted = Convert.ToBoolean(parameters[6]);
+            room.isDropItem = Convert.ToBoolean(parameters[7]);
+            match.useBuildGun = false;
+        }
+
+        public void HandleMatchEnd(MatchData matchData)
         {
             matchData.room.Status = Room.ROOM_STATUS.WAITING;
             SendMatchEnd(matchData);
             matchData.Reset();
-            ServerEmulator.instance.SendRoom(null, matchData, SendType.BroadcastRoom);
+            ServerEmulator.instance.SendUpdateRoom(matchData);
         }
 
-        static void SendMatchEnd(MatchData matchData)
+        public void SendMatchEnd(MatchData matchData)
         {
             for (int team = 0; team < 2; team++)
             {
@@ -44,10 +69,10 @@ namespace _Emulator.Network.Gamemodes
                     body.Write(matchData.clientList[i].data.xp);
                     body.Write((long)0); //buff
                 }
-                ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_MISSION_END_ACK, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam));
+                emulator.Say(new MsgReference((ushort)MessageId.CS_MISSION_END_ACK, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam));
             }
 
-            if (ServerEmulator.instance.debugSend)
+            if (emulator.debugSend)
                 Debug.Log("Broadcasted SendDefenseMatchEnd for room no: " + matchData.room.No);
         }
     }

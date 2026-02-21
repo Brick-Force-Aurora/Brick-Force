@@ -1,6 +1,6 @@
 ﻿namespace _Emulator
 {
-    class SlotData
+    public class SlotData
     {
         public ClientReference client;
         public bool isUsed = false;

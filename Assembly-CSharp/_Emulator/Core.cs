@@ -11,6 +11,7 @@ namespace _Emulator
         {
             HooksManaged.Initialize();
             coreObject = new GameObject();
+            ClientExtension.instance = coreObject.AddComponent<ClientExtension>();
             MainGUI.instance = coreObject.AddComponent<MainGUI>();
             InventoryGUI.instance = coreObject.AddComponent<InventoryGUI>();
             ConfigGUI.instance = coreObject.AddComponent<ConfigGUI>();

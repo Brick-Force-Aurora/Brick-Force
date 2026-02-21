@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Security.Policy;
 using System.Text.RegularExpressions;
 using _Emulator.Network;
@@ -14,11 +15,12 @@ using Steamworks;
 using UnityEngine;
 using static MyInfoManager;
 using static Room;
+using static TItem;
 using Debug = UnityEngine.Debug;
 
 namespace _Emulator
 {
-    class ServerEmulator : MonoBehaviour
+    public class ServerEmulator : MonoBehaviour
     {
         public static ServerEmulator instance;
         private readonly object dataLock = new object();
@@ -37,13 +39,166 @@ namespace _Emulator
         public bool hasHost = false;
         public EmulatorChannelManager channelManager = new EmulatorChannelManager();
         private float killLogTimer = 0f;
+        private float lastUpdateTime = 0f;
         public List<KeyValuePair<int, RegMap>> regMaps = new List<KeyValuePair<int, RegMap>>();
         private bool waitForShutDown = false;
         public readonly Version hostVersion;
 
+        public readonly IGameMode[] gameModes;
+        public readonly BuildMapEdit buildMapEdit;
+        public readonly PlayBuildAndDestroy playBuildAndDestroy;
+        public readonly PlayCaptureTheFlag playCaptureTheFlag;
+        public readonly PlayDeathMatch playDeathMatch;
+        public readonly PlayDefense playDefense;
+        public readonly PlayEscape playEscape;
+        public readonly PlayExplosion playExplosion;
+        public readonly PlayFreefall playFreefall;
+        public readonly PlayTeamDeathMatch playTeamDeathMatch;
+        public readonly PlayZombie playZombie;
+
+        private readonly Dictionary<ushort, Action<MsgReference>> _handlers = new Dictionary<ushort, Action<MsgReference>>();
+
         public ServerEmulator()
         {
             hostVersion = ClientExtension.GetGithubVersionOrUnknown();
+            gameModes = new IGameMode[10];
+            gameModes[(int)ROOM_TYPE.MAP_EDITOR] = buildMapEdit = new BuildMapEdit(this);
+            gameModes[(int)ROOM_TYPE.BND] = playBuildAndDestroy = new PlayBuildAndDestroy(this);
+            gameModes[(int)ROOM_TYPE.CAPTURE_THE_FLAG] = playCaptureTheFlag = new PlayCaptureTheFlag(this);
+            gameModes[(int)ROOM_TYPE.INDIVIDUAL] = playDeathMatch = new PlayDeathMatch(this);
+            gameModes[(int)ROOM_TYPE.MISSION] = playDefense = new PlayDefense(this);
+            gameModes[(int)ROOM_TYPE.ESCAPE] = playEscape = new PlayEscape(this);
+            gameModes[(int)ROOM_TYPE.EXPLOSION] = playExplosion = new PlayExplosion(this);
+            gameModes[(int)ROOM_TYPE.BUNGEE] = playFreefall = new PlayFreefall(this);
+            gameModes[(int)ROOM_TYPE.TEAM_MATCH] = playTeamDeathMatch = new PlayTeamDeathMatch(this);
+            gameModes[(int)ROOM_TYPE.ZOMBIE] = playZombie = new PlayZombie(this);
+        }
+        private void RegisterHandlers()
+        {
+            Action<MessageId, Action<MsgReference>> register = (messageId, action) => _handlers[(ushort)messageId] = action;
+            Action<ExtensionOpcodes, Action<MsgReference>> registerCustom = (messageId, action) => _handlers[(ushort)messageId] = action;
+            
+            foreach (IGameMode gameMode in gameModes)
+            {
+                gameMode.RegisterNetworkHandlers(register, registerCustom);
+            }
+
+            register(MessageId.CS_LOGIN_REQ, HandleLoginRequest);
+            register(MessageId.CS_HEARTBEAT_REQ, HandleHeartbeat);
+            register(MessageId.CS_ROOM_LIST_REQ, HandleRoomListRequest);
+            register(MessageId.CS_CREATE_ROOM_REQ, HandleCreateRoomRequest);
+            register(MessageId.CS_ADD_BRICK_REQ, HandleAddBrickRequest);
+            register(MessageId.CS_DEL_BRICK_REQ, HandleDelBrickRequest);
+            register(MessageId.CS_CACHE_BRICK_REQ, HandleCacheBrickRequest);
+            register(MessageId.CS_CACHE_BRICK_ACK, HandleCacheBrickAck);
+            register(MessageId.CS_CACHE_BRICK_DONE_ACK, HandleCacheBrickDoneAck);
+            register(MessageId.CS_LEAVE_REQ, HandleLeave);
+            register(MessageId.CS_CHAT_REQ, HandleChatRequest);
+            register(MessageId.CS_JOIN_REQ, HandleJoinRequest);
+            register(MessageId.CS_RESUME_ROOM_REQ, HandleResumeRoomRequest);
+            register(MessageId.CS_MORPH_BRICK_REQ, HandleMorphBrickRequest);
+            register(MessageId.CS_EQUIP_REQ, HandleEquipRequest);
+            register(MessageId.CS_UNEQUIP_REQ, HandleUnequipRequest);
+            register(MessageId.CS_SAVE_REQ, HandleSaveMap);
+            register(MessageId.CS_LOAD_COMPLETE_REQ, HandleLoadComplete);
+            register(MessageId.CS_KILL_LOG_REQ, HandleKillLogRequest);
+            register(MessageId.CS_SET_STATUS_REQ, HandleSetStatusRequest);
+            register(MessageId.CS_START_REQ, HandleStartRequest);
+            register(MessageId.CS_REGISTER_REQ, HandleRegisterMapRequest);
+            register(MessageId.CS_CHANGE_USERMAP_ALIAS_REQ, HandleChangeUserMapAliasRequest);
+            register(MessageId.CS_RESPAWN_TICKET_REQ, HandleRespawnTicketRequest);
+            register(MessageId.CS_TIMER_REQ, HandleTimer);
+            register(MessageId.CS_MATCH_COUNTDOWN_REQ, HandleMatchCountdown);
+            register(MessageId.CS_BREAK_INTO_REQ, HandleBreakIntoRequest);
+            register(MessageId.CS_TEAM_SCORE_REQ, HandleTeamScoreRequest);
+            register(MessageId.CS_DESTROY_BRICK_REQ, HandleDestroyBrickRequest);
+            register(MessageId.CS_TEAM_CHANGE_REQ, HandleTeamChangeRequest);
+            register(MessageId.CS_SLOT_LOCK_REQ, HandleSlotLockRequest);
+            register(MessageId.CS_KICK_REQ, HandleKickRequest);
+            register(MessageId.CS_ROOM_CONFIG_REQ, HandleRoomConfig);
+            register(MessageId.CS_TEAM_CHAT_REQ, HandleTeamChatRequest);
+            register(MessageId.CS_RADIO_MSG_REQ, HandleRadioMsgRequest);
+            register(MessageId.CS_BUY_ITEM_REQ, HandleBuyRequest);
+            register(MessageId.CS_P2P_COMPLETE_REQ, HandleP2PComplete);
+            register(MessageId.CS_RESULT_DONE_REQ, HandleResultDoneRequest);
+            register(MessageId.CS_ROAMOUT_REQ, HandleRoamout);
+            register(MessageId.CS_ROAMIN_REQ, HandleRoamin);
+            register(MessageId.CS_GET_CANNON_REQ, HandleGetCannonRequest);
+            register(MessageId.CS_EMPTY_CANNON_REQ, HandleEmptyCannonRequest);
+            register(MessageId.CS_GET_BACK2SPAWNER_REQ, HandleGetBack2SpawnerRequest);
+            register(MessageId.CS_MATCH_RESTART_COUNT_REQ, HandleMatchRestartCountRequest);
+            register(MessageId.CS_MATCH_RESTARTED_REQ, HandleMatchRestartRequest);
+            register(MessageId.CS_ME_CHG_EDITOR_REQ, HandleChangeEditorPermissionRequest);
+            register(MessageId.CS_INIT_TERM_ITEM_REQ, HandleInitItemTermRequest);
+            register(MessageId.CS_LINE_BRICK_REQ, HandleLineBrickRequest);
+            register(MessageId.CS_REPLACE_BRICK_REQ, HandleReplaceBrickRequest);
+            register(MessageId.CS_SET_SHOOTER_TOOL_REQ, HandleSetShooterToolRequest);
+            register(MessageId.CS_CLEAR_SHOOTER_TOOLS_REQ, HandleClearShooterTools);
+            register(MessageId.CS_REG_MAP_INFO_REQ, HandleRegMapInfoRequest);
+            register(MessageId.CS_CORE_HP_REQ, HandleCoreHPReq);
+            register(MessageId.CS_WEAPON_HELD_RATIO_REQ, HandleWeaponHeldRatioRequest);
+            register(MessageId.CS_TC_OPEN_REQ, HandleTCOpenRequest);
+            register(MessageId.CS_TC_ENTER_REQ, HandleCS_TC_ENTER_REQ);
+            register(MessageId.CS_TC_OPEN_PRIZE_TAG_REQ, HandleCS_TC_OPEN_PRIZE_TAG_REQ);
+            register(MessageId.CS_TC_RECEIVE_PRIZE_REQ, HandleCS_TC_RECEIVE_PRIZE_REQ);
+            register(MessageId.CS_ACCEPT_DAILY_MISSION_REQ, Handle_CS_ACCEPT_DAILY_MISSION_REQ);
+            register(MessageId.CS_DELEGATE_MASTER_REQ, HandleDelegateMasterRequest);
+            register(MessageId.CS_TC_LEAVE_REQ, HandleCS_TC_LEAVE_REQ);
+            register(MessageId.CS_INFLICTED_DAMAGE_REQ, HandleInflictedDamage);
+            //register(MessageId.CS_RESET_USER_MAP_SLOTS_REQ, HandleResetUserMapSlot);
+            register(MessageId.CS_WEAPON_CHANGE_REQ, HandleWeaponChangeRequest);
+            register(MessageId.CS_SET_WEAPON_SLOT_REQ, HandleSetWeaponSlotRequest);
+            register(MessageId.CS_CLEAR_WEAPON_SLOTS_REQ, HandleClearWeaponSlots);
+            register(MessageId.CS_MY_DOWNLOAD_MAP_REQ, HandleRequestDownloadedMaps);
+            register(MessageId.CS_MY_REGISTER_MAP_REQ, HandleRequestRegisteredMaps);
+            //register(MessageId.CS_USER_MAP_REQ, HandleRequestUserMaps);
+            register(MessageId.CS_ALL_MAP_REQ, HandleRequestAllMaps);
+            register(MessageId.CS_OPEN_DOOR_REQ, HandleOpenDoorRequest);
+            register(MessageId.CS_CLOSE_DOOR_REQ, HandleCloseDoorRequest);
+            register(MessageId.CS_SAVE_PLAYER_COMMON_OPT_REQ, HandleCommonOpt);
+            register(MessageId.CS_ROOM_REQ, HandleRoomRequest);
+            register(MessageId.CS_CHARGE_FORCE_POINT_REQ, HandleChargeForcePoint);
+            register(MessageId.CS_CHANNEL_PLAYER_LIST_REQ, HandleRequestUserList);
+            register(MessageId.CS_BATCH_DEL_BRICK_REQ, HandleBrickBatchDeleteRequest);
+            register(MessageId.CS_MISSION_POINT_REQ, HandleMissionPointRequest);
+            register(MessageId.CS_GET_TRAIN_REQ, HandleGetTrainRequest);
+            register(MessageId.CS_EMPTY_TRAIN_REQ, HandleEmptyTrainRequest);
+
+            registerCustom(ExtensionOpcodes.opInventoryAck, HandleInventoryData);
+            registerCustom(ExtensionOpcodes.opDisconnectReq, HandleDisconnect);
+            registerCustom(ExtensionOpcodes.opBeginChunkedBufferReq, HandleBeginChunkedBufferReceive);
+            registerCustom(ExtensionOpcodes.opChunkedBufferReq, HandleChunkedBufferReceive);
+            registerCustom(ExtensionOpcodes.opEndChunkedBufferReq, HandleEndChunkedBufferReceive);
+            registerCustom(ExtensionOpcodes.opBeginChunkedBufferAck, HandleBeginChunkedBuffer);
+            registerCustom(ExtensionOpcodes.opChunkedBufferAck, HandleChunkedBuffer);
+            registerCustom(ExtensionOpcodes.opEndChunkedBufferAck, HandleEndChunkedBuffer);
+            registerCustom(ExtensionOpcodes.opEndChunkedBufferFailedAck, HandleEndChunkedBufferFailed);
+            registerCustom(ExtensionOpcodes.opVersionCheckReq, HandleVersionCheck);
+            registerCustom(ExtensionOpcodes.opBulkBrickReq, HandleBulkBrickRequest);
+            registerCustom(ExtensionOpcodes.opAmIConnectedReq, HandleAmIConnected);
+
+            Type messageIdType = typeof(MessageId);
+            foreach (MessageId id in Enum.GetValues(messageIdType))
+            {
+                ushort mapId = (ushort)id;
+                if (_handlers.ContainsKey(mapId))
+                {
+                    continue;
+                }
+                string name = Enum.GetName(messageIdType, id);
+                _handlers[mapId] = msgRef => Debug.LogWarning($"Client {msgRef.client.GetIdentifier()} sent unhandled packet: {name} ({mapId})");
+            }
+            messageIdType = typeof(ExtensionOpcodes);
+            foreach (ExtensionOpcodes id in Enum.GetValues(messageIdType))
+            {
+                ushort mapId = (ushort)id;
+                if (_handlers.ContainsKey(mapId))
+                {
+                    continue;
+                }
+                string name = Enum.GetName(messageIdType, id);
+                _handlers[mapId] = msgRef => Debug.LogWarning($"Client {msgRef.client.GetIdentifier()} sent unhandled packet: {name} ({mapId})");
+            }
         }
 
         public void SetupServer()
@@ -61,6 +216,7 @@ namespace _Emulator
                 serverSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 serverSocket.Listen(16);
                 serverSocket.BeginAccept(new AsyncCallback(AcceptCallback), null);
+                lastUpdateTime = Time.time;
                 serverCreated = true;
                 Debug.Log("Server created");
             }
@@ -79,6 +235,7 @@ namespace _Emulator
             RegisterHandlers();
             isSteam = true;
             hasHost = false;
+            lastUpdateTime = Time.time;
             serverCreated = true;
             Debug.Log("Server set to Steam");
 
@@ -518,10 +675,16 @@ namespace _Emulator
                     ShutdownFinally();
 
                 killLogTimer += Time.deltaTime;
-                HandleClientUpdates();
                 HandleMessages();
                 SendMessages();
             }
+        }
+
+        private void FixedUpdate()
+        {
+            if (!serverCreated)
+                return;
+            HandleClientUpdates();
         }
 
         public void Reset()
@@ -565,38 +728,40 @@ namespace _Emulator
 
         private void HandleClientUpdates()
         {
-            float time = Time.time, delta = Time.deltaTime;
+            float time = Time.time, delta = time - lastUpdateTime;
             ClientReference clientRef;
             for (int i = clientList.Count - 1; i >= 0; i--)
             {
                 clientRef = clientList[i];
                 if (clientRef.isHost) { continue; }
-                // Handle client heartbeat
-                if (clientRef.didHeartBeat)
-                {
-                    clientRef.lastHeartBeatTime = time;
-                    clientRef.didHeartBeat = false;
-                } else if (time - clientRef.lastHeartBeatTime > 15f)
-                {
-                    if (ServerEmulator.instance.debugHandle)
-                        Debug.Log("[Disconnect] Client timed out: " + clientRef.GetIdentifier());
-                    clientRef.Disconnect(false);
-                    continue;
-                }
                 // Handle dead clients
                 if (clientRef.seq == -1)
                 {
-                    if (clientRef.loginToleranceTime < 5f)
+                    if (clientRef.loginToleranceTime < 4f)
                     {
                         clientRef.loginToleranceTime += delta;
                         continue;
                     }
+                    SendDisconnect(clientRef, message: "Login timedout");
                     clientRef.Disconnect(false);
                     if (ServerEmulator.instance.debugHandle)
                         Debug.Log("[Disconnect] Client login timed out: " + clientRef.GetIdentifier());
                     continue;
                 }
+                // Handle client heartbeat
+                if (clientRef.didHeartBeat)
+                {
+                    clientRef.lastHeartBeatTime = time;
+                    clientRef.didHeartBeat = false;
+                } else if (time - clientRef.lastHeartBeatTime > 7.5f)
+                {
+                    if (ServerEmulator.instance.debugHandle)
+                        Debug.Log("[Disconnect] Client timed out: " + clientRef.GetIdentifier());
+                    clientRef.Disconnect(true);
+                    continue;
+                }
             }
+            lastUpdateTime = time;
         }
 
         public bool GetGamestateStrings(out string roomType, out string roomStatus, out string mapAlias)
@@ -671,120 +836,6 @@ namespace _Emulator
             }
 
             return result;
-        }
-
-        private readonly Dictionary<int, Action<MsgReference>> _handlers = new Dictionary<int, Action<MsgReference>>();
-
-        private void RegisterHandlers()
-        {
-            _handlers[(int)MessageId.CS_LOGIN_REQ] = HandleLoginRequest;
-            _handlers[(int)MessageId.CS_HEARTBEAT_REQ] = HandleHeartbeat;
-            _handlers[(int)MessageId.CS_ROOM_LIST_REQ] = HandleRoomListRequest;
-            _handlers[(int)MessageId.CS_CREATE_ROOM_REQ] = HandleCreateRoomRequest;
-            _handlers[(int)MessageId.CS_ADD_BRICK_REQ] = HandleAddBrickRequest;
-            _handlers[(int)MessageId.CS_DEL_BRICK_REQ] = HandleDelBrickRequest;
-            _handlers[(int)MessageId.CS_SAVE_PALETTE_REQ] = msgRef => Debug.LogWarning("PaletteManagerRequest");
-            _handlers[(int)MessageId.CS_CACHE_BRICK_REQ] = HandleCacheBrickRequest;
-            _handlers[(int)MessageId.CS_LEAVE_REQ] = HandleLeave;
-            _handlers[(int)MessageId.CS_CHAT_REQ] = HandleChatRequest;
-            _handlers[(int)MessageId.CS_JOIN_REQ] = HandleJoinRequest;
-            _handlers[(int)MessageId.CS_RESUME_ROOM_REQ] = HandleResumeRoomRequest;
-            _handlers[(int)MessageId.CS_MORPH_BRICK_REQ] = HandleMorphBrickRequest;
-            _handlers[(int)MessageId.CS_EQUIP_REQ] = HandleEquipRequest;
-            _handlers[(int)MessageId.CS_UNEQUIP_REQ] = HandleUnequipRequest;
-            _handlers[(int)MessageId.CS_SAVE_REQ] = HandleSaveMap;
-            _handlers[(int)MessageId.CS_LOAD_COMPLETE_REQ] = HandleLoadComplete;
-            _handlers[(int)MessageId.CS_KILL_LOG_REQ] = HandleKillLogRequest;
-            _handlers[(int)MessageId.CS_SET_STATUS_REQ] = HandleSetStatusRequest;
-            _handlers[(int)MessageId.CS_START_REQ] = HandleStartRequest;
-            _handlers[(int)MessageId.CS_REGISTER_REQ] = HandleRegisterMapRequest;
-            _handlers[(int)MessageId.CS_CHANGE_USERMAP_ALIAS_REQ] = HandleChangeUserMapAliasRequest;
-            _handlers[(int)MessageId.CS_RESPAWN_TICKET_REQ] = HandleRespawnTicketRequest;
-            _handlers[(int)MessageId.CS_TIMER_REQ] = HandleTimer;
-            _handlers[(int)MessageId.CS_MATCH_COUNTDOWN_REQ] = HandleMatchCountdown;
-            _handlers[(int)MessageId.CS_BREAK_INTO_REQ] = HandleBreakIntoRequest;
-            _handlers[(int)MessageId.CS_TEAM_SCORE_REQ] = HandleTeamScoreRequest;
-            _handlers[(int)MessageId.CS_DESTROY_BRICK_REQ] = HandleDestroyBrickRequest;
-            _handlers[(int)MessageId.CS_TEAM_CHANGE_REQ] = HandleTeamChangeRequest;
-            _handlers[(int)MessageId.CS_SLOT_LOCK_REQ] = HandleSlotLockRequest;
-            _handlers[(int)MessageId.CS_KICK_REQ] = HandleKickRequest;
-            _handlers[(int)MessageId.CS_ROOM_CONFIG_REQ] = HandleRoomConfig;
-            _handlers[(int)MessageId.CS_TEAM_CHAT_REQ] = HandleTeamChatRequest;
-            _handlers[(int)MessageId.CS_RADIO_MSG_REQ] = HandleRadioMsgRequest;
-            _handlers[(int)MessageId.CS_BUY_ITEM_REQ] = HandleBuyRequest;
-            _handlers[(int)MessageId.CS_P2P_COMPLETE_REQ] = HandleP2PComplete;
-            _handlers[(int)MessageId.CS_RESULT_DONE_REQ] = HandleResultDoneRequest;
-            _handlers[(int)MessageId.CS_ROAMOUT_REQ] = HandleRoamout;
-            _handlers[(int)MessageId.CS_ROAMIN_REQ] = HandleRoamin;
-            _handlers[(int)MessageId.CS_GET_CANNON_REQ] = HandleGetCannonRequest;
-            _handlers[(int)MessageId.CS_EMPTY_CANNON_REQ] = HandleEmptyCannonRequest;
-            _handlers[(int)MessageId.CS_GET_BACK2SPAWNER_REQ] = HandleGetBack2SpawnerRequest;
-            _handlers[(int)MessageId.CS_MATCH_RESTART_COUNT_REQ] = HandleMatchRestartCountRequest;
-            _handlers[(int)MessageId.CS_MATCH_RESTARTED_REQ] = HandleMatchRestartRequest;
-            _handlers[(int)MessageId.CS_BM_INSTALL_BOMB_REQ] = Defusion.HandleBombInstallRequest;
-            _handlers[(int)MessageId.CS_BM_UNINSTALL_BOMB_REQ] = Defusion.HandleBombUninstallRequest;
-            _handlers[(int)MessageId.CS_BM_BLAST_REQ] = Defusion.HandleBombBlastRequest;
-            _handlers[(int)MessageId.CS_CTF_PICK_FLAG_REQ] = CTF.HandlePickFlagRequest;
-            _handlers[(int)MessageId.CS_CTF_CAPTURE_FLAG_REQ] = CTF.HandleCaptureFlagRequest;
-            _handlers[(int)MessageId.CS_CTF_DROP_FLAG_REQ] = CTF.HandleDropFlagRequest;
-            _handlers[(int)MessageId.CS_BLAST_MODE_SCORE_REQ] = Defusion.HandleScoreRequest;
-            _handlers[(int)MessageId.CS_CTF_SCORE_REQ] = CTF.HandleCTFScoreRequest;
-            _handlers[(int)MessageId.CS_ME_CHG_EDITOR_REQ] = HandleChangeEditorPermissionRequest;
-            _handlers[(int)MessageId.CS_INIT_TERM_ITEM_REQ] = HandleInitItemTermRequest;
-            _handlers[(int)MessageId.CS_BND_SCORE_REQ] = BND.HandleBNDScoreRequest;
-            _handlers[(int)MessageId.CS_LINE_BRICK_REQ] = HandleLineBrickRequest;
-            _handlers[(int)MessageId.CS_REPLACE_BRICK_REQ] = HandleReplaceBrickRequest;
-            _handlers[(int)MessageId.CS_USE_SHOOTER_CONSUMABLE_REQ] = msgRef => Debug.LogWarning("UseConsumable Item");
-            _handlers[(int)MessageId.CS_SET_SHOOTER_TOOL_REQ] = HandleSetShooterToolRequest;
-            _handlers[(int)MessageId.CS_CLEAR_SHOOTER_TOOLS_REQ] = HandleClearShooterTools;
-            _handlers[(int)MessageId.CS_REG_MAP_INFO_REQ] = HandleRegMapInfoRequest;
-            _handlers[(int)MessageId.CS_CORE_HP_REQ] = HandleCoreHPReq;
-            _handlers[(int)MessageId.CS_STACK_POINT_REQ] = msgRef => Debug.LogWarning("StackPointRequest");
-            _handlers[(int)MessageId.CS_BND_SHIFT_PHASE_REQ] = BND.HandleBNDShiftPhaseRequest;
-            _handlers[(int)MessageId.CS_CTF_FLAG_RETURN_REQ] = CTF.HandleFlagReturnRequest;
-            _handlers[(int)MessageId.CS_WEAPON_HELD_RATIO_REQ] = HandleWeaponHeldRatioRequest;
-            _handlers[(int)MessageId.CS_TC_OPEN_REQ] = HandleTCOpenRequest;
-            _handlers[(int)MessageId.CS_TC_ENTER_REQ] = HandleCS_TC_ENTER_REQ;
-            _handlers[(int)MessageId.CS_TC_OPEN_PRIZE_TAG_REQ] = HandleCS_TC_OPEN_PRIZE_TAG_REQ;
-            _handlers[(int)MessageId.CS_TC_RECEIVE_PRIZE_REQ] = HandleCS_TC_RECEIVE_PRIZE_REQ;
-            _handlers[(int)MessageId.CS_ACCEPT_DAILY_MISSION_REQ] = Handle_CS_ACCEPT_DAILY_MISSION_REQ;
-            _handlers[(int)MessageId.CS_DELEGATE_MASTER_REQ] = HandleDelegateMasterRequest;
-            _handlers[(int)MessageId.CS_TC_LEAVE_REQ] = HandleCS_TC_LEAVE_REQ;
-            _handlers[(int)MessageId.CS_INFLICTED_DAMAGE_REQ] = HandleInflictedDamage;
-            //_handlers[(int)MessageId.CS_RESET_USER_MAP_SLOTS_REQ] = HandleResetUserMapSlot;
-            _handlers[(int)MessageId.CS_WEAPON_CHANGE_REQ] = HandleWeaponChangeRequest;
-            _handlers[(int)MessageId.CS_SET_WEAPON_SLOT_REQ] = HandleSetWeaponSlotRequest;
-            _handlers[(int)MessageId.CS_CLEAR_WEAPON_SLOTS_REQ] = HandleClearWeaponSlots;
-            _handlers[(int)MessageId.CS_MY_DOWNLOAD_MAP_REQ] = HandleRequestDownloadedMaps;
-            _handlers[(int)MessageId.CS_MY_REGISTER_MAP_REQ] = HandleRequestRegisteredMaps;
-            //_handlers[(int)MessageId.CS_USER_MAP_REQ] = HandleRequestUserMaps;
-            _handlers[(int)MessageId.CS_ALL_MAP_REQ] = HandleRequestAllMaps;
-            _handlers[(int)MessageId.CS_OPEN_DOOR_REQ] = HandleOpenDoorRequest;
-            _handlers[(int)MessageId.CS_CLOSE_DOOR_REQ] = HandleCloseDoorRequest;
-            _handlers[(int)MessageId.CS_SAVE_PLAYER_COMMON_OPT_REQ] = HandleCommonOpt;
-            _handlers[(int)MessageId.CS_ROOM_REQ] = HandleRoomRequest;
-            _handlers[(int)MessageId.CS_CHARGE_FORCE_POINT_REQ] = HandleChargeForcePoint;
-            _handlers[(int)MessageId.CS_CHANNEL_PLAYER_LIST_REQ] = HandleRequestUserList;
-            _handlers[(int)MessageId.CS_BATCH_DEL_BRICK_REQ] = HandleBrickBatchDeleteRequest;
-            _handlers[(int)MessageId.CS_MISSION_POINT_REQ] = HandleMissionPointRequest;
-            _handlers[(int)MessageId.CS_ZOMBIE_INFECTION_REQ] = Zombie.HandleZombieInfectionRequest;
-            _handlers[(int)MessageId.CS_ZOMBIE_INFECT_REQ] = Zombie.HandleZombieInfectRequest;
-            _handlers[(int)MessageId.CS_ZOMBIE_MODE_SCORE_REQ] = Zombie.HandleZombieScoreRequest;
-            _handlers[(int)MessageId.CS_ZOMBIE_STATUS_REQ] = Zombie.HandleZombieStatusRequest;
-            _handlers[(int)MessageId.CS_ZOMBIE_OBSERVER_REQ] = Zombie.HandleZombieObserverRequest;
-            _handlers[(int)MessageId.CS_GET_TRAIN_REQ] = HandleGetTrainRequest;
-            _handlers[(int)MessageId.CS_EMPTY_TRAIN_REQ] = HandleEmptyTrainRequest;
-            _handlers[ExtensionOpcodes.opInventoryAck] = HandleInventoryData;
-            _handlers[ExtensionOpcodes.opDisconnectReq] = HandleDisconnect;
-            _handlers[ExtensionOpcodes.opBeginChunkedBufferReq] = HandleBeginChunkedBufferReceive;
-            _handlers[ExtensionOpcodes.opChunkedBufferReq] = HandleChunkedBufferReceive;
-            _handlers[ExtensionOpcodes.opEndChunkedBufferReq] = HandleEndChunkedBufferReceive;
-            _handlers[ExtensionOpcodes.opBeginChunkedBufferAck] = HandleBeginChunkedBuffer;
-            _handlers[ExtensionOpcodes.opChunkedBufferAck] = HandleChunkedBuffer;
-            _handlers[ExtensionOpcodes.opEndChunkedBufferAck] = HandleEndChunkedBuffer;
-            _handlers[ExtensionOpcodes.opEndChunkedBufferFailedAck] = HandleEndChunkedBufferFailed;
-            _handlers[ExtensionOpcodes.opVersionCheckReq] = HandleVersionCheck;
-            _handlers[ExtensionOpcodes.opBulkBrickReq] = HandleBulkBrickRequest;
         }
 
         private void HandleMessages()
@@ -907,6 +958,12 @@ namespace _Emulator
             }
         }
 
+        private void HandleAmIConnected(MsgReference msgRef)
+        {
+            msgRef.client.didHeartBeat = true;
+            SayInstant(new MsgReference(ExtensionOpcodes.opAmIConnectedAck, null, msgRef.client));
+        }
+
         private void HandleHeartbeat(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out int gmFunction);
@@ -992,7 +1049,7 @@ namespace _Emulator
                         //round code blue team wins when time runs out
                         //this could be wrong and needs to be checked and referenced in exlplosionMatch.cs
                         matchData.blueScore++;
-                        Defusion.HandleRoundEnd(msgRef, 1);
+                        playExplosion.HandleRoundEnd(msgRef, 1);
                     }
                 }
             }
@@ -1000,7 +1057,7 @@ namespace _Emulator
             {
                 if (matchData.remainTime <= 0 && matchData.zombieRoundsLeft >= 0)
                 {
-                    Zombie.SendZombieRoundEnd(msgRef, matchData);
+                    playZombie.SendZombieRoundEnd(msgRef, matchData);
                 }
             }
             else
@@ -1027,7 +1084,7 @@ namespace _Emulator
                 if (matchData.countdownTime <= 0)
                 {
                     matchData.room.Status = Room.ROOM_STATUS.PLAYING;
-                    SendRoom(null, matchData, SendType.BroadcastRoom);
+                    SendUpdateRoom(matchData);
                 }
 
                 SendMatchCountdown(matchData);
@@ -1191,8 +1248,8 @@ namespace _Emulator
                     SendRendezvousInfo(msgRef.client);
                 SendMaster(msgRef.client, matchData);
                 SendSlotLocks(msgRef.client);
-                SendRoomConfig(msgRef.client, matchData);
-                SendAddRoom(msgRef.client, matchData);
+                SendRoomConfig(msgRef.client);
+                SendUpdateRoom(matchData, msgRef.client);
 
                 if (isSteam)
                     SendEnterSteam(msgRef.client);
@@ -1217,6 +1274,17 @@ namespace _Emulator
             MatchData matchData = msgRef.matchData;
 
             int reply = 0;
+            bool sendMap = false;
+
+            if (matchData.room.Type == Room.ROOM_TYPE.MAP_EDITOR)
+            {
+                if (!matchData.cachedMap.isLoaded)
+                {
+                    SendBreakInto(msgRef.client, -1);
+                    return;
+                }
+                sendMap = true;
+            }
 
             if (!matchData.room.isBreakInto)
                 reply = -1;
@@ -1235,12 +1303,22 @@ namespace _Emulator
                     SendKillCount(matchData.clientList[i]);
                     SendDeathCount(matchData.clientList[i]);
                 }
-                BND.SendBnDStatus(msgRef.client);
+                if (matchData.room.Type == ROOM_TYPE.BND)
+                {
+                    playBuildAndDestroy.SendBnDStatus(msgRef.client);
+                    SendUpdateRoom(matchData, msgRef.client);
+                }
                 SendTimer(msgRef.client);
                 msgRef.client.isBreakingInto = true;
             }
 
             SendBreakInto(msgRef.client, reply);
+
+            if (sendMap)
+            {
+                SendCacheBrick(msgRef.client);
+                SendCacheBrickDone(msgRef.client);
+            }
         }
 
         private void HandleLeave(MsgReference msgRef)
@@ -1254,6 +1332,25 @@ namespace _Emulator
             SendSetStatus(msgRef.client);
 
             matchData.RemoveClient(msgRef.client);
+
+            if (matchData.room.Type == ROOM_TYPE.MAP_EDITOR)
+            {
+                if (msgRef.client.seq == matchData.masterSeq)
+                {
+                    if (matchData.room.CurPlayer > 0)
+                    {
+                        ClientReference[] clients = matchData.clientList.ToArray();
+                        foreach (ClientReference client in clients)
+                        {
+                            SendKick(client);
+                            SendRoomList(client);
+                        }
+                    }
+                    SendDeleteRoom(matchData, matchData.channel);
+                    msgRef.client.channel.RemoveMatch(matchData);
+                }
+                return;
+            }
 
             if (matchData.room.CurPlayer <= 0)
             {
@@ -1271,22 +1368,6 @@ namespace _Emulator
 
         private void HandleCreateRoomRequest(MsgReference msgRef)
         {
-            msgRef.msg._msg.Read(out int type);
-            msgRef.msg._msg.Read(out string title);
-            msgRef.msg._msg.Read(out bool isLocked);
-            msgRef.msg._msg.Read(out string pswd);
-            msgRef.msg._msg.Read(out int maxPlayer);
-            msgRef.msg._msg.Read(out int param1);   //Play: goal			Build: isLoad
-            msgRef.msg._msg.Read(out int param2);   //Play: timeLimit		Build: slot
-            msgRef.msg._msg.Read(out int param3);   //Play: weaponOption	Build: brickCount:landscapeIndex
-            msgRef.msg._msg.Read(out int param4);   //Play: map				Build: map:skyboxIndex
-            msgRef.msg._msg.Read(out int param5);   //Play: breakInto		Build: premium
-            msgRef.msg._msg.Read(out int param6);   //Play: isBalance		Build: N/A
-            msgRef.msg._msg.Read(out int param7);   //Play: isWanted		Build: N/A
-            msgRef.msg._msg.Read(out int param8);   //Play: isDrop			Build: N/A
-            msgRef.msg._msg.Read(out string alias);
-            msgRef.msg._msg.Read(out int master);
-
             if (Config.instance.onlyHostRooms && !msgRef.client.isHost)
             {
                 SendCustomMessage("Only host can create rooms.", msgRef.client, SendType.Unicast);
@@ -1301,63 +1382,37 @@ namespace _Emulator
 
             MatchData matchData = msgRef.client.channel.AddNewMatch();
 
-            matchData.room.Type = (Room.ROOM_TYPE)type;
+            msgRef.msg._msg.Read(out int type);
+            msgRef.msg._msg.Read(out string title);
+            msgRef.msg._msg.Read(out bool isLocked);
+            msgRef.msg._msg.Read(out string pswd);
+            msgRef.msg._msg.Read(out int maxPlayer);
+            int[] parameters = new int[8];
+            msgRef.msg._msg.Read(out parameters[0]);
+            msgRef.msg._msg.Read(out parameters[1]);
+            msgRef.msg._msg.Read(out parameters[2]);
+            msgRef.msg._msg.Read(out parameters[3]);
+            msgRef.msg._msg.Read(out parameters[4]);
+            msgRef.msg._msg.Read(out parameters[5]);
+            msgRef.msg._msg.Read(out parameters[6]);
+            msgRef.msg._msg.Read(out parameters[7]);
+            msgRef.msg._msg.Read(out string alias);
+            msgRef.msg._msg.Read(out int master);
+
+            Room.ROOM_TYPE roomType = (Room.ROOM_TYPE)type;
+
+            matchData.room.Type = roomType;
             matchData.room.Title = title;
             matchData.room.Locked = isLocked;
             matchData.room.MaxPlayer = maxPlayer;
             matchData.room.CurMapAlias = alias;
             matchData.masterSeq = msgRef.client.seq;
-            matchData.LockSlotsByMaxPlayers(matchData.room.MaxPlayer, (ROOM_TYPE)type);
+            matchData.LockSlotsByMaxPlayers(matchData.room.MaxPlayer, roomType);
             matchData.roomCreated = true;
 
-            if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.MAP_EDITOR)
+            if (roomType != ROOM_TYPE.NONE && roomType != ROOM_TYPE.NUM_TYPE)
             {
-                //UserMapInfoManager.Instance.AddOrUpdate(param2, alias, param3, DateTime.Now, (sbyte)param5);
-                //UserMapInfoManager.Instance.CurSlot = param2;
-                //UserMapInfoManager.Instance.CurMapName = alias;
-                if (param1 == 1)
-                {
-                    //matchData.CacheMap(regMaps.Find(x => x.Value.Map == param2).Value, new UserMapInfo(param2, (sbyte)param5));
-                    //matchData.CacheMap(regMaps.Find(x => x.Value.Map == param2).Value, UserMapInfoManager.Instance.Get(param2));
-                    matchData.CacheMapFromSlot(UserMapInfoManager.Instance.Get(param2));
-                }
-                else
-                {
-                    matchData.CacheMapGenerate(param2, param3, param4, alias);
-                }
-            }
-            else
-            {
-                matchData.room.goal = param1;
-                matchData.room.timelimit = param2;
-                matchData.room.weaponOption = param3;
-                matchData.room.map = param4;
-                matchData.room.isBreakInto = Convert.ToBoolean(param5);
-                matchData.room.isWanted = Convert.ToBoolean(param7);
-                matchData.room.isDropItem = false;//Convert.ToBoolean(param8);
-                matchData.isBalance = Convert.ToBoolean(param6);
-            }
-
-            if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.BUNGEE)
-            {
-                matchData.CacheMap(regMaps.Find(x => x.Value.Map == param4).Value, new UserMapInfo(0, 0));
-            }
-
-            if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.BND)
-            {
-                // Unpack the timer configuration for Build and Destroy phases
-                int buildTime, destroyTime, repeat;
-                BND.UnpackTimerOption(param2, out buildTime, out destroyTime, out repeat);
-
-                matchData.buildPhaseTime = buildTime;
-                matchData.battlePhaseTime = destroyTime;
-                matchData.repeat = repeat;
-                matchData.CacheMap(regMaps.Find(x => x.Value.Map == param4).Value, new UserMapInfo(0, 0));
-
-                // Initialize BND-specific fields
-                /*matchData.currentPhase = MatchData.BnDPhase.Build;
-                matchData.currentRound = 1;
-                matchData.remainTime = buildTime; // Start with Build phase time*/
+                gameModes[type].HandleRoomCreation(msgRef.client, matchData, matchData.room, parameters);
             }
 
             if (debugHandle)
@@ -1372,8 +1427,8 @@ namespace _Emulator
 
             SendMaster(msgRef.client, matchData);
             SendSlotLocks(msgRef.client);
-            SendRoomConfig(msgRef.client, matchData);
-            SendAddRoom(msgRef.client, matchData);
+            SendRoomConfig(msgRef.client);
+            SendAddRoom(msgRef.client);
             SendCreateRoom(msgRef.client);
 
             if (isSteam)
@@ -1412,7 +1467,7 @@ namespace _Emulator
             matchData.room.map = nWhere;
             matchData.room.isBreakInto = Convert.ToBoolean(breakInto);
             matchData.isBalance = Convert.ToBoolean(teamBalance);
-            matchData.room.isDropItem = false;//Convert.ToBoolean(itemPickup);
+            matchData.room.isDropItem = Convert.ToBoolean(itemPickup);
             matchData.room.CurMapAlias = whereAlias;
             matchData.room.Type = (Room.ROOM_TYPE)type;
 
@@ -1425,11 +1480,12 @@ namespace _Emulator
             {
                 // Unpack the timer configuration for Build and Destroy phases
                 int buildTime, destroyTime, repeat;
-                BND.UnpackTimerOption(timeLimit, out buildTime, out destroyTime, out repeat);
+                PlayBuildAndDestroy.UnpackTimerOption(timeLimit, out buildTime, out destroyTime, out repeat);
 
                 matchData.buildPhaseTime = buildTime;
                 matchData.battlePhaseTime = destroyTime;
                 matchData.repeat = repeat;
+                matchData.useBuildGun = Convert.ToBoolean(useBuildGun);
                 matchData.CacheMap(regMaps.Find(x => x.Value.Map == nWhere).Value, new UserMapInfo(0, 0));
 
                 // Initialize BND-specific fields
@@ -1441,7 +1497,8 @@ namespace _Emulator
             if (debugHandle)
                 Debug.Log("HandleRoomConfig from: " + msgRef.client.GetIdentifier());
 
-            SendRoomConfig(null, matchData);
+            SendRoomConfig(msgRef.client);
+            SendUpdateRoom(matchData);
         }
 
         private void HandleRoomRequest(MsgReference msgRef)
@@ -1453,7 +1510,7 @@ namespace _Emulator
                 Debug.Log("HandleRoomRequest from: " + msgRef.client.GetIdentifier());
 
             MatchData matchData = msgRef.client.channel.GetMatchByRoomNumber(roomNumber);
-            SendRoom(msgRef.client, matchData);
+            SendRoom(msgRef.client);
         }
 
         private void HandleRoomListRequest(MsgReference msgRef)
@@ -1478,7 +1535,7 @@ namespace _Emulator
             if (debugHandle)
                 Debug.Log("HandleResumeRoomRequest from: " + msgRef.client.GetIdentifier());
 
-            SendRoom(null, matchData, SendType.BroadcastRoom);
+            SendUpdateRoom(matchData);
         }
 
         private void HandleTeamChangeRequest(MsgReference msgRef)
@@ -1558,7 +1615,7 @@ namespace _Emulator
             }
 
             matchData.room.Status = Room.ROOM_STATUS.PENDING;
-            SendRoom(null, matchData, SendType.BroadcastRoom);
+            SendUpdateRoom(matchData);
 
             for (int i = 0; i < matchData.clientList.Count; i++)
             {
@@ -1847,7 +1904,7 @@ namespace _Emulator
                         SendTeamScore(matchData);
                         if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
                         {
-                            HandleTeamMatchEnd(matchData);
+                            playTeamDeathMatch.HandleMatchEnd(matchData);
                         }
                         break;
 
@@ -1857,7 +1914,7 @@ namespace _Emulator
 
                         if (matchData.redScore >= matchData.room.goal)
                         {
-                            HandleIndividualMatchEnd(matchData);
+                            playDeathMatch.HandleMatchEnd(matchData);
                         }
                         break;
 
@@ -1872,11 +1929,11 @@ namespace _Emulator
                             else
                                 matchData.blueScore++;
 
-                            BND.SendBnDScore(matchData);
+                            playBuildAndDestroy.SendBnDScore(matchData);
 
                             if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
                             {
-                                BND.HandleBNDMatchEnd(matchData);
+                                playBuildAndDestroy.HandleMatchEnd(matchData);
                             }
                         }
                         break;
@@ -1889,7 +1946,7 @@ namespace _Emulator
                         SendTeamScore(matchData);
                         if (matchData.blueScore >= matchData.room.goal || matchData.redScore >= matchData.room.goal)
                         {
-                            CTF.HandleCTFMatchEnd(matchData);
+                            playCaptureTheFlag.HandleMatchEnd(matchData);
                         }
                         break;
 
@@ -1914,12 +1971,12 @@ namespace _Emulator
                         if (deadBlue >= totalBlue)
                         {
                             matchData.blueScore++;
-                            Defusion.HandleRoundEnd(msgRef, 1);
+                            playExplosion.HandleRoundEnd(msgRef, 1);
                         }
                         else if (deadRed >= totalRed)
                         {
                             matchData.redScore++;
-                            Defusion.HandleRoundEnd(msgRef, 0); 
+                            playExplosion.HandleRoundEnd(msgRef, 0); 
                         }
                         break;
 
@@ -1930,18 +1987,18 @@ namespace _Emulator
                             matchData.killedPlayers.Add(victim);
                             if (matchData.zombiePlayers.Count <= 0)
                             {
-                                Zombie.SendZombieRoundEnd(msgRef, matchData);
+                                playZombie.SendZombieRoundEnd(msgRef, matchData);
                             }
                         }
                         break;
 
                     case Room.ROOM_TYPE.BUNGEE:
                         matchData.redScore++;
-                        Freefall.SendFreefallScore(matchData);
+                        playFreefall.SendFreefallScore(matchData);
 
                         if (matchData.redScore >= matchData.room.goal)
                         {
-                            Freefall.HandleMatchEnd(matchData);
+                            playFreefall.HandleMatchEnd(matchData);
                         }
                         break;
                 }
@@ -2340,22 +2397,6 @@ namespace _Emulator
             SendRespawnTicket(msgRef.client);
         }
 
-        public void HandleIndividualMatchEnd(MatchData matchData)
-        {
-            matchData.room.Status = Room.ROOM_STATUS.WAITING;
-            SendIndividualMatchEnd(matchData);
-            matchData.Reset();
-            SendRoom(null, matchData, SendType.BroadcastRoom);
-        }
-
-        public void HandleTeamMatchEnd(MatchData matchData)
-        {
-            matchData.room.Status = Room.ROOM_STATUS.WAITING;
-            SendTeamMatchEnd(matchData);
-            matchData.Reset();
-            SendRoom(null, matchData, SendType.BroadcastRoom);
-        }
-
         private void HandleWeaponChangeRequest(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out int slot);
@@ -2480,8 +2521,52 @@ namespace _Emulator
             if (debugHandle)
                 Debug.Log("HandleCacheBrickRequest from: " + msgRef.client.GetIdentifier());
 
+            if (msgRef.matchData.room.Type == ROOM_TYPE.MAP_EDITOR && !msgRef.matchData.cachedMap.isLoaded)
+            {
+                return;
+            }
+
             SendCacheBrick(msgRef.client);
             SendCacheBrickDone(msgRef.client);
+        }
+
+        private void HandleCacheBrickAck(MsgReference msgRef)
+        {
+            UserMap userMap = msgRef.matchData.cachedMap;
+
+            MsgBody msg = msgRef.msg._msg;
+            msg.Read(out int val);
+            for (int i = 0; i < val; i++)
+            {
+                msg.Read(out int val2);
+                msg.Read(out byte val3);
+                msg.Read(out byte val4);
+                msg.Read(out byte val5);
+                msg.Read(out byte val6);
+                msg.Read(out ushort val7);
+                msg.Read(out byte val8);
+                msg.Read(out byte val9);
+                userMap.CacheBrick(val2, val3, val4, val5, val6, val7, val8);
+                if (val9 > 0)
+                {
+                    msg.Read(out string val10);
+                    msg.Read(out bool val11);
+                    msg.Read(out bool val12);
+                    msg.Read(out string val13);
+                    userMap.UpdateScript(val2, val10, val11, val12, val13);
+                }
+            }
+        }
+
+        private void HandleCacheBrickDoneAck(MsgReference msgRef)
+        {
+            MsgBody msg = msgRef.msg._msg;
+            msg.Read(out int mapIndex);
+            msg.Read(out int skyboxIndex);
+            MatchData match = msgRef.matchData;
+            UserMap userMap = match.cachedMap;
+            userMap.CacheDone(mapIndex, skyboxIndex);
+            match.SetMapDone();
         }
 
         private void HandleAddBrickRequest(MsgReference msgRef)
@@ -2627,12 +2712,16 @@ namespace _Emulator
                 Debug.Log("SendAddBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
         }
 
-        public void SendCacheBrick(ClientReference client)
+        public void SendCacheBrick(ClientReference client, MatchData matchData = null, SendType sendType = SendType.Unicast)
         {
-            MatchData matchData = client.matchData;
+            if (matchData == null)
+            {
+                matchData = client.matchData;
+            }
 
-            List<KeyValuePair<int, BrickInst>> brickList = new List<KeyValuePair<int, BrickInst>>();
-            brickList = matchData.cachedMap.dic.ToList();
+            List<KeyValuePair<int, BrickInst>> brickList;
+            UserMap userMap = matchData.cachedMap;
+            brickList = userMap.dic.ToList();
 
             int chunkSize = 100;
             int chunkCount = Mathf.CeilToInt((float)brickList.Count / (float)chunkSize);
@@ -2675,26 +2764,30 @@ namespace _Emulator
                         body.Write((byte)0);
                 }
 
-                Say(new MsgReference(21, body, client, SendType.Unicast));
+                Say(new MsgReference(21, body, client, sendType, matchData.channel, matchData));
             }
 
             if (debugSend)
                 Debug.Log("SendCacheBrick with " + chunkCount + " chunks to: " + client.GetIdentifier());
         }
 
-        public void SendCacheBrickDone(ClientReference client)
+        public void SendCacheBrickDone(ClientReference client, MatchData matchData = null, SendType sendType = SendType.Unicast)
         {
-            MatchData matchData = client.matchData;
+            if (matchData == null)
+            {
+                matchData = client.matchData;
+            }
+            UserMap userMap = matchData.cachedMap;
 
             MsgBody body = new MsgBody();
 
-            body.Write(0); //mapIndex
-            body.Write(matchData.cachedMap.skybox);
+            body.Write(0); // mapIndex
+            body.Write(userMap.skybox);
 
-            Say(new MsgReference(22, body, client, SendType.Unicast));
+            Say(new MsgReference(22, body, client, sendType, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("SendCacheBrickDone for map " + matchData.cachedMap.map + " to: " + client.GetIdentifier());
+                Debug.Log("SendCacheBrickDone for map " + userMap.map + " to: " + client.GetIdentifier());
         }
 
         public void SendCopyright(ClientReference client)
@@ -2871,67 +2964,6 @@ namespace _Emulator
             //SendItemProperties(client);
             SendItemPimps(client);
             SendPremiumItems(client);
-        }
-        public void SendIndividualMatchEnd(MatchData matchData)
-        {
-            MsgBody body = new MsgBody();
-
-            body.Write(matchData.clientList.Count);
-            for (int i = 0; i < matchData.clientList.Count; i++)
-            {
-                body.Write(matchData.clientList[i].slot.isRed);
-                body.Write(matchData.clientList[i].seq);
-                body.Write(matchData.clientList[i].name);
-                body.Write(matchData.clientList[i].kills);
-                body.Write(matchData.clientList[i].deaths);
-                body.Write(matchData.clientList[i].assists);
-                body.Write(matchData.clientList[i].score);
-                body.Write(0); //points
-                body.Write(0); //xp
-                body.Write(0); //mission
-                body.Write(matchData.clientList[i].data.xp);
-                body.Write(matchData.clientList[i].data.xp);
-                body.Write((long)0); //buff
-            }
-            Say(new MsgReference(180, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
-
-            if (debugSend)
-                Debug.Log("Broadcasted SendIndivudalMatchEnd for room no: " + matchData.room.No);
-        }
-
-        public void SendTeamMatchEnd(MatchData matchData)
-        {
-            for (int team = 0; team < 2; team++)
-            {
-                MsgBody body = new MsgBody();
-
-                body.Write(team == 0 ? matchData.GetWinningTeam() : (sbyte)-matchData.GetWinningTeam());
-                body.Write(matchData.redScore);
-                body.Write(matchData.blueScore);
-                body.Write(matchData.blueScore);
-                body.Write(matchData.redScore);
-                body.Write(matchData.clientList.Count);
-                for (int i = 0; i < matchData.clientList.Count; i++)
-                {
-                    body.Write(matchData.clientList[i].slot.isRed);
-                    body.Write(matchData.clientList[i].seq);
-                    body.Write(matchData.clientList[i].name);
-                    body.Write(matchData.clientList[i].kills);
-                    body.Write(matchData.clientList[i].deaths);
-                    body.Write(matchData.clientList[i].assists);
-                    body.Write(matchData.clientList[i].score);
-                    body.Write(0); //points
-                    body.Write(0); //xp
-                    body.Write(0); //mission
-                    body.Write(matchData.clientList[i].data.xp);
-                    body.Write(matchData.clientList[i].data.xp);
-                    body.Write((long)0); //buff
-                }
-                Say(new MsgReference(70, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam));
-            }
-
-            if (debugSend)
-                Debug.Log("Broadcasted SendTeamMatchEnd for room no: " + matchData.room.No);
         }
 
         public void SendChat(ClientReference client, ChatText.CHAT_TYPE type, string text)
@@ -3318,9 +3350,10 @@ namespace _Emulator
             }
         }
 
-        public void SendRoomConfig(ClientReference client, MatchData matchData)
+        public void SendRoomConfig(ClientReference client)
         {
             MsgBody body = new MsgBody();
+            MatchData matchData = client.matchData;
 
             ROOM_TYPE roomType = matchData.room.type;
 
@@ -3336,7 +3369,7 @@ namespace _Emulator
             }
             if (roomType == ROOM_TYPE.BND)
             {
-                body.Write(BND.PackTimerOptions(matchData.buildPhaseTime, matchData.battlePhaseTime, matchData.repeat));
+                body.Write(PlayBuildAndDestroy.PackTimerOptions(matchData.buildPhaseTime, matchData.battlePhaseTime, matchData.repeat));
             } else
             {
                 body.Write(matchData.room.timelimit);
@@ -3344,33 +3377,20 @@ namespace _Emulator
             body.Write(matchData.room.goal);
             body.Write(matchData.room.isBreakInto);
             body.Write(matchData.isBalance);
-            body.Write(false); //useBuildGun
-            body.Write(""); //password
-            body.Write((byte)0); //commented
+            body.Write(matchData.useBuildGun);
+            body.Write("");         //password
+            body.Write((byte)0);    //commented
             body.Write((int)matchData.room.Type);
             body.Write(matchData.room.isDropItem);
             body.Write(matchData.room.isWanted);
 
-            if (client == null)
-            {
-                Say(new MsgReference(92, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
-
-                if (debugSend)
-                    Debug.Log("Broadcasted SendRoomConfig for room no: " + matchData.room.No);
-            }
-
-            else
-            {
-                Say(new MsgReference(92, body, client));
-
-                if (debugSend)
-                    Debug.Log("SendRoomConfig to: " + client.GetIdentifier());
-            }
+            Say(new MsgReference(92, body, client));
         }
 
-        public void SendAddRoom(ClientReference client, MatchData matchData)
+        public void SendAddRoom(ClientReference client)
         {
             MsgBody body = new MsgBody();
+            MatchData matchData = client.matchData;
 
             body.Write(matchData.room.No);
             body.Write((int)matchData.room.Type);
@@ -3394,26 +3414,62 @@ namespace _Emulator
             body.Write(matchData.room.Squad);
             body.Write(matchData.room.SquadCounter);
 
-            if (client == null)
+            Say(new MsgReference(5, body, client, SendType.BroadcastChannel, matchData.channel, matchData));
+            if (debugSend)
             {
-                Say(new MsgReference(5, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
-
-                if (debugSend)
-                    Debug.Log("Broadcasted SendAddRoom for room no: " + matchData.room.No);
-            }
-
-            else
-            {
-                Say(new MsgReference(5, body, client));
-
-                if (debugSend)
-                    Debug.Log("SendAddRoom to: " + client.GetIdentifier());
+                Debug.Log("SendAddRoom to channel: " + matchData.channel.channel.Name);
             }
         }
 
-        public void SendRoom(ClientReference client, MatchData matchData, SendType sendType = SendType.Unicast)
+        public void SendUpdateRoom(MatchData matchData, ClientReference client = null)
         {
             MsgBody body = new MsgBody();
+
+            body.Write(matchData.room.No);
+            body.Write((int)matchData.room.Status);
+            body.Write(matchData.room.CurPlayer);
+            body.Write(matchData.room.MaxPlayer);
+            body.Write(matchData.room.Locked);
+            body.Write(matchData.room.map);
+            body.Write(matchData.room.CurMapAlias);
+            body.Write(matchData.room.goal);
+            body.Write(matchData.room.timelimit);
+            body.Write(matchData.room.weaponOption);
+            body.Write(matchData.room.ping);
+            body.Write(matchData.room.score1);
+            body.Write(matchData.room.score2);
+            body.Write(matchData.room.CountryFilter);
+            body.Write(matchData.room.isBreakInto);
+            body.Write((int)matchData.room.Type);
+            body.Write(matchData.room.Title);
+            body.Write(matchData.room.isDropItem);
+            body.Write(matchData.room.isWanted);
+            body.Write(matchData.room.Squad);
+            body.Write(matchData.room.SquadCounter);
+
+            if (client == null)
+            {
+                Say(new MsgReference(30, body, null, SendType.BroadcastChannel, matchData.channel, matchData));
+                if (debugSend)
+                {
+                    Debug.Log("SendUpdateRoom to channel: " + matchData.channel.channel.Name);
+                }
+            } else
+            {
+                Say(new MsgReference(30, body, client, SendType.Unicast, matchData.channel, matchData));
+
+                if (debugSend)
+                {
+                    Debug.Log("SendUpdateRoom to: " + client.GetIdentifier());
+                }
+            }
+
+        }
+
+        public void SendRoom(ClientReference client)
+        {
+            MsgBody body = new MsgBody();
+            MatchData matchData = client.matchData;
 
             body.Write(matchData.room.No);
             body.Write((int)matchData.room.Type);
@@ -3422,7 +3478,21 @@ namespace _Emulator
             body.Write((int)matchData.room.Status);
             body.Write(matchData.room.CurPlayer);
             body.Write(matchData.room.MaxPlayer);
-            body.Write(matchData.room.map);
+            if (matchData.room.type == ROOM_TYPE.BND)
+            {
+                if (matchData.room.Status == ROOM_STATUS.PLAYING)
+                {
+                    body.Write(matchData.room.map);
+                }
+                else
+                {
+                    body.Write(0);
+                }
+            }
+            else
+            {
+                body.Write(matchData.room.map);
+            }
             body.Write(matchData.room.CurMapAlias);
             body.Write(matchData.room.goal);
             body.Write(matchData.room.timelimit);
@@ -3437,15 +3507,11 @@ namespace _Emulator
             body.Write(matchData.room.Squad);
             body.Write(matchData.room.SquadCounter);
 
-            Say(new MsgReference(470, body, client, sendType, matchData.channel, matchData));
+            Say(new MsgReference(470, body, client, SendType.Unicast, matchData.channel, matchData));
 
             if (debugSend)
             {
-                if (sendType == SendType.Unicast)
-                    Debug.Log("SendRoom to: " + client.GetIdentifier());
-
-                else
-                    Debug.Log("Broadcasted SendRoom for room no: " + matchData.room.No);
+                Debug.Log("SendRoom to: " + client.GetIdentifier());
             }
 
         }

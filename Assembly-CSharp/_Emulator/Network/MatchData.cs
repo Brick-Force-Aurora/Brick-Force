@@ -3,10 +3,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using static Room;
 
 namespace _Emulator
 {
-    class MatchData
+    public class MatchData
     {
         public int countdownTime;
         public int remainTime;
@@ -103,7 +104,7 @@ namespace _Emulator
 
             redKillCount = 0;
             blueKillCount = 0;
-            room = new Room(false, 0, "", Room.ROOM_TYPE.TEAM_MATCH, Room.ROOM_STATUS.WAITING, 0, 0, 0, "", 0, 0, 0, 0, 0, 0, 0, false, false, false, 0, 0);
+            room = new Room(false, 0, "", Room.ROOM_TYPE.NONE, Room.ROOM_STATUS.WAITING, 0, 0, 0, "", 0, 0, 0, 0, 0, 0, 0, false, false, false, 0, 0);
             cachedMap = new UserMap();
             mapCached = false;
             roundInit = true;
@@ -270,6 +271,11 @@ namespace _Emulator
             cachedUMI = new UserMapInfo(slot, alias, cachedMap.dic.Keys.Count, time, 0);
         }
 
+        public void SetMapDone()
+        {
+            mapCached = true;
+        }
+
         public int GetNextBrickSeq()
         {
             int seq = UnityEngine.Random.Range(0, int.MaxValue);
@@ -318,54 +324,12 @@ namespace _Emulator
 
         public void EndMatch()
         {
-            switch (room.Type)
+            Room.ROOM_TYPE roomType = room.Type;
+            if (roomType == Room.ROOM_TYPE.NONE || roomType == Room.ROOM_TYPE.NUM_TYPE)
             {
-                case Room.ROOM_TYPE.TEAM_MATCH:
-                    ServerEmulator.instance.HandleTeamMatchEnd(this);
-                    break;
-
-                case Room.ROOM_TYPE.INDIVIDUAL:
-                    ServerEmulator.instance.HandleIndividualMatchEnd(this);
-                    break;
-
-                case Room.ROOM_TYPE.CAPTURE_THE_FLAG:
-                    CTF.HandleCTFMatchEnd(this);
-                    break;
-
-                case Room.ROOM_TYPE.BND:
-                    /*Debug.LogWarning("MatchDataEndMatch repeat:" + repeat + " remainTime: " + remainTime + " isBuildPhase: " + isBuildPhase);
-                    if (repeat <= 0 && remainTime <0 && !isBuildPhase)
-                    {
-                        ServerEmulator.instance.HandleBNDMatchEnd(this);
-                    }*/
-                    BND.HandleBNDMatchEnd(this);
-                    break;
-
-                case Room.ROOM_TYPE.ZOMBIE:
-                    //Debug.LogWarning("ZombieMatchend");
-                    Zombie.HandleZombieMatchEnd(this);
-                    break;
-
-                case Room.ROOM_TYPE.EXPLOSION:
-                    Defusion.HandleMatchEnd(this);
-                    break;
-
-                case Room.ROOM_TYPE.ESCAPE:
-                    DefenseGamemode.HandleMatchEnd(this);
-                    break;
-
-                case Room.ROOM_TYPE.BUNGEE:
-                    Freefall.HandleMatchEnd(this);
-                    break;
-
-                case Room.ROOM_TYPE.MISSION:
-                    DefenseGamemode.HandleMatchEnd(this);
-                    break;
-
-                default:
-                    ServerEmulator.instance.HandleIndividualMatchEnd(this);
-                    break;
+                roomType = Room.ROOM_TYPE.INDIVIDUAL;
             }
+            ServerEmulator.instance.gameModes[(int)roomType].HandleMatchEnd(this);
         }
 
         public void AddClient(ClientReference client)
@@ -389,6 +353,39 @@ namespace _Emulator
             client.score = 0;
             clientList.Remove(client);
             room.CurPlayer = clientList.Count;
+
+
+            if (room.Type == ROOM_TYPE.MAP_EDITOR)
+            {
+                if (client.seq == masterSeq)
+                {
+                    ServerEmulator emulator = ServerEmulator.instance;
+                    if (room.CurPlayer > 0)
+                    {
+                        ClientReference[] clients = clientList.ToArray();
+                        foreach (ClientReference otherClient in clients)
+                        {
+                            emulator.SendKick(otherClient);
+                            emulator.SendRoomList(otherClient);
+                        }
+                    }
+                    emulator.SendDeleteRoom(this, channel);
+                    channel.RemoveMatch(this);
+                }
+                return;
+            }
+            if (room.CurPlayer <= 0)
+            {
+                ServerEmulator.instance.SendDeleteRoom(this, channel);
+                channel.RemoveMatch(this);
+                return;
+            }
+
+            if (client.seq == masterSeq)
+            {
+                masterSeq = clientList[0].seq;
+                ServerEmulator.instance.SendMaster(null, this);
+            }
         }
 
         public void LockSlotsByMaxPlayers(int maxPlayers, Room.ROOM_TYPE roomType)

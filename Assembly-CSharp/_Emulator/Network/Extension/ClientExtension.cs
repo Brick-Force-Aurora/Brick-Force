@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using _Emulator.Network;
 using Steamworks;
@@ -11,9 +12,9 @@ using Debug = UnityEngine.Debug;
 
 namespace _Emulator
 {
-    class ClientExtension
+    public class ClientExtension : MonoBehaviour
     {
-        public static ClientExtension instance = new ClientExtension();
+        public static ClientExtension instance;
         public string hostIP = "";
         public Inventory inventory;
         public bool clientConnected = false;
@@ -22,21 +23,66 @@ namespace _Emulator
         public float killLogRealiableTime = 0f;
         public bool isSteam = false;
 
-        public float lastAnswer = 0f;
+        public float lastAnswer = 0f, connectedRequest = 0f;
+        private volatile bool receivedAnswer = false, awaitingConnectedAnswer = false;
 
         public ChunkedBufferReceiver chunkedBufferReceiver = new ChunkedBufferReceiver();
         public ChunkedBufferSender chunkedBufferSender = new ChunkedBufferSender();
 
         public readonly Version clientVersion;
+
+        private readonly Dictionary<ushort, Action<MsgBody>> _handlers = new Dictionary<ushort, Action<MsgBody>>();
+
         private ClientExtension()
         {
             clientVersion = GetGithubVersionOrUnknown();
             Debug.Log($"GameVersion: {clientVersion}");
+            RegisterHandlers();
+        }
+
+        private void RegisterHandlers()
+        {
+            Action<MessageId, Action<MsgBody>> register = (messageId, action) => _handlers[(ushort)messageId] = action;
+            Action<ExtensionOpcodes, Action<MsgBody>> registerCustom = (messageId, action) => _handlers[(ushort)messageId] = action;
+
+            registerCustom(ExtensionOpcodes.opConnectedAck, HandleConnected);
+            registerCustom(ExtensionOpcodes.opVersionCheckAck, HandleVersionCheck);
+            registerCustom(ExtensionOpcodes.opSlotDataAck, HandleReceiveSlotData);
+            registerCustom(ExtensionOpcodes.opPostLoadInitAck, HandlePostLoadInit);
+            registerCustom(ExtensionOpcodes.opInventoryReq, HandleRequestInventory);
+            registerCustom(ExtensionOpcodes.opCustomMessageAck, HandleCustomMessage);
+            registerCustom(ExtensionOpcodes.opDisconnectAck, HandleDisconnected);
+            registerCustom(ExtensionOpcodes.opRendezvousInfoSteamAck, HandleRendezvousInfoSteam);
+            registerCustom(ExtensionOpcodes.opEnterSteamAck, HandleEnterSteam);
+            registerCustom(ExtensionOpcodes.opSlotDataSteamAck, HandleReceiveSlotDataSteam);
+            registerCustom(ExtensionOpcodes.opBulkBrickAck, HandleBulkBrickAck);
+            registerCustom(ExtensionOpcodes.opBulkBrickFailAck, HandleBulkBrickFailAck);
+            registerCustom(ExtensionOpcodes.opBeginChunkedBufferAck, HandleBeginChunkedBuffer);
+            registerCustom(ExtensionOpcodes.opChunkedBufferAck, HandleChunkedBuffer);
+            registerCustom(ExtensionOpcodes.opEndChunkedBufferAck, HandleEndChunkedBuffer);
+            registerCustom(ExtensionOpcodes.opEndChunkedBufferFailedAck, HandleEndChunkedBufferFailed);
+            registerCustom(ExtensionOpcodes.opBeginChunkedBufferReq, HandleBeginChunkedBufferReceive);
+            registerCustom(ExtensionOpcodes.opChunkedBufferReq, HandleChunkedBufferReceive);
+            registerCustom(ExtensionOpcodes.opEndChunkedBufferReq, HandleEndChunkedBufferReceive);
+            registerCustom(ExtensionOpcodes.opAmIConnectedAck, HandleAmIConnected);
+            registerCustom(ExtensionOpcodes.opRequestUserSlotMapAck, HandleRequestUserSlotMap);
+
+            Type messageIdType = typeof(ExtensionOpcodes);
+            foreach (ExtensionOpcodes id in Enum.GetValues(messageIdType))
+            {
+                ushort mapId = (ushort)id;
+                if (_handlers.ContainsKey(mapId))
+                {
+                    continue;
+                }
+                string name = Enum.GetName(messageIdType, id);
+                _handlers[mapId] = msgRef => Debug.LogWarning($"Server sent unhandled packet: {name} ({mapId})");
+            }
         }
 
         public void LoadServer()
         {
-            lastAnswer = Time.time;
+            receivedAnswer = true;
             CSNetManager.Instance.BfServer = hostIP;
             CSNetManager.Instance.BfPort = 5000;
             GameObject gameObject = GameObject.Find("Main");
@@ -62,7 +108,7 @@ namespace _Emulator
         {
             if (SteamManager.Initialized)
             {
-                lastAnswer = Time.time;
+                receivedAnswer = true;
                 isSteam = true;
                 GameObject gameObject = GameObject.Find("Main");
                 if (null != gameObject)
@@ -79,6 +125,72 @@ namespace _Emulator
                 ShopEmulator shop = new ShopEmulator();
                 //shop.LoadAndSave();
                 shop.ParseData();
+            }
+        }
+
+        void FixedUpdate()
+        {
+            if (!clientConnected)
+                return;
+            HandleClientTimeout();
+        }
+
+        private void HandleClientTimeout()
+        {
+            float time = Time.time;
+            if (receivedAnswer)
+            {
+                receivedAnswer = false;
+                lastAnswer = time;
+                return;
+            }
+            if (time - lastAnswer <= 5f)
+            {
+                return;
+            }
+            if (!awaitingConnectedAnswer)
+            {
+                awaitingConnectedAnswer = true;
+                connectedRequest = time;
+                Say(ExtensionOpcodes.opAmIConnectedReq);
+                return;
+            }
+            if (time - connectedRequest > 3f)
+            {
+                Disconnect("Disconnected from server:\nServer didn't respond for too long");
+            }
+        }
+
+        private void Disconnect(string message = null)
+        {
+            bool custom = true;
+            if (message == null)
+            {
+                custom = false;
+                message = StringMgr.Instance.Get("NETWORK_BROKEN");
+            }
+            clientConnected = false;
+            lastAnswer = 0;
+            connectedRequest = 0;
+            awaitingConnectedAnswer = false;
+            receivedAnswer = false;
+            if (!isSteam)
+            {
+                if (CSNetManager.Instance.Sock != null)
+                    CSNetManager.Instance.Sock.Close();
+                BuildOption.Instance.Exit();
+                Actor.Instance.ShowDelayedMessage(message);
+            }
+            else
+            {
+                if (custom)
+                {
+                    SteamLobbyManager.instance.LeaveCurrentLobbyAndShutdown(message);
+                }
+                else
+                {
+                    SteamLobbyManager.instance.LeaveCurrentLobbyAndShutdown();
+                }
             }
         }
 
@@ -129,8 +241,24 @@ namespace _Emulator
             }
         }
 
-        public void Say(ushort id, MsgBody msgBody, bool doChunked = true)
+        public void Say(MessageId id, MsgBody msgBody = null, bool doChunked = true)
         {
+            if (msgBody == null)
+                msgBody = new MsgBody();
+            CSNetManager.Instance.Sock.Say((ushort)id, msgBody, doChunked);
+        }
+
+        public void Say(ExtensionOpcodes id, MsgBody msgBody = null, bool doChunked = true)
+        {
+            if (msgBody == null)
+                msgBody = new MsgBody();
+            CSNetManager.Instance.Sock.Say((ushort)id, msgBody, doChunked);
+        }
+
+        public void Say(ushort id, MsgBody msgBody = null, bool doChunked = true)
+        {
+            if (msgBody == null)
+                msgBody = new MsgBody();
             CSNetManager.Instance.Sock.Say(id, msgBody, doChunked);
         }
 
@@ -175,87 +303,97 @@ namespace _Emulator
 
         public bool HandleMessage(Msg2Handle msg)
         {
-            lastAnswer = Time.time;
+            receivedAnswer = true;
             if (ServerEmulator.instance.debugSend)
                 Debug.Log($"[Verbose/Client] Processing message ID: {msg._id}");
-            bool result = true;
-            switch (msg._id)
+            if (!_handlers.ContainsKey(msg._id))
             {
-                case ExtensionOpcodes.opConnectedAck:
-                    HandleConnected(msg._msg);
-                    break;
-                case ExtensionOpcodes.opVersionCheckAck:
-                    HandleVersionCheck(msg._msg);
-                    break;
-
-                case ExtensionOpcodes.opSlotDataAck:
-                    HandleReceiveSlotData(msg._msg);
-                    break;
-
-                case ExtensionOpcodes.opPostLoadInitAck:
-                    HandlePostLoadInit(msg._msg);
-                    break;
-
-                case ExtensionOpcodes.opInventoryReq:
-                    HandleRequestInventory(msg._msg);
-                    break;
-
-                case ExtensionOpcodes.opCustomMessageAck:
-                    HandleCustomMessage(msg._msg);
-                    break;
-
-                case ExtensionOpcodes.opDisconnectAck:
-                    HandleDisconnected(msg._msg);
-                    break;
-
-                case ExtensionOpcodes.opRendezvousInfoSteamAck:
-                    HandleRendezvousInfoSteam(msg._msg);
-                    break;
-
-                case ExtensionOpcodes.opEnterSteamAck:
-                    HandleEnterSteam(msg._msg);
-                    break;
-
-                case ExtensionOpcodes.opSlotDataSteamAck:
-                    HandleReceiveSlotDataSteam(msg._msg);
-                    break;
-
-                case ExtensionOpcodes.opBulkBrickAck:
-                    HandleBulkBrickAck(msg._msg);
-                    break;
-
-                case ExtensionOpcodes.opBulkBrickFailAck:
-                    HandleBulkBrickFailAck(msg._msg);
-                    break;
-
-                case ExtensionOpcodes.opBeginChunkedBufferAck:
-                    HandleBeginChunkedBuffer(msg._msg);
-                    break;
-                case ExtensionOpcodes.opChunkedBufferAck:
-                    HandleChunkedBuffer(msg._msg);
-                    break;
-                case ExtensionOpcodes.opEndChunkedBufferAck:
-                    HandleEndChunkedBuffer(msg._msg);
-                    break;
-                case ExtensionOpcodes.opEndChunkedBufferFailedAck:
-                    HandleEndChunkedBufferFailed(msg._msg);
-                    break;
-
-                case ExtensionOpcodes.opBeginChunkedBufferReq:
-                    HandleBeginChunkedBufferReceive(msg._msg);
-                    break;
-                case ExtensionOpcodes.opChunkedBufferReq:
-                    HandleChunkedBufferReceive(msg._msg);
-                    break;
-                case ExtensionOpcodes.opEndChunkedBufferReq:
-                    HandleEndChunkedBufferReceive(msg._msg);
-                    break;
-
-                default:
-                    result = false;
-                    break;
+                return false;
             }
-            return result;
+            _handlers[msg._id].Invoke(msg._msg);
+            return true;
+        }
+
+        private void HandleAmIConnected(MsgBody body)
+        {
+            connectedRequest = 0;
+            awaitingConnectedAnswer = false;
+        }
+
+        private void HandleRequestUserSlotMap(MsgBody body)
+        {
+            body.Read(out int slot);
+            UserMapInfo info = UserMapInfoManager.Instance.Get(slot);
+            UserMap map = new UserMap();
+            if (info == null || !map.Load(info.Slot))
+            {
+                Say(ExtensionOpcodes.opRequestUserSlotMapFailedReq);
+                return;
+            }
+            SendCacheBrick(map);
+            SendCacheBrickDone(map);
+            body = new MsgBody();
+            body.Write(info.BrickCount);
+            Say(ExtensionOpcodes.opRequestUserSlotMapSuccessReq, body);
+        }
+        public void SendCacheBrick(UserMap userMap)
+        {
+            List<KeyValuePair<int, BrickInst>> brickList = userMap.dic.ToList();
+
+            int chunkSize = 100;
+            int chunkCount = Mathf.CeilToInt((float)brickList.Count / (float)chunkSize);
+            int processedCount = 0;
+
+            for (int chunk = 0; chunk < chunkCount; chunk++)
+            {
+                int remaining = brickList.Count - processedCount;
+                if (remaining < chunkSize)
+                    chunkSize = remaining;
+
+                MsgBody body = new MsgBody();
+
+                body.Write(chunkSize);
+
+                for (int i = 0; i < chunkSize; i++, processedCount++)
+                {
+                    BrickInst brickInst = brickList[processedCount].Value;
+                    body.Write(brickInst.Seq);
+                    body.Write(brickInst.Template);
+                    body.Write(brickInst.PosX);
+                    body.Write(brickInst.PosY);
+                    body.Write(brickInst.PosZ);
+                    body.Write(brickInst.Code);
+                    body.Write(brickInst.Rot);
+                    if (brickInst.BrickForceScript != null)
+                    {
+                        body.Write((byte)brickInst.BrickForceScript.CmdList.Count);
+
+                        if (brickInst.BrickForceScript.CmdList.Count > 0)
+                        {
+                            body.Write(brickInst.BrickForceScript.Alias);
+                            body.Write(brickInst.BrickForceScript.EnableOnAwake);
+                            body.Write(brickInst.BrickForceScript.VisibleOnAwake);
+                            body.Write(brickInst.BrickForceScript.GetCommandString());
+                        }
+                    }
+
+                    else
+                        body.Write((byte)0);
+                }
+
+                Say(21, body);
+            }
+        }
+
+        public void SendCacheBrickDone(UserMap userMap)
+        {
+
+            MsgBody body = new MsgBody();
+
+            body.Write(-1);
+            body.Write(userMap.skybox);
+
+            Say(22, body);
         }
 
         private void HandleBeginChunkedBufferReceive(MsgBody body)
@@ -502,32 +640,11 @@ namespace _Emulator
         private void HandleDisconnected(MsgBody msg)
         {
             string message = StringMgr.Instance.Get("NETWORK_BROKEN");
-            bool customMessage = false;
             if (msg.Buffer.Length != 0)
             {
-                customMessage = true;
                 msg.Read(out message);
             }
-
-            clientConnected = false;
-            if (!isSteam)
-            {
-                Debug.Log(message);
-                if (CSNetManager.Instance.Sock != null)
-                    CSNetManager.Instance.Sock.Close();
-                BuildOption.Instance.Exit();
-                Actor.Instance.ShowDelayedMessage(message);
-            }
-            else
-            {
-                if (customMessage)
-                {
-                    SteamLobbyManager.instance.LeaveCurrentLobbyAndShutdown(message);
-                } else
-                {
-                    SteamLobbyManager.instance.LeaveCurrentLobbyAndShutdown();
-                }
-            }
+            Disconnect(message);
         }
 
         private void HandleRendezvousInfoSteam(MsgBody msg)

@@ -81,7 +81,7 @@ namespace _Emulator.Network
             buffers.Add(buffer);
             output.Write(opcode);
             output.Write(subId);
-            return ExtensionOpcodes.opBeginChunkedBufferAck;
+            return (int)ExtensionOpcodes.opBeginChunkedBufferAck;
         }
 
         public int ReceiveChunk(MsgBody input, ref MsgBody output)
@@ -99,7 +99,7 @@ namespace _Emulator.Network
             Array.Copy(data, 0, buffer.data, chunkId * MAX_CHUNK_LENGTH, data.Length);
             output.Write(opcode);
             output.Write(subId);
-            return ExtensionOpcodes.opChunkedBufferAck;
+            return (int)ExtensionOpcodes.opChunkedBufferAck;
         }
 
         public int End(MsgBody input, ref MsgBody output, out ushort packedOpcode, out MsgBody packedBody)
@@ -122,11 +122,11 @@ namespace _Emulator.Network
             {
                 packedOpcode = 0;
                 packedBody = null;
-                return ExtensionOpcodes.opEndChunkedBufferFailedAck;
+                return (int)ExtensionOpcodes.opEndChunkedBufferFailedAck;
             }
             packedOpcode = opcode;
             packedBody = new MsgBody(buffer.data, 0, buffer.data.Length);
-            return ExtensionOpcodes.opEndChunkedBufferAck;
+            return (int)ExtensionOpcodes.opEndChunkedBufferAck;
         }
     }
 }

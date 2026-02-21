@@ -6,17 +6,52 @@ using UnityEngine;
 
 namespace _Emulator.Network.Gamemodes
 {
-    internal static class Freefall
+    // Also known as Bungee
+    public class PlayFreefall : IGameMode
     {
-        internal static void HandleMatchEnd(MatchData matchData)
+        private readonly ServerEmulator emulator;
+
+        public PlayFreefall(ServerEmulator emulator)
+        {
+            this.emulator = emulator;
+        }
+
+        public void RegisterNetworkHandlers(Action<MessageId, Action<MsgReference>> register, Action<ExtensionOpcodes, Action<MsgReference>> registerCustom)
+        {
+
+        }
+
+        public void HandleRoomCreation(ClientReference clientRef, MatchData match, Room room, int[] parameters)
+        {
+            room.goal = parameters[0];
+            room.timelimit = parameters[1];
+            room.weaponOption = parameters[2];
+            room.map = parameters[3];
+            room.isBreakInto = Convert.ToBoolean(parameters[4]);
+            match.isBalance = Convert.ToBoolean(parameters[5]);
+            room.isWanted = Convert.ToBoolean(parameters[6]);
+            room.isDropItem = Convert.ToBoolean(parameters[7]);
+            match.CacheMap(emulator.regMaps.Find(x => x.Value.Map == room.map).Value, new UserMapInfo(0, 0));
+            match.useBuildGun = true;
+        }
+
+        public void HandleMatchEnd(MatchData matchData)
         {
             matchData.room.Status = Room.ROOM_STATUS.WAITING;
             SendMatchEnd(matchData);
             matchData.Reset();
-            ServerEmulator.instance.SendRoom(null, matchData, SendType.BroadcastRoom);
+            ServerEmulator.instance.SendUpdateRoom(matchData);
         }
 
-        private static void SendMatchEnd(MatchData matchData)
+        public void HandleRoomCreation(MatchData matchData, Room room, int kills, int timeLimit, int map, bool breakInto)
+        {
+            room.goal = kills;
+            room.timelimit = timeLimit;
+            room.map = map;
+            room.isBreakInto = breakInto;
+        }
+
+        private void SendMatchEnd(MatchData matchData)
         {
             MsgBody body = new MsgBody();
 
@@ -41,7 +76,7 @@ namespace _Emulator.Network.Gamemodes
             ServerEmulator.instance.Say(new MsgReference(476, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
         }
 
-        public static void SendFreefallScore(MatchData matchData)
+        public void SendFreefallScore(MatchData matchData)
         {
             MsgBody body = new MsgBody();
 

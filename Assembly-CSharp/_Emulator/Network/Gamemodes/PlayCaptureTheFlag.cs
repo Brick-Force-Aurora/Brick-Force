@@ -6,9 +6,39 @@ using Debug = UnityEngine.Debug;
 
 namespace _Emulator.Network.Gamemodes
 {
-    internal static class CTF
+    public class PlayCaptureTheFlag : IGameMode
     {
-        internal static void HandlePickFlagRequest(MsgReference msgRef)
+        private readonly ServerEmulator emulator;
+
+        public PlayCaptureTheFlag(ServerEmulator emulator)
+        {
+            this.emulator = emulator;
+        }
+
+        public void RegisterNetworkHandlers(Action<MessageId, Action<MsgReference>> register, Action<ExtensionOpcodes, Action<MsgReference>> registerCustom)
+        {
+            register(MessageId.CS_CTF_PICK_FLAG_REQ, HandlePickFlagRequest);
+            register(MessageId.CS_CTF_CAPTURE_FLAG_REQ, HandleCaptureFlagRequest);
+            register(MessageId.CS_CTF_DROP_FLAG_REQ, HandleDropFlagRequest);
+            register(MessageId.CS_CTF_SCORE_REQ, HandleCTFScoreRequest);
+            register(MessageId.CS_CTF_FLAG_RETURN_REQ, HandleFlagReturnRequest);
+        }
+
+        public void HandleRoomCreation(ClientReference clientRef, MatchData match, Room room, int[] parameters)
+        {
+            room.goal = parameters[0];
+            room.timelimit = parameters[1];
+            room.weaponOption = parameters[2];
+            room.map = parameters[3];
+            room.isBreakInto = Convert.ToBoolean(parameters[4]);
+            match.isBalance = Convert.ToBoolean(parameters[5]);
+            room.isWanted = Convert.ToBoolean(parameters[6]);
+            room.isDropItem = Convert.ToBoolean(parameters[7]);
+            match.useBuildGun = false;
+        }
+
+
+        public void HandlePickFlagRequest(MsgReference msgRef)
         {
             MatchData data = msgRef.matchData;
             msgRef.msg._msg.Read(out int flag);
@@ -21,7 +51,7 @@ namespace _Emulator.Network.Gamemodes
             ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_CTF_PICK_FLAG_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
 
-        internal static void HandleDropFlagRequest(MsgReference msgRef)
+        public void HandleDropFlagRequest(MsgReference msgRef)
         {
             MatchData data = msgRef.matchData;
             msgRef.msg._msg.Read(out int x);
@@ -39,7 +69,7 @@ namespace _Emulator.Network.Gamemodes
             ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_CTF_DROP_FLAG_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
 
-        internal static void HandleCaptureFlagRequest(MsgReference msgRef)
+        public void HandleCaptureFlagRequest(MsgReference msgRef)
         {
             MatchData data = msgRef.matchData;
             msgRef.msg._msg.Read(out int flag);
@@ -63,7 +93,7 @@ namespace _Emulator.Network.Gamemodes
             ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_CTF_CAPTURE_FLAG_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
 
-        internal static void HandleCTFScoreRequest(MsgReference msgRef)
+        public void HandleCTFScoreRequest(MsgReference msgRef)
         {
             MatchData data = msgRef.matchData;
             MsgBody msg = new MsgBody();
@@ -75,7 +105,7 @@ namespace _Emulator.Network.Gamemodes
             ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_CTF_SCORE_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
 
-        internal static void HandleFlagReturnRequest(MsgReference msgRef)
+        public void HandleFlagReturnRequest(MsgReference msgRef)
         {
             MatchData data = msgRef.matchData;
             msgRef.msg._msg.Read(out float x);
@@ -88,16 +118,27 @@ namespace _Emulator.Network.Gamemodes
             ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_CTF_FLAG_RETURN_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
 
+        public void HandleRoomCreation(MatchData matchData, Room room, int points, int timeLimit, int weaponOption, int map, bool breakInto, bool teamBalance, bool itemPickup)
+        {
+            room.goal = points;
+            room.timelimit = timeLimit;
+            room.weaponOption = weaponOption;
+            room.map = map;
+            room.isBreakInto = breakInto;
+            room.isDropItem = itemPickup;
+            matchData.isBalance = teamBalance;
+        }
 
-        internal static void HandleCTFMatchEnd(MatchData matchData)
+
+        public void HandleMatchEnd(MatchData matchData)
         {
             matchData.room.Status = Room.ROOM_STATUS.WAITING;
             SendCTFMatchEnd(matchData);
             matchData.Reset();
-            ServerEmulator.instance.SendRoom(null, matchData, SendType.BroadcastRoom);
+            ServerEmulator.instance.SendUpdateRoom(matchData);
         }
 
-        private static void SendCTFMatchEnd(MatchData matchData)
+        private void SendCTFMatchEnd(MatchData matchData)
         {
             for (int team = 0; team < 2; team++)
             {

@@ -139,6 +139,14 @@ namespace _Emulator
         static MethodInfo hSockTcpMyDownloadMapReq = typeof(HooksManaged).GetMethod("hMyDownloadMapReq", BindingFlags.Public | BindingFlags.Instance);
         static ManagedHook SockTcpMyDownloadMapReqHook;
 
+        static MethodInfo oBndMatchStartLoadInfo = typeof(BndMatch).GetMethod("StartLoad", BindingFlags.NonPublic | BindingFlags.Instance);
+        static MethodInfo hBndMatchStartLoadInfo = typeof(HooksManaged).GetMethod("hBndMatchStartLoad", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook BndMatchStartLoadHook;
+
+        static MethodInfo oMapEditorStartLoadInfo = typeof(MapEditor).GetMethod("StartLoad", BindingFlags.NonPublic | BindingFlags.Instance);
+        static MethodInfo hMapEditorStartLoadInfo = typeof(HooksManaged).GetMethod("hMapEditorStartLoad", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook MapEditorStartLoadHook;
+
         private void hP2PManagerHandshake()
         {
             if (MyInfoManager.Instance.Status == 3 || MyInfoManager.Instance.Status == 4)
@@ -186,7 +194,23 @@ namespace _Emulator
 			}
 		}
 
-		public byte hSockTcpGetSendKey()
+		public void hBndMatchStartLoad() 
+		{ 
+			GC.Collect();
+			UserMap userMap = new UserMap();
+			userMap.isLoaded = false;
+			BrickManager.Instance.userMap = userMap;
+            CSNetManager.Instance.Sock.SendCS_CACHE_BRICK_REQ();
+        }
+        public void hMapEditorStartLoad()
+        {
+            GC.Collect();
+            UserMap userMap = new UserMap();
+            userMap.isLoaded = false;
+            BrickManager.Instance.userMap = userMap;
+            CSNetManager.Instance.Sock.SendCS_CACHE_BRICK_REQ();
+        }
+        public byte hSockTcpGetSendKey()
 		{
 			return byte.MaxValue;
 		}
@@ -946,6 +970,10 @@ namespace _Emulator
             SockTcpResetUserMapSlotReqHook.ApplyHook();
             SockTcpMyDownloadMapReqHook = new ManagedHook(oSockTcpMyDownloadMapReq, hSockTcpMyDownloadMapReq);
             SockTcpMyDownloadMapReqHook.ApplyHook();
+            BndMatchStartLoadHook = new ManagedHook(oBndMatchStartLoadInfo, hBndMatchStartLoadInfo);
+            BndMatchStartLoadHook.ApplyHook();
+            MapEditorStartLoadHook = new ManagedHook(oMapEditorStartLoadInfo, hMapEditorStartLoadInfo);
+            MapEditorStartLoadHook.ApplyHook();
         }
     }
 }

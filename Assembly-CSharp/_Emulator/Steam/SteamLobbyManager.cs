@@ -214,6 +214,8 @@ namespace _Emulator
 
                 if (IsInLobby())
                 {
+                    if (CSNetManager.Instance.Sock != null)
+                        CSNetManager.Instance.Sock.Close();
                     BuildOption.Instance.Exit();
                     Actor.Instance.ShowDelayedMessage(message);
                 }

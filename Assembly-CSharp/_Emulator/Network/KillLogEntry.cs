@@ -2,7 +2,7 @@
 
 namespace _Emulator
 {
-    class KillLogEntry
+    public class KillLogEntry
     {
         public int id;
         public sbyte killerType;
