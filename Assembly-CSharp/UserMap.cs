@@ -49,11 +49,11 @@ public class UserMap
 
 	private List<SpawnerDesc> railSpawners;
 
-	public static byte xMax = 255;
+	public static byte xMax = 100;
 
-	public static byte yMax = 255;
+	public static byte yMax = 100;
 
-	public static byte zMax = 255;
+	public static byte zMax = 100;
 
 	public float cenX;
 
