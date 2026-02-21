@@ -9,7 +9,10 @@ namespace _Emulator
 
     public static class EditHelper
     {
-        private static readonly Vector3 half = new Vector3(0f, 0.5f, 0f);
+        public const byte MAX_COORD = 100;
+
+        public static readonly Vector3 HALF_UP = new Vector3(0f, 0.5f, 0f);
+        public static readonly Vector3 MAP_CENTER = new Vector3(UserMap.xMax / 2f, UserMap.yMax + 5f, UserMap.zMax / 2f);
 
         public static BrickEditTool BrickEditTool
         {
@@ -28,7 +31,7 @@ namespace _Emulator
                 {
                     return Vector3.zero;
                 }
-                return gameObject.transform.position + half;
+                return gameObject.transform.position + HALF_UP;
             }
         }
 
@@ -102,7 +105,7 @@ namespace _Emulator
             }
             if (int.TryParse(tokens[index], out int parsed))
             {
-                coordinate = (byte)Math.Min(Math.Max(parsed, 0), 255);
+                coordinate = (byte)Math.Min(Math.Max(parsed, 0), EditHelper.MAX_COORD);
                 return true;
             }
             coordinate = 0;
@@ -134,7 +137,7 @@ namespace _Emulator
             {
                 if (int.TryParse(tokens[i], out int parsed))
                 {
-                    coordinates[i - startIndex] = (byte)Math.Min(Math.Max(parsed, 0), 255);
+                    coordinates[i - startIndex] = (byte)Math.Min(Math.Max(parsed, 0), EditHelper.MAX_COORD);
                 }
             }
         }
@@ -168,9 +171,9 @@ namespace _Emulator
 
         public static void ToCoords(this Vector3 position, out byte x, out byte y, out byte z)
         {
-            x = (byte)Math.Min(Math.Max(Mathf.FloorToInt(position.x), 0), 255);
-            y = (byte)Math.Min(Math.Max(Mathf.FloorToInt(position.y), 0), 255);
-            z = (byte)Math.Min(Math.Max(Mathf.FloorToInt(position.z), 0), 255);
+            x = (byte)Math.Min(Math.Max(Mathf.FloorToInt(position.x), 0), EditHelper.MAX_COORD);
+            y = (byte)Math.Min(Math.Max(Mathf.FloorToInt(position.y), 0), EditHelper.MAX_COORD);
+            z = (byte)Math.Min(Math.Max(Mathf.FloorToInt(position.z), 0), EditHelper.MAX_COORD);
         }
 
         public static void ToCoords(this Vector3 position, ref byte[] coordinates)
@@ -179,9 +182,9 @@ namespace _Emulator
             {
                 throw new ArgumentException("Coordinates array has to have a Length of 3");
             }
-            coordinates[0] = (byte)Math.Min(Math.Max(Mathf.FloorToInt(position.x), 0), 255);
-            coordinates[1] = (byte)Math.Min(Math.Max(Mathf.FloorToInt(position.y), 0), 255);
-            coordinates[2] = (byte)Math.Min(Math.Max(Mathf.FloorToInt(position.z), 0), 255);
+            coordinates[0] = (byte)Math.Min(Math.Max(Mathf.FloorToInt(position.x), 0), EditHelper.MAX_COORD);
+            coordinates[1] = (byte)Math.Min(Math.Max(Mathf.FloorToInt(position.y), 0), EditHelper.MAX_COORD);
+            coordinates[2] = (byte)Math.Min(Math.Max(Mathf.FloorToInt(position.z), 0), EditHelper.MAX_COORD);
         }
 
         public static void RadiusToCoords(this Vector3 position, byte radius, out byte x1, out byte y1, out byte z1, out byte x2, out byte y2, out byte z2)
@@ -192,12 +195,12 @@ namespace _Emulator
             int maxX = Mathf.FloorToInt(position.x) + radius;
             int maxY = Mathf.FloorToInt(position.y) + radius;
             int maxZ = Mathf.FloorToInt(position.z) + radius;
-            x1 = (byte)Math.Min(Math.Max(minX, 0), 255);
-            y1 = (byte)Math.Min(Math.Max(minY, 0), 255);
-            z1 = (byte)Math.Min(Math.Max(minZ, 0), 255);
-            x2 = (byte)Math.Min(Math.Max(maxX, 0), 255);
-            y2 = (byte)Math.Min(Math.Max(maxY, 0), 255);
-            z2 = (byte)Math.Min(Math.Max(maxZ, 0), 255);
+            x1 = (byte)Math.Min(Math.Max(minX, 0), EditHelper.MAX_COORD);
+            y1 = (byte)Math.Min(Math.Max(minY, 0), EditHelper.MAX_COORD);
+            z1 = (byte)Math.Min(Math.Max(minZ, 0), EditHelper.MAX_COORD);
+            x2 = (byte)Math.Min(Math.Max(maxX, 0), EditHelper.MAX_COORD);
+            y2 = (byte)Math.Min(Math.Max(maxY, 0), EditHelper.MAX_COORD);
+            z2 = (byte)Math.Min(Math.Max(maxZ, 0), EditHelper.MAX_COORD);
         }
         public static void CacheBrick(this UserMap userMap, int seq, byte template, byte x, byte y, byte z, ushort meshCode, byte rot)
         {

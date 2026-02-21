@@ -36,6 +36,8 @@ namespace _Emulator.Network.Gamemodes
             match.buildPhaseTime = buildTime;
             match.battlePhaseTime = battleTime;
             match.repeat = repeats;
+
+            match.CacheMap(emulator.regMaps.Find(x => x.Value.Map == room.map).Value, new UserMapInfo(0, 0));
         }
 
         public void HandleBNDScoreRequest(MsgReference msgRef)

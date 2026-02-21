@@ -264,6 +264,7 @@ namespace _Emulator
             mapCached = true;
             cachedMap.Clear();
             cachedMap = MapGenerator.instance.Generate(landscapeIndex, skyboxIndex);
+            cachedMap.CacheDone(-1,  skyboxIndex); 
 
             DateTime time = DateTime.Now;
 

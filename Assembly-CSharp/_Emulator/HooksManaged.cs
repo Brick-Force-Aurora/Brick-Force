@@ -147,6 +147,10 @@ namespace _Emulator
         static MethodInfo hMapEditorStartLoadInfo = typeof(HooksManaged).GetMethod("hMapEditorStartLoad", BindingFlags.Public | BindingFlags.Instance);
         static ManagedHook MapEditorStartLoadHook;
 
+        static MethodInfo oMapEditorOnLoadCompleteInfo = typeof(MapEditor).GetMethod("OnLoadComplete", BindingFlags.NonPublic | BindingFlags.Instance);
+        static MethodInfo hMapEditorOnLoadCompleteInfo = typeof(HooksManaged).GetMethod("hMapEditorOnLoadComplete", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook MapEditorOnLoadComplete;
+
         private void hP2PManagerHandshake()
         {
             if (MyInfoManager.Instance.Status == 3 || MyInfoManager.Instance.Status == 4)
@@ -209,6 +213,39 @@ namespace _Emulator
             userMap.isLoaded = false;
             BrickManager.Instance.userMap = userMap;
             CSNetManager.Instance.Sock.SendCS_CACHE_BRICK_REQ();
+        }
+        public void hMapEditorOnLoadComplete()
+        {
+            GameObject gameObject = GameObject.Find("Main");
+            if (gameObject == null)
+            {
+                return;
+            }
+            MapEditor mapEditor = gameObject.GetComponent<MapEditor>();
+            if (mapEditor == null)
+            {
+                return;
+            }
+            CSNetManager.Instance.Sock.SendCS_RESUME_ROOM_REQ(2);
+            UserMap userMap = BrickManager.Instance.userMap;
+            Vector3 position;
+            if (userMap == null)
+            {
+                position = EditHelper.MAP_CENTER;
+            } else
+            {
+                position = new Vector3(userMap.cenX, userMap.max.y + 5f, userMap.cenZ);
+            }
+            mapEditor.localController.Spawn(position, Rot.ToQuaternion((byte)UnityEngine.Random.Range(0, 4)));
+            mapEditor.bLoaded = true;
+            if (!MyInfoManager.Instance.GetCommonMask(MyInfoManager.COMMON_OPT.DONOT_MAPEDIT_GUIDE))
+            {
+                MapEditGuideDialog mapEditGuideDialog = (MapEditGuideDialog)DialogManager.Instance.GetDialogAlways(DialogManager.DIALOG_INDEX.BUILD_GUIDE);
+                if (mapEditGuideDialog != null && !mapEditGuideDialog.DontShowThisMessageAgain)
+                {
+                    ((MapEditGuideDialog)DialogManager.Instance.Popup(DialogManager.DIALOG_INDEX.BUILD_GUIDE, exclusive: false))?.InitDialog();
+                }
+            }
         }
         public byte hSockTcpGetSendKey()
 		{
@@ -672,6 +709,8 @@ namespace _Emulator
                 }
                 id = (ushort)opcode;
             }
+            if (ServerEmulator.instance.debugSend)
+                Debug.Log("[Verbose/Client] Sending message ID: " + id);
             Msg4Send msg4Send = new Msg4Send(id, uint.MaxValue, uint.MaxValue, msgBody, CSNetManager.Instance.Sock.GetSendKey());
 
             if (ClientExtension.instance.isSteam)
@@ -974,6 +1013,8 @@ namespace _Emulator
             BndMatchStartLoadHook.ApplyHook();
             MapEditorStartLoadHook = new ManagedHook(oMapEditorStartLoadInfo, hMapEditorStartLoadInfo);
             MapEditorStartLoadHook.ApplyHook();
+            MapEditorOnLoadComplete = new ManagedHook(oMapEditorOnLoadCompleteInfo, hMapEditorOnLoadCompleteInfo);
+            MapEditorOnLoadComplete.ApplyHook();
         }
     }
 }

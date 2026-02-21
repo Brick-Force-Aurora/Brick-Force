@@ -111,7 +111,7 @@ public class BrickEditTool : EditorTool
 
     private bool ToCoords(Vector3 pos, out byte x, out byte y, out byte z)
     {
-        if (pos.x < 0 || pos.y < 0 || pos.z < 0 || pos.x > 255 || pos.y > 255 || pos.z > 255)
+        if (pos.x < 0 || pos.y < 0 || pos.z < 0 || pos.x > EditHelper.MAX_COORD || pos.y > EditHelper.MAX_COORD || pos.z > EditHelper.MAX_COORD)
         {
             x = 0; y = 0; z = 0;
             return false;

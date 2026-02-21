@@ -50,13 +50,13 @@ namespace _Emulator
             byte maxY = Math.Max(y1, y2);
             byte maxZ = Math.Max(z1, z2);
 
-            byte minXInner = (byte)(minX == 255 ? 255 : minX + 1);
+            byte minXInner = (byte)(minX == EditHelper.MAX_COORD ? EditHelper.MAX_COORD : minX + 1);
             byte maxXInner = Math.Max((byte)(maxX == 0 ? 0 : maxX - 1), minXInner);
 
-            byte minYInner = (byte)(minY == 255 ? 255 : minY + 1);
+            byte minYInner = (byte)(minY == EditHelper.MAX_COORD ? EditHelper.MAX_COORD : minY + 1);
             byte maxYInner = Math.Max((byte)(maxY == 0 ? 0 : maxY - 1), minYInner);
 
-            byte minZInner = (byte)(minZ == 255 ? 255 : minZ + 1);
+            byte minZInner = (byte)(minZ == EditHelper.MAX_COORD ? EditHelper.MAX_COORD : minZ + 1);
             byte maxZInner = Math.Max((byte)(maxZ == 0 ? 0 : maxZ - 1), minZInner);
 
             byte[] coordinates = new byte[((maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1) * 3) - ((maxXInner - minXInner + 1) * (maxYInner - minYInner + 1) * (maxZInner - minZInner + 1) * 3)];

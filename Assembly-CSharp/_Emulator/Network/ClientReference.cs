@@ -20,7 +20,7 @@ namespace _Emulator
         public Socket socket;
         public string ip;
         public int port;
-        public byte[] buffer;
+        public Msg4Recv recvBuf;
         public CSteamID steamID = CSteamID.Nil;
         public bool isSteam = false;
         public volatile bool didHeartBeat = false;
@@ -35,6 +35,7 @@ namespace _Emulator
         public int assists = 0;
         public int score = 0;
         public bool isZombie = false;
+        public bool buildModeRequestedMap = false;
         public bool isBreakingInto;
         public ClientStatus clientStatus;
         public BrickManDesc.STATUS status;
@@ -70,7 +71,7 @@ namespace _Emulator
                 isHost = true;
             }
             isVersionSetUp = false;
-            buffer = new byte[8192];
+            recvBuf = new Msg4Recv(new byte[8192]);
             isSteam = false;
             SetupChunkedBuffers();
         }
@@ -88,7 +89,7 @@ namespace _Emulator
             isLoaded = false;
             isHost = SteamManager.Initialized && SteamLobbyManager.instance.IsCurrentOwner(_steamID);
             isVersionSetUp = false;
-            buffer = new byte[8192];
+            recvBuf = new Msg4Recv(new byte[8192]);
             isSteam = true;
             SetupChunkedBuffers();
         }

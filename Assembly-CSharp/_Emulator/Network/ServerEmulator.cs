@@ -16,6 +16,7 @@ using UnityEngine;
 using static MyInfoManager;
 using static Room;
 using static TItem;
+using static WindowSystemManager;
 using Debug = UnityEngine.Debug;
 
 namespace _Emulator
@@ -253,7 +254,7 @@ namespace _Emulator
                 if (!Config.instance.blockConnections)
                 {
                     if (HandleClientAccepted(client))
-                        clientSocket.BeginReceive(client.buffer, 0, client.buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallback), client);
+                        clientSocket.BeginReceive(client.recvBuf.Buffer, client.recvBuf.Io, client.recvBuf.Buffer.Length - client.recvBuf.Io, SocketFlags.None, new AsyncCallback(ReceiveCallback), client);
                     else
                         SendDisconnect(client);
                 }
@@ -278,26 +279,21 @@ namespace _Emulator
             try
             {
                 ClientReference client = (ClientReference)result.AsyncState;
-                int numBytes = client.socket.EndReceive(result);
-                Msg4Recv recv = new Msg4Recv(client.buffer);
-                recv._hdr.FromArray(recv.Buffer);
-                MsgBody msgBody = recv.Flush();
-                msgBody.Decrypt(recvKey);
-
-                lock (dataLock)
+                int bytes = client.socket.EndReceive(result);
+                if (bytes > 0)
                 {
-                    if (numBytes <= 0)
-                        client.Disconnect(true);
-                    else
+                    client.recvBuf.Io += bytes;
+                    for (Msg4Recv.MsgStatus status = client.recvBuf.GetStatus(recvKey); status == Msg4Recv.MsgStatus.COMPLETE; status = client.recvBuf.GetStatus(recvKey))
                     {
-                        readQueue.Enqueue(new MsgReference(new Msg2Handle(recv.GetId(), msgBody), client, _channelRef: client.channel, _matchData: client.matchData));
-                        //HandleMessages();
+                        MsgBody msgBody = client.recvBuf.Flush();
+                        msgBody.Decrypt(recvKey);
+                        lock (this)
+                        {
+                            readQueue.Enqueue(new MsgReference(new Msg2Handle(client.recvBuf.GetId(), msgBody), client, _channelRef: client.channel, _matchData: client.matchData));
+                        }
                     }
+                    client.socket.BeginReceive(client.recvBuf.Buffer, client.recvBuf.Io, client.recvBuf.Buffer.Length - client.recvBuf.Io, SocketFlags.None, new AsyncCallback(ReceiveCallback), client);
                 }
-
-                client.buffer = new byte[8192];
-                if (numBytes > 0)
-                    client.socket.BeginReceive(client.buffer, 0, client.buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallback), client);
             }
 
             catch (Exception ex)
@@ -1428,7 +1424,7 @@ namespace _Emulator
             SendMaster(msgRef.client, matchData);
             SendSlotLocks(msgRef.client);
             SendRoomConfig(msgRef.client);
-            SendAddRoom(msgRef.client);
+            SendAddRoom(msgRef.client, matchData);
             SendCreateRoom(msgRef.client);
 
             if (isSteam)
@@ -2523,6 +2519,7 @@ namespace _Emulator
 
             if (msgRef.matchData.room.Type == ROOM_TYPE.MAP_EDITOR && !msgRef.matchData.cachedMap.isLoaded)
             {
+                msgRef.client.buildModeRequestedMap = true;
                 return;
             }
 
@@ -2538,22 +2535,22 @@ namespace _Emulator
             msg.Read(out int val);
             for (int i = 0; i < val; i++)
             {
-                msg.Read(out int val2);
-                msg.Read(out byte val3);
-                msg.Read(out byte val4);
-                msg.Read(out byte val5);
-                msg.Read(out byte val6);
-                msg.Read(out ushort val7);
-                msg.Read(out byte val8);
-                msg.Read(out byte val9);
-                userMap.CacheBrick(val2, val3, val4, val5, val6, val7, val8);
-                if (val9 > 0)
+                msg.Read(out int seq);
+                msg.Read(out byte template);
+                msg.Read(out byte posX);
+                msg.Read(out byte posY);
+                msg.Read(out byte posZ);
+                msg.Read(out ushort code);
+                msg.Read(out byte rotation);
+                msg.Read(out byte scriptCount);
+                userMap.CacheBrick(seq, template, posX, posY, posZ, code, rotation);
+                if (scriptCount > 0)
                 {
-                    msg.Read(out string val10);
-                    msg.Read(out bool val11);
-                    msg.Read(out bool val12);
-                    msg.Read(out string val13);
-                    userMap.UpdateScript(val2, val10, val11, val12, val13);
+                    msg.Read(out string alias);
+                    msg.Read(out bool enableOnAwake);
+                    msg.Read(out bool visibleOnAwake);
+                    msg.Read(out string commandString);
+                    userMap.UpdateScript(seq, alias, enableOnAwake, visibleOnAwake, commandString);
                 }
             }
         }
@@ -2759,14 +2756,13 @@ namespace _Emulator
                             body.Write(brickInst.BrickForceScript.GetCommandString());
                         }
                     }
-
                     else
+                    {
                         body.Write((byte)0);
+                    }
                 }
-
-                Say(new MsgReference(21, body, client, sendType, matchData.channel, matchData));
+                Say(new MsgReference(21, body, client, sendType, matchData.channel, matchData, _doChunked: false));
             }
-
             if (debugSend)
                 Debug.Log("SendCacheBrick with " + chunkCount + " chunks to: " + client.GetIdentifier());
         }
@@ -2778,14 +2774,10 @@ namespace _Emulator
                 matchData = client.matchData;
             }
             UserMap userMap = matchData.cachedMap;
-
             MsgBody body = new MsgBody();
-
             body.Write(0); // mapIndex
             body.Write(userMap.skybox);
-
             Say(new MsgReference(22, body, client, sendType, matchData.channel, matchData));
-
             if (debugSend)
                 Debug.Log("SendCacheBrickDone for map " + userMap.map + " to: " + client.GetIdentifier());
         }
@@ -3387,10 +3379,9 @@ namespace _Emulator
             Say(new MsgReference(92, body, client));
         }
 
-        public void SendAddRoom(ClientReference client)
+        public void SendAddRoom(ClientReference client, MatchData matchData)
         {
             MsgBody body = new MsgBody();
-            MatchData matchData = client.matchData;
 
             body.Write(matchData.room.No);
             body.Write((int)matchData.room.Type);

@@ -36,6 +36,12 @@ namespace _Emulator
                 if (clientRef.isHost)
                 {
                     match.CacheMapFromSlot(UserMapInfoManager.Instance.Get(slot));
+                    if (clientRef.buildModeRequestedMap)
+                    {
+                        clientRef.buildModeRequestedMap = false;
+                        emulator.SendCacheBrick(clientRef, match);
+                        emulator.SendCacheBrickDone(clientRef, match);
+                    }
                 } else
                 {
                     UserMapInfo userMapInfo = new UserMapInfo(slot, premium);
@@ -45,7 +51,14 @@ namespace _Emulator
             } else
             {
                 match.CacheMapGenerate(slot, landscapeIndex, skyboxIndex, room.CurMapAlias);
+                if (clientRef.buildModeRequestedMap)
+                {
+                    clientRef.buildModeRequestedMap = false;
+                    emulator.SendCacheBrick(clientRef, match);
+                    emulator.SendCacheBrickDone(clientRef, match);
+                }
             }
+            match.room.map = slot;
             match.room.isBreakInto = true;
             match.useBuildGun = true;
         }
@@ -75,8 +88,12 @@ namespace _Emulator
             }
             msgRef.msg._msg.Read(out int slot);
             msgRef.matchData.CacheMapGenerate(slot, 0, 0, msgRef.matchData.room.CurMapAlias);
-            emulator.SendCacheBrick(msgRef.client);
-            emulator.SendCacheBrickDone(msgRef.client);
+            if (msgRef.client.buildModeRequestedMap)
+            {
+                msgRef.client.buildModeRequestedMap = false;
+                emulator.SendCacheBrick(msgRef.client);
+                emulator.SendCacheBrickDone(msgRef.client);
+            }
         }
 
         public void HandleUserSlotMapSuccess(MsgReference msgRef)
@@ -89,10 +106,15 @@ namespace _Emulator
             MsgBody body = msgRef.msg._msg;
             body.Read(out int brickCount);
 
+            match.cachedMap.map = match.room.map;
             match.cachedUMI.BrickCount = brickCount;
-            
-            emulator.SendCacheBrick(msgRef.client);
-            emulator.SendCacheBrickDone(msgRef.client);
+
+            if (msgRef.client.buildModeRequestedMap)
+            {
+                msgRef.client.buildModeRequestedMap = false;
+                emulator.SendCacheBrick(msgRef.client);
+                emulator.SendCacheBrickDone(msgRef.client);
+            }
         }
     }
 }

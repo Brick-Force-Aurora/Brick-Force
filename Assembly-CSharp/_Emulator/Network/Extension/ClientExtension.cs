@@ -376,12 +376,13 @@ namespace _Emulator
                             body.Write(brickInst.BrickForceScript.GetCommandString());
                         }
                     }
-
                     else
+                    {
                         body.Write((byte)0);
+                    }
                 }
 
-                Say(21, body);
+                Say(21, body, doChunked: false);
             }
         }
 
@@ -393,7 +394,7 @@ namespace _Emulator
             body.Write(-1);
             body.Write(userMap.skybox);
 
-            Say(22, body);
+            Say(22, body, doChunked: false);
         }
 
         private void HandleBeginChunkedBufferReceive(MsgBody body)
@@ -444,7 +445,7 @@ namespace _Emulator
             {
                 return;
             }
-            Say((ushort) opcode, output, false);
+            Say((ushort)opcode, output, false);
         }
 
         private void HandleChunkedBuffer(MsgBody body)

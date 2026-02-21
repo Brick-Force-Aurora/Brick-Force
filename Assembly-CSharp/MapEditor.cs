@@ -16,9 +16,9 @@ public class MapEditor : MonoBehaviour
 
 	private BattleChat battleChat;
 
-	private LocalController localController;
+	public LocalController localController;
 
-	private bool bLoaded;
+	public bool bLoaded;
 
 	private List<int> loadPlayherList = new List<int>();
 
