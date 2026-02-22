@@ -287,7 +287,7 @@ namespace _Emulator
                     {
                         MsgBody msgBody = client.recvBuf.Flush();
                         msgBody.Decrypt(recvKey);
-                        lock (this)
+                        lock (dataLock)
                         {
                             readQueue.Enqueue(new MsgReference(new Msg2Handle(client.recvBuf.GetId(), msgBody), client, _channelRef: client.channel, _matchData: client.matchData));
                         }
