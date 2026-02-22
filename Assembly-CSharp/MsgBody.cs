@@ -86,9 +86,38 @@ public class MsgBody
 			return false;
 		}
 		return Copy(val);
-	}
+    }
 
-	public bool Write(int val)
+	// AURORA - Start: Add offset write
+    private bool Copy(byte[] src, int offset, int length)
+    {
+        bool result = true;
+        if (length + _offset > _buffer.Length)
+        {
+            ExpandBuffer(length + _offset);
+            result = false;
+        }
+        Array.Copy(src, offset, _buffer, _offset, length);
+        _offset += length;
+        return result;
+    }
+
+    public bool Write(byte[] val, int offset, int length)
+    {
+        if (!Write(length))
+        {
+            return false;
+        }
+        return Copy(val, offset, length);
+    }
+
+	public void Clear()
+	{
+		_offset = 0;
+	}
+    // AURORA - End
+
+    public bool Write(int val)
 	{
 		MemoryStream memoryStream = new MemoryStream();
 		BinaryWriter binaryWriter = new BinaryWriter(memoryStream);

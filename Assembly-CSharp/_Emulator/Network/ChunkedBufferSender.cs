@@ -26,26 +26,24 @@ namespace _Emulator
 
             MsgBody msgBody = new MsgBody();
             msgBody.Write(opcode);
-            int startOffset = msgBody.Offset;
-
-            msgBody.Write(length);
+            msgBody.Write((uint)length);
             msgBody.Write(crc);
             sender.Invoke(msgBody.NewMessage(ExtensionOpcodes.opBeginChunkedBufferReq, sendKey));
 
             int chunkLength, remainingLength = length;
             for (ushort chunkId = 0; chunkId < chunkCount; chunkId++)
             {
-                body.Offset = startOffset;
-                chunkLength = Math.Min(ChunkedBufferReceiver.MAX_CHUNK_LENGTH, remainingLength);
+                msgBody.Clear();
+                msgBody.Write(opcode);
                 msgBody.Write(chunkId);
-                msgBody.Write(chunkLength);
-                Array.Copy(data, chunkId * ChunkedBufferReceiver.MAX_CHUNK_LENGTH, data, body.Offset, chunkLength);
-                body.Offset += chunkLength;
+                chunkLength = Math.Min(ChunkedBufferReceiver.MAX_CHUNK_LENGTH, remainingLength);
+                msgBody.Write(data, chunkId * ChunkedBufferReceiver.MAX_CHUNK_LENGTH, chunkLength);
                 remainingLength -= chunkLength;
                 sender.Invoke(msgBody.NewMessage(ExtensionOpcodes.opChunkedBufferReq, sendKey));
             }
 
-            body.Offset = startOffset;
+            msgBody.Clear();
+            msgBody.Write(opcode);
             sender.Invoke(msgBody.NewMessage(ExtensionOpcodes.opEndChunkedBufferReq, sendKey));
 
             return true;
