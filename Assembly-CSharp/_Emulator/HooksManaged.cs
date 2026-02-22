@@ -149,7 +149,11 @@ namespace _Emulator
 
         static MethodInfo oMapEditorOnLoadCompleteInfo = typeof(MapEditor).GetMethod("OnLoadComplete", BindingFlags.NonPublic | BindingFlags.Instance);
         static MethodInfo hMapEditorOnLoadCompleteInfo = typeof(HooksManaged).GetMethod("hMapEditorOnLoadComplete", BindingFlags.Public | BindingFlags.Instance);
-        static ManagedHook MapEditorOnLoadComplete;
+        static ManagedHook MapEditorOnLoadCompleteHook;
+
+        static MethodInfo oUserMapInfoManagerCreateBuildModeInfo = typeof(UserMapInfoManager).GetMethod("CreateBuildMode", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hUserMapInfoManagerCreateBuildModeInfo = typeof(HooksManaged).GetMethod("hUserMapInfoManagerCreateBuildMode", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook UserMapInfoManagerCreateBuildModeHook;
 
         private void hP2PManagerHandshake()
         {
@@ -226,6 +230,12 @@ namespace _Emulator
             {
                 return;
             }
+            PaletteManager paletteManager = PaletteManager.Instance;
+            if (paletteManager != null)
+            {
+                int[] pal = BrickCache.Instance.palette;
+                PaletteManager.Instance.Setup(pal[0], pal[1], pal[2], pal[3], pal[4], pal[5], pal[6], pal[7], pal[8], pal[9]);
+            }
             CSNetManager.Instance.Sock.SendCS_RESUME_ROOM_REQ(2);
             UserMap userMap = BrickManager.Instance.userMap;
             Vector3 position;
@@ -247,6 +257,16 @@ namespace _Emulator
                 }
             }
         }
+
+        public void hUserMapInfoManagerCreateBuildMode(int slot, string alias)
+        {
+            ClientExtension.instance.buildModeMapName = alias;
+            UserMapInfoManager.Instance.CurSlot = slot;
+            UserMapInfoManager.Instance.CurMapName = alias;
+            UserMapInfoManager.Instance.dicRegMap.Clear();
+            UserMapInfoManager.Instance.cacheRegMap.Clear();
+        }
+
         public byte hSockTcpGetSendKey()
 		{
 			return byte.MaxValue;
@@ -689,31 +709,29 @@ namespace _Emulator
             msgBody.Write(slot);
 			msgBody.Write(thumbnail);
             CSNetManager.Instance.Sock.Say(39, msgBody);*/
-            UserMapInfo umi = UserMapInfoManager.Instance.Get(slot);
+            UserMapInfoManager mapInfoMng = UserMapInfoManager.Instance;
+            if (mapInfoMng.CurSlot != slot)
+            {
+                Actor.Instance.ShowDelayedMessage("Map slots don't align, can't save");
+                return;
+            }
+            string mapName = ClientExtension.instance.buildModeMapName;
             if (RoomManager.Instance.Master != MyInfoManager.Instance.Seq)
             {
-                Actor.Instance.ShowDelayedMessage(string.Format(StringMgr.Instance.Get("SAVE_FAIL"), umi.Alias));
+                Actor.Instance.ShowDelayedMessage(string.Format(StringMgr.Instance.Get("SAVE_FAIL"), mapName));
                 return;
             }
             Texture2D thumb = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
             DateTime time = DateTime.Now;
             thumb.LoadImage(thumbnail);
             thumb.Apply();
-            umi.Thumbnail = thumb;
-            umi.SaveCache();
-            UserMapInfoManager.Instance.AddOrUpdate(
-                slot,
-                umi.Alias,
-                umi.BrickCount,
-                time,
-                umi.Premium
-            );
-            UserMapInfoManager.Instance.SetThumbnail(slot, thumb);
-            UserMapInfoManager.Instance.CurMapName = umi.Alias;
+            int brickCount = BrickManager.Instance.Count;
+            mapInfoMng.AddOrUpdate(slot, mapName, brickCount, time, (sbyte) 0);
+            mapInfoMng.SetThumbnail(slot, thumb);
+            mapInfoMng.Get(slot).SaveCache();
             UserMap map = BrickManager.Instance.userMap;
             map.Save(slot, map.skybox);
-            umi.Alias = UserMapInfoManager.Instance.CurMapName;
-            Actor.Instance.ShowDelayedMessage(string.Format(StringMgr.Instance.Get("SAVE_SUCCESS"), umi.Alias));
+            Actor.Instance.ShowDelayedMessage(string.Format(StringMgr.Instance.Get("SAVE_SUCCESS"), mapName));
             MyInfoManager.Instance.IsModified = false;
         }
 
@@ -991,8 +1009,10 @@ namespace _Emulator
             BndMatchStartLoadHook.ApplyHook();
             MapEditorStartLoadHook = new ManagedHook(oMapEditorStartLoadInfo, hMapEditorStartLoadInfo);
             MapEditorStartLoadHook.ApplyHook();
-            MapEditorOnLoadComplete = new ManagedHook(oMapEditorOnLoadCompleteInfo, hMapEditorOnLoadCompleteInfo);
-            MapEditorOnLoadComplete.ApplyHook();
+            MapEditorOnLoadCompleteHook = new ManagedHook(oMapEditorOnLoadCompleteInfo, hMapEditorOnLoadCompleteInfo);
+            MapEditorOnLoadCompleteHook.ApplyHook();
+            UserMapInfoManagerCreateBuildModeHook = new ManagedHook(oUserMapInfoManagerCreateBuildModeInfo, hUserMapInfoManagerCreateBuildModeInfo);
+            UserMapInfoManagerCreateBuildModeHook.ApplyHook();
         }
     }
 }

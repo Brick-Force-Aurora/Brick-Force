@@ -23,6 +23,7 @@ namespace _Emulator
         public int lastKillLogId = -1;
         public float killLogRealiableTime = 0f;
         public bool isSteam = false;
+        public string buildModeMapName = string.Empty;
 
         public float lastAnswer = 0f, connectedRequest = 0f;
         private volatile bool receivedAnswer = false, awaitingConnectedAnswer = false;
@@ -178,14 +179,14 @@ namespace _Emulator
 
         private void HandleClientTimeout()
         {
-            float time = Time.time;
+            float time = Time.fixedTime;
             if (receivedAnswer)
             {
                 receivedAnswer = false;
                 lastAnswer = time;
                 return;
             }
-            if (time - lastAnswer <= 5f)
+            if (time - lastAnswer <= 6f)
             {
                 return;
             }
@@ -196,7 +197,7 @@ namespace _Emulator
                 Say(ExtensionOpcodes.opAmIConnectedReq);
                 return;
             }
-            if (time - connectedRequest > 3f)
+            if (time - connectedRequest > 4f)
             {
                 Disconnect("Disconnected from server:\nServer didn't respond for too long");
             }
@@ -357,8 +358,8 @@ namespace _Emulator
 
         private void HandleAmIConnected(MsgBody body)
         {
-            connectedRequest = 0;
             awaitingConnectedAnswer = false;
+            connectedRequest = Time.fixedTime;
         }
 
         private void HandleRequestUserSlotMap(MsgBody body)

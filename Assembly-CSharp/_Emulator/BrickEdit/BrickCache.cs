@@ -41,6 +41,7 @@ namespace _Emulator
                 { "red_brick_2", 1000 }, // Some kind of barrier
         };
 
+        public readonly int[] palette = new int[10];
         private readonly Dictionary<string, byte> aliasToId = new Dictionary<string, byte>();
 
         private BrickCache() {}
@@ -59,6 +60,7 @@ namespace _Emulator
         internal void Init() {
             aliasToId.Clear();
             StringMgr stringMgr = StringMgr.Instance;
+            int paletteIndex = 0;
             foreach (Brick brick in BrickManager.Instance.bricks)
             {
                 string brickName = stringMgr.Get(brick.brickAlias, LangOptManager.LANG_OPT.ENGLISH);
@@ -73,6 +75,10 @@ namespace _Emulator
                 } else
                 {
                     brick.maxInstancePerMap = -1;
+                    if (paletteIndex < palette.Length)
+                    {
+                        palette[paletteIndex++] = brick.seq;
+                    }
                 }
                 if (aliasToId.ContainsKey(brickName))
                 {

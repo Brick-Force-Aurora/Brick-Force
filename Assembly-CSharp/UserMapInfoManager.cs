@@ -8,9 +8,9 @@ public class UserMapInfoManager : MonoBehaviour
 
 	private SortedList<int, UserMapInfo> listUMI;
 
-	private Dictionary<int, int> dicRegMap;
+	public Dictionary<int, int> dicRegMap;
 
-	private List<int> cacheRegMap;
+    public List<int> cacheRegMap;
 
 	private string curMapName = string.Empty;
 

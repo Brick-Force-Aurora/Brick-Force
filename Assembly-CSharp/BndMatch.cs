@@ -1,3 +1,4 @@
+using _Emulator;
 using System;
 using UnityEngine;
 
@@ -205,7 +206,15 @@ public class BndMatch : MonoBehaviour
 
 	private void OnLoadComplete()
 	{
-		TrainManager.Instance.Load();
+        // AURORA - Start: Fix palette
+        PaletteManager paletteManager = PaletteManager.Instance;
+        if (paletteManager != null)
+        {
+            int[] pal = BrickCache.Instance.palette;
+            PaletteManager.Instance.Setup(pal[0], pal[1], pal[2], pal[3], pal[4], pal[5], pal[6], pal[7], pal[8], pal[9]);
+        }
+		// AURORA - End
+        TrainManager.Instance.Load();
 		if (MyInfoManager.Instance.BreakingInto && MyInfoManager.Instance.BndModeDesc != null)
 		{
 			timer.IsBuildPhase = MyInfoManager.Instance.BndModeDesc.buildPhase;

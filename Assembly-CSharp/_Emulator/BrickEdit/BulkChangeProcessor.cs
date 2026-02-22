@@ -61,6 +61,7 @@ namespace _Emulator
         private List<int> pendingMorphs = new List<int>();
         private List<BulkChange> pendingChanges = new List<BulkChange>();
         private List<GameObject> pendingChunks = new List<GameObject>();
+        private bool cleared = false;
         private System.Object dataLock;
 
         void Awake()
@@ -71,6 +72,26 @@ namespace _Emulator
 
         void Update()
         {
+            if (RoomManager.Instance.CurrentRoomType != Room.ROOM_TYPE.MAP_EDITOR)
+            {
+                if (cleared)
+                {
+                    return;
+                }
+                cleared = true;
+                lock (dataLock)
+                {
+                    removalMorphs.Clear();
+                    pendingChunks.Clear();
+                    pendingChanges.Clear();
+                    pendingMorphs.Clear();
+                }
+                return;
+            } else if (cleared)
+            {
+                cleared = false;
+            }
+
             // First we morph
             if (pendingMorphs.Count > 0)
             {

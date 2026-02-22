@@ -1390,7 +1390,7 @@ namespace _Emulator
             if (debugHandle)
                 Debug.Log("HandleRoomConfig from: " + msgRef.client.GetIdentifier());
 
-            SendRoomConfig(msgRef.client);
+            SendRoomConfig(msgRef.client, SendType.BroadcastRoom);
             SendUpdateRoom(matchData);
         }
 
@@ -3239,7 +3239,7 @@ namespace _Emulator
             }
         }
 
-        public void SendRoomConfig(ClientReference client)
+        public void SendRoomConfig(ClientReference client, SendType sendType = SendType.Unicast)
         {
             MsgBody body = new MsgBody();
             MatchData matchData = client.matchData;
@@ -3273,7 +3273,7 @@ namespace _Emulator
             body.Write(matchData.room.isDropItem);
             body.Write(matchData.room.isWanted);
 
-            Say(new MsgReference(92, body, client));
+            Say(new MsgReference(92, body, client, sendType, matchData.channel, matchData));
         }
 
         public void SendAddRoom(ClientReference client, MatchData matchData)
@@ -3302,7 +3302,7 @@ namespace _Emulator
             body.Write(matchData.room.Squad);
             body.Write(matchData.room.SquadCounter);
 
-            Say(new MsgReference(5, body, client, SendType.BroadcastChannel, matchData.channel, matchData));
+            Say(new MsgReference(MessageId.CS_ADD_ROOM_ACK, body, client, SendType.BroadcastChannel, matchData.channel, matchData));
             if (debugSend)
             {
                 Debug.Log("SendAddRoom to channel: " + matchData.channel.channel.Name);
@@ -3318,7 +3318,21 @@ namespace _Emulator
             body.Write(matchData.room.CurPlayer);
             body.Write(matchData.room.MaxPlayer);
             body.Write(matchData.room.Locked);
-            body.Write(matchData.room.map);
+            if (matchData.room.type == ROOM_TYPE.BND)
+            {
+                if (matchData.room.Status == ROOM_STATUS.PLAYING)
+                {
+                    body.Write(matchData.room.map);
+                }
+                else
+                {
+                    body.Write(0);
+                }
+            }
+            else
+            {
+                body.Write(matchData.room.map);
+            }
             body.Write(matchData.room.CurMapAlias);
             body.Write(matchData.room.goal);
             body.Write(matchData.room.timelimit);
@@ -3337,14 +3351,14 @@ namespace _Emulator
 
             if (client == null)
             {
-                Say(new MsgReference(30, body, null, SendType.BroadcastChannel, matchData.channel, matchData));
+                Say(new MsgReference(MessageId.CS_UPDATE_ROOM_ACK, body, null, SendType.BroadcastChannel, matchData.channel, matchData));
                 if (debugSend)
                 {
                     Debug.Log("SendUpdateRoom to channel: " + matchData.channel.channel.Name);
                 }
             } else
             {
-                Say(new MsgReference(30, body, client, SendType.Unicast, matchData.channel, matchData));
+                Say(new MsgReference(MessageId.CS_UPDATE_ROOM_ACK, body, client, SendType.Unicast, matchData.channel, matchData));
 
                 if (debugSend)
                 {
@@ -3395,7 +3409,7 @@ namespace _Emulator
             body.Write(matchData.room.Squad);
             body.Write(matchData.room.SquadCounter);
 
-            Say(new MsgReference(470, body, client, SendType.Unicast, matchData.channel, matchData));
+            Say(new MsgReference(MessageId.CS_ROOM_ACK, body, client, SendType.Unicast, matchData.channel, matchData));
 
             if (debugSend)
             {
