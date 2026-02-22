@@ -67,6 +67,18 @@ namespace _Emulator
         internal string szExePath;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MEMORY_BASIC_INFORMATION
+    {
+        public IntPtr BaseAddress;
+        public IntPtr AllocationBase;
+        public uint AllocationProtect;
+        public IntPtr RegionSize;
+        public uint State;
+        public uint Protect;
+        public uint Type;
+    }
+
     class Import
     {
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -183,5 +195,14 @@ namespace _Emulator
 
         [DllImport("psapi.dll")]
         public static extern uint GetModuleBaseName(IntPtr hProcess, IntPtr hModule, StringBuilder lpBaseName, int nSize);
+
+        public const uint PAGE_READONLY = 0x2;
+        public const uint PAGE_READWRITE = 0x4;
+        public const uint PAGE_EXECUTE_READ = 0x20;
+        public const uint PAGE_EXECUTE_READWRITE = 0x40;
+        public const uint MEM_COMMIT = 0x1000;
+
+        [DllImport("kernel32.dll")]
+        public static extern int VirtualQuery(IntPtr lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, uint dwLength);
     }
 }

@@ -471,6 +471,12 @@ namespace _Emulator
 
             ImGui.Separator();
 
+            ImGui.TextDisabled("Advanced");
+            ImGui.Checkbox("Follow Overlay Hooks", ref Config.instance.followHooks);
+            ImGui.Checkbox("Use D3D Pattern Scan", ref Config.instance.useD3DPatternScan);
+
+            ImGui.Separator();
+
             ImGui.TextDisabled("Debug");
             ImGui.Checkbox("Debug Handle", ref ServerEmulator.instance.debugHandle);
             ImGui.Checkbox("Debug Send", ref ServerEmulator.instance.debugSend);

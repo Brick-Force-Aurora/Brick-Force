@@ -34,6 +34,8 @@ namespace _Emulator
         public bool announceLobbyToFriends = true;
         public bool vsync = false;
         public int fpsLimit = -1;
+        public bool followHooks = true;
+        public bool useD3DPatternScan = true;
 
         public Config()
         {
@@ -68,6 +70,8 @@ namespace _Emulator
                 data["announce_lobby_to_friends"] = announceLobbyToFriends;
                 data["limitFPS"] = fpsLimit;
                 data["vsync"] = vsync;
+                data["followHooks"] = followHooks;
+                data["useD3DPatternScan"] = useD3DPatternScan;
 
                 StringBuilder stringBuilder = new StringBuilder();
                 JsonWriter writer = new JsonWriter(stringBuilder)
@@ -124,6 +128,8 @@ namespace _Emulator
                 try { announceLobbyToFriends = (bool)data["announce_lobby_to_friends"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
                 try { fpsLimit = (int)data["limitFPS"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
                 try { vsync = (bool)data["vsync"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { followHooks = (bool)data["followHooks"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { useD3DPatternScan = (bool)data["useD3DPatternScan"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
             }
 
             catch (Exception ex)
