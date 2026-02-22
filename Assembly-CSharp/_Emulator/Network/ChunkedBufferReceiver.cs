@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 
-namespace _Emulator.Network
+namespace _Emulator
 {
 
     public class ChunkedBufferReceiver
@@ -24,14 +24,13 @@ namespace _Emulator.Network
             internal ushort expectedChunkId;
             internal bool done = false;
 
-            public ReceivingBuffer(ushort opcode, byte subId, uint size, uint crc)
+            public ReceivingBuffer(ushort opcode, uint size, uint crc)
             {
                 this.opcode = opcode;
-                this.subId = subId;
                 this.data = new byte[size];
-                this.chunkCount = (ushort)Mathf.Ceil(size / 6144f);
-                this.crc = crc;
+                this.chunkCount = (ushort)Mathf.Ceil(size / (float)MAX_CHUNK_LENGTH);
                 this.expectedChunkId = 0;
+                this.crc = crc;
             }
         }
 
@@ -44,13 +43,13 @@ namespace _Emulator.Network
             }
         }
 
-        private ReceivingBuffer GetFor(ushort opcode, byte subId, bool done = false)
+        private ReceivingBuffer GetFor(ushort opcode)
         {
             ReceivingBuffer buffer;
             for (int i = 0; i < buffers.Count; i++)
             {
                 buffer = buffers[i];
-                if (buffer.opcode == opcode && buffer.subId == subId && buffer.done == done)
+                if (buffer.opcode == opcode)
                 {
                     return buffer;
                 }
@@ -58,75 +57,80 @@ namespace _Emulator.Network
             return null;
         }
 
-        public int Begin(MsgBody input, ref MsgBody output)
+        public bool Begin(MsgBody input)
         {
             input.Read(out ushort opcode);
-            input.Read(out byte subId);
             input.Read(out uint dataSize);
             input.Read(out uint crc);
 
             if (dataSize > MAX_BUFFER_LIMIT)
             {
                 Debug.LogWarning($"RECV ({Identifier}): Buffer of message {opcode} is too big");
-                return -1;
+                return false;
             }
 
-            ReceivingBuffer buffer = GetFor(opcode, subId);
+            ReceivingBuffer buffer = GetFor(opcode);
             if (buffer != null)
             {
-                Debug.LogWarning($"RECV ({Identifier}): There is already a buffer for message {opcode} with sub id {subId}");
-                return -1;
+                Debug.LogWarning($"RECV ({Identifier}): There is already a buffer for message {opcode}");
+                return false;
             }
-            buffer = new ReceivingBuffer(opcode, subId, dataSize, crc);
-            buffers.Add(buffer);
-            output.Write(opcode);
-            output.Write(subId);
-            return (int)ExtensionOpcodes.opBeginChunkedBufferAck;
+            buffers.Add(new ReceivingBuffer(opcode, dataSize, crc));
+            return true;
         }
 
-        public int ReceiveChunk(MsgBody input, ref MsgBody output)
+        public bool ReceiveChunk(MsgBody input)
         {
             input.Read(out ushort opcode);
-            input.Read(out byte subId);
             input.Read(out ushort chunkId);
             input.Read(out byte[] data);
-            ReceivingBuffer buffer = GetFor(opcode, subId);
+            ReceivingBuffer buffer = GetFor(opcode);
             if (buffer == null)
             {
-                Debug.LogWarning($"RECV ({Identifier}): No buffer for message {opcode} with sub id {subId}");
-                return -1;
+                Debug.LogWarning($"RECV ({Identifier}): No buffer of message {opcode}");
+                return false;
+            }
+            if (chunkId != buffer.expectedChunkId)
+            {
+                Debug.LogWarning($"RECV ({Identifier}): Expected chunk {buffer.expectedChunkId} but got chunk {chunkId} for buffer of message {opcode}");
+                buffers.Remove(buffer);
+                return false;
             }
             Array.Copy(data, 0, buffer.data, chunkId * MAX_CHUNK_LENGTH, data.Length);
-            output.Write(opcode);
-            output.Write(subId);
-            return (int)ExtensionOpcodes.opChunkedBufferAck;
+            buffer.expectedChunkId = (ushort)(chunkId + 1);
+            return true;
         }
 
-        public int End(MsgBody input, ref MsgBody output, out ushort packedOpcode, out MsgBody packedBody)
+        public bool End(MsgBody input, out ushort packedOpcode, out MsgBody packedBody)
         {
             input.Read(out ushort opcode);
-            input.Read(out byte subId);
-            ReceivingBuffer buffer = GetFor(opcode, subId);
+            ReceivingBuffer buffer = GetFor(opcode);
             if (buffer == null)
             {
-                Debug.LogWarning($"RECV ({Identifier}): No buffer for message {opcode} with sub id {subId}");
+                Debug.LogWarning($"RECV ({Identifier}): No buffer of message {opcode}");
                 packedOpcode = 0;
                 packedBody = null;
-                return -1;
+                return false;
             }
-            buffer.done = true;
+            if (buffer.chunkCount != buffer.expectedChunkId)
+            {
+                Debug.LogWarning($"RECV ({Identifier}): Not all chunks were delivered for buffer of message {opcode}");
+                packedOpcode = 0;
+                packedBody = null;
+                return false;
+            }
             uint crc = CRC32.computeUnsigned(buffer.data);
-            output.Write(opcode);
-            output.Write(subId);
             if (crc != buffer.crc)
             {
+                Debug.LogWarning($"RECV ({Identifier}): CRC check failed, expected {buffer.crc} but got {crc} for buffer of message {opcode}");
                 packedOpcode = 0;
                 packedBody = null;
-                return (int)ExtensionOpcodes.opEndChunkedBufferFailedAck;
+                return false;
             }
+            buffers.Remove(buffer);
             packedOpcode = opcode;
             packedBody = new MsgBody(buffer.data, 0, buffer.data.Length);
-            return (int)ExtensionOpcodes.opEndChunkedBufferAck;
+            return true;
         }
     }
 }

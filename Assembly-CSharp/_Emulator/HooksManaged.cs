@@ -719,55 +719,7 @@ namespace _Emulator
 
 		public void hSockTcpSay(ushort id, MsgBody msgBody, bool doChunked = true)
 		{
-            if (doChunked && msgBody.Offset > 6144)
-            {
-                byte[] data = msgBody.Buffer;
-                if (data.Length != msgBody.Offset)
-                {
-                    data = new byte[msgBody.Offset];
-                    Array.Copy(msgBody.Buffer, 0, data, 0, data.Length);
-                }
-                msgBody = new MsgBody();
-                int opcode = ClientExtension.instance.chunkedBufferSender.Begin(id, data, ref msgBody);
-                if (opcode == -1)
-                {
-                    return;
-                }
-                id = (ushort)opcode;
-            }
-            if (ServerEmulator.instance.debugSend)
-                Debug.Log("[Verbose/Client] Sending message ID: " + id);
-            Msg4Send msg4Send = new Msg4Send(id, uint.MaxValue, uint.MaxValue, msgBody, CSNetManager.Instance.Sock.GetSendKey());
-
-            if (ClientExtension.instance.isSteam)
-			{
-				SteamNetworkingManager.instance.SendMessageToHost(msg4Send);
-			}
-
-            else if (CSNetManager.Instance.Sock._writeQueue != null)
-            {
-                lock (this)
-                {
-                    if (CSNetManager.Instance.Sock._writeQueue.Count > 0)
-                    {
-                        CSNetManager.Instance.Sock._writeQueue.Enqueue(msg4Send);
-                    }
-                    else
-                    {
-                        CSNetManager.Instance.Sock._writeQueue.Enqueue(msg4Send);
-                        try
-                        {
-							if (CSNetManager.Instance.Sock._sock != null)
-                                CSNetManager.Instance.Sock._sock.BeginSend(msg4Send.Buffer, 0, msg4Send.Buffer.Length, SocketFlags.None, CSNetManager.Instance.Sock.SendCallback, null);
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.LogError("Error, " + ex.Message.ToString());
-                            CSNetManager.Instance.Sock.Close();
-                        }
-                    }
-                }
-            }
+            ClientExtension.instance.SendPacket(id, msgBody, doChunked);
         }
 
         public bool hSockTcpIsConnected()

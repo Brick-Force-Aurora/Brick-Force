@@ -57,6 +57,11 @@ namespace _Emulator
         public readonly PlayTeamDeathMatch playTeamDeathMatch;
         public readonly PlayZombie playZombie;
 
+        private readonly Action<ClientReference, MsgReference> sendToSteam;
+        private readonly Action<ClientReference, MsgReference> sendToTCP;
+
+        private Action<ClientReference, MsgReference> sendMessage;
+
         private readonly Dictionary<ushort, Action<MsgReference>> _handlers = new Dictionary<ushort, Action<MsgReference>>();
 
         public ServerEmulator()
@@ -73,6 +78,9 @@ namespace _Emulator
             gameModes[(int)ROOM_TYPE.BUNGEE] = playFreefall = new PlayFreefall(this);
             gameModes[(int)ROOM_TYPE.TEAM_MATCH] = playTeamDeathMatch = new PlayTeamDeathMatch(this);
             gameModes[(int)ROOM_TYPE.ZOMBIE] = playZombie = new PlayZombie(this);
+
+            sendToSteam = SendMessageToSteam;
+            sendToTCP = SendMessageToTCP;
         }
         private void RegisterHandlers()
         {
@@ -170,10 +178,6 @@ namespace _Emulator
             registerCustom(ExtensionOpcodes.opBeginChunkedBufferReq, HandleBeginChunkedBufferReceive);
             registerCustom(ExtensionOpcodes.opChunkedBufferReq, HandleChunkedBufferReceive);
             registerCustom(ExtensionOpcodes.opEndChunkedBufferReq, HandleEndChunkedBufferReceive);
-            registerCustom(ExtensionOpcodes.opBeginChunkedBufferAck, HandleBeginChunkedBuffer);
-            registerCustom(ExtensionOpcodes.opChunkedBufferAck, HandleChunkedBuffer);
-            registerCustom(ExtensionOpcodes.opEndChunkedBufferAck, HandleEndChunkedBuffer);
-            registerCustom(ExtensionOpcodes.opEndChunkedBufferFailedAck, HandleEndChunkedBufferFailed);
             registerCustom(ExtensionOpcodes.opVersionCheckReq, HandleVersionCheck);
             registerCustom(ExtensionOpcodes.opBulkBrickReq, HandleBulkBrickRequest);
             registerCustom(ExtensionOpcodes.opAmIConnectedReq, HandleAmIConnected);
@@ -209,6 +213,7 @@ namespace _Emulator
             hasHost = false;
             try
             {
+                sendMessage = sendToTCP;
                 if (serverSocket == null)
                 {
                     serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -238,6 +243,7 @@ namespace _Emulator
             hasHost = false;
             lastUpdateTime = Time.time;
             serverCreated = true;
+            sendMessage = sendToSteam;
             Debug.Log("Server set to Steam");
 
             //Pulls all loaded RegMaps into the emulator
@@ -250,7 +256,7 @@ namespace _Emulator
             {
                 Socket clientSocket = serverSocket.EndAccept(result);
 
-                ClientReference client = new ClientReference(clientSocket);
+                ClientReference client = new ClientReference(this, clientSocket);
                 if (!Config.instance.blockConnections)
                 {
                     if (HandleClientAccepted(client))
@@ -303,7 +309,7 @@ namespace _Emulator
             }
         }
 
-        private void SendCallback(IAsyncResult result)
+        internal void SendCallback(IAsyncResult result)
         {
             Socket clientSocket = (Socket)result.AsyncState;
             clientSocket.EndSend(result);
@@ -319,7 +325,7 @@ namespace _Emulator
                 if (SteamLobbyManager.instance.currentLobby != null)
                 {
                     string name = SteamLobbyManager.instance.currentLobby.GetMemberName(steamID);
-                    ClientReference client = new ClientReference(steamID, name);
+                    ClientReference client = new ClientReference(this, steamID, name);
 
                     if (!Config.instance.blockConnections)
                     {
@@ -379,187 +385,77 @@ namespace _Emulator
             }
         }
 
-        private Msg4Send buildMessageFor(MsgReference msgRef, ClientReference clientRef)
+        private void SendMessageToSteam(ClientReference clientRef, MsgReference msgRef)
         {
-            ushort id = msgRef.msg._id;
-            MsgBody body = msgRef.msg._msg;
-            if (msgRef.doChunked && body.Offset > 6144)
+            if (!msgRef.doChunked || msgRef.msg._msg.Offset <= ChunkedBufferReceiver.MAX_CHUNK_LENGTH)
             {
-                byte[] data = body.Buffer;
-                if (data.Length != body.Offset)
-                {
-                    data = new byte[body.Offset];
-                    Array.Copy(body.Buffer, 0, data, 0, data.Length);
-                }
-                body = new MsgBody();
-                int opcode = clientRef.chunkedBufferSender.Begin(id, data, ref body);
-                if (opcode == -1)
-                {
-                    return null;
-                }
-                id = (ushort)opcode;
+                clientRef.WritePacketSteam(new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey));
+                return;
             }
-            return new Msg4Send(id, uint.MaxValue, uint.MaxValue, body, sendKey);
+            msgRef.msg._msg.SendChunked(msgRef.msg._id, sendKey, "Server", clientRef.WritePacketSteam);
+        }
+
+        private void SendMessageToTCP(ClientReference clientRef, MsgReference msgRef)
+        {
+            if (!msgRef.doChunked || msgRef.msg._msg.Offset <= ChunkedBufferReceiver.MAX_CHUNK_LENGTH)
+            {
+                clientRef.WritePacketTcp(new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey));
+                return;
+            }
+            msgRef.msg._msg.SendChunked(msgRef.msg._id, sendKey, "Server", clientRef.WritePacketTcp);
         }
 
         private void UnicastMessage(MsgReference msgRef)
         {
-            Msg4Send msg = buildMessageFor(msgRef, msgRef.client);
-            if (isSteam)
-                SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, msgRef.client.steamID, msg);
-            else
-                msgRef.client.socket.BeginSend(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.client.socket);
+            sendMessage(msgRef.client, msgRef);
         }
+
+        private void BroadcastToClientList(List<ClientReference> list, MsgReference msgRef)
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                sendMessage(list[i], msgRef);
+            }
+        }
+
+        private void BroadcastToClientList(List<ClientReference> list, MsgReference msgRef, Predicate<ClientReference> filter)
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (filter.Invoke(list[i]))
+                    continue;
+                sendMessage(list[i], msgRef);
+            }
+        }
+
         private void BroadcastMessage(MsgReference msgRef)
         {
-            if (isSteam)
-            {
-                for (int i = 0; i < clientList.Count; i++)
-                {
-                    SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, clientList[i].steamID, buildMessageFor(msgRef, clientList[i]));
-                }
-            }
-
-            else
-            {
-                Msg4Send msg;
-                for (int i = 0; i < clientList.Count; i++)
-                {
-                    msg = buildMessageFor(msgRef, clientList[i]);
-                    clientList[i].socket.BeginSend(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), clientList[i].socket);
-                }
-            }
+            BroadcastToClientList(clientList, msgRef);
         }
 
         private void BroadcastChannelMessage(MsgReference msgRef)
         {
-            if (isSteam)
-            {
-                for (int i = 0; i < msgRef.channelRef.clientList.Count; i++)
-                {
-                    SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, msgRef.channelRef.clientList[i].steamID, buildMessageFor(msgRef, msgRef.channelRef.clientList[i]));
-                }
-            }
-
-            else
-            {
-                Msg4Send msg;
-                for (int i = 0; i < msgRef.channelRef.clientList.Count; i++)
-                {
-                    msg = buildMessageFor(msgRef, msgRef.channelRef.clientList[i]);
-                    msgRef.channelRef.clientList[i].socket.BeginSend(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.channelRef.clientList[i].socket);
-                }
-            }
+            BroadcastToClientList(msgRef.channelRef.clientList, msgRef);
         }
 
         private void BroadcastRoomMessage(MsgReference msgRef)
         {
-            if (isSteam)
-            {
-                for (int i = 0; i < msgRef.matchData.clientList.Count; i++)
-                {
-                    if (msgRef.matchData.clientList[i].clientStatus < ClientReference.ClientStatus.Room)
-                        continue;
-
-                    SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, msgRef.matchData.clientList[i].steamID, buildMessageFor(msgRef, msgRef.matchData.clientList[i]));
-                }
-            }
-
-            else
-            {
-                Msg4Send msg;
-                for (int i = 0; i < msgRef.matchData.clientList.Count; i++)
-                {
-                    if (msgRef.matchData.clientList[i].clientStatus < ClientReference.ClientStatus.Room)
-                        continue;
-
-                    msg = buildMessageFor(msgRef, msgRef.matchData.clientList[i]);
-                    msgRef.matchData.clientList[i].socket.BeginSend(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.matchData.clientList[i].socket);
-                }
-            }
+            BroadcastToClientList(msgRef.matchData.clientList, msgRef, client => client.clientStatus < ClientReference.ClientStatus.Room);
         }
 
         private void BroadcastRedTeamMessage(MsgReference msgRef)
         {
-            Debug.LogWarning("BroadcastRedTeamMessage");
-            if (isSteam)
-            {
-                for (int i = 0; i < clientList.Count; i++)
-                {
-                    if (clientList[i].clientStatus < ClientReference.ClientStatus.Room || !clientList[i].slot.isRed)
-                        continue;
-
-                    SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, clientList[i].steamID, buildMessageFor(msgRef, clientList[i]));
-                }
-            }
-
-            else
-            {
-                Msg4Send msg;
-                for (int i = 0; i < clientList.Count; i++)
-                {
-                    if (clientList[i].clientStatus < ClientReference.ClientStatus.Room || !clientList[i].slot.isRed)
-                        continue;
-
-                    msg = buildMessageFor(msgRef, clientList[i]);
-                    clientList[i].socket.BeginSend(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), clientList[i].socket);
-                }
-            }
+            BroadcastToClientList(msgRef.matchData.clientList, msgRef, client => client.clientStatus < ClientReference.ClientStatus.Room || !client.slot.isRed);
         }
 
         private void BroadcastBlueTeamMessage(MsgReference msgRef)
         {
-            Debug.LogWarning("BroadcastBlueTeamMessage");
-            if (isSteam)
-            {
-                for (int i = 0; i < clientList.Count; i++)
-                {
-                    if (clientList[i].clientStatus < ClientReference.ClientStatus.Room || clientList[i].slot.isRed)
-                        continue;
-
-                    SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, clientList[i].steamID, buildMessageFor(msgRef, clientList[i]));
-                }
-            }
-
-            else
-            {
-                Msg4Send msg;
-                for (int i = 0; i < clientList.Count; i++)
-                {
-                    if (clientList[i].clientStatus < ClientReference.ClientStatus.Room || clientList[i].slot.isRed)
-                        continue;
-
-                    msg = buildMessageFor(msgRef, clientList[i]);
-                    clientList[i].socket.BeginSend(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), clientList[i].socket);
-                }
-            }
+            BroadcastToClientList(msgRef.matchData.clientList, msgRef, client => client.clientStatus < ClientReference.ClientStatus.Room || client.slot.isRed);
         }
 
         private void BroadcastRoomMessageExclusive(MsgReference msgRef)
         {
-            if (isSteam)
-            {
-                for (int i = 0; i < msgRef.matchData.clientList.Count; i++)
-                {
-                    if (msgRef.matchData.clientList[i].steamID == msgRef.client.steamID || msgRef.matchData.clientList[i].clientStatus < ClientReference.ClientStatus.Room)
-                        continue;
-
-                    SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, msgRef.matchData.clientList[i].steamID, buildMessageFor(msgRef, msgRef.matchData.clientList[i]));
-                }
-            }
-
-            else
-            {
-                Msg4Send msg;
-                for (int i = 0; i < msgRef.matchData.clientList.Count; i++)
-                {
-                    if (msgRef.matchData.clientList[i].socket == msgRef.client.socket || msgRef.matchData.clientList[i].clientStatus < ClientReference.ClientStatus.Room)
-                        continue;
-
-                    msg = buildMessageFor(msgRef, msgRef.matchData.clientList[i]);
-                    msgRef.matchData.clientList[i].socket.BeginSend(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), msgRef.matchData.clientList[i].socket);
-                }
-            }
+            BroadcastToClientList(msgRef.matchData.clientList, msgRef, client => client.seq == msgRef.client.seq || client.clientStatus < ClientReference.ClientStatus.Room);
         }
 
         private ClientReference FindClientBySocket(Socket clientSocket)
@@ -972,6 +868,7 @@ namespace _Emulator
             {
                 Debug.LogWarning($"Disconnecting client: Version check failed, client didn't send any version");
                 SendDisconnect(msgRef.client, message: $"Version mismatch detected, the host is using a newer version ({hostVersion})");
+                msgRef.client.Disconnect(false);
                 return;
             }
 
@@ -4403,83 +4300,34 @@ namespace _Emulator
                 Debug.Log("SendRespawnTicket to: " + client.GetIdentifier());
         }
 
-        private void HandleBeginChunkedBuffer(MsgReference msgRef)
-        {
-            MsgBody output = new MsgBody();
-            int opcode = msgRef.client.chunkedBufferSender.WriteChunk(msgRef.msg._msg, ref output);
-            if (opcode == -1)
-            {
-                return;
-            }
-            SayInstant(new MsgReference((ushort)opcode, output, msgRef.client, _doChunked: false));
-        }
-
-        private void HandleChunkedBuffer(MsgReference msgRef)
-        {
-            MsgBody output = new MsgBody();
-            int opcode = msgRef.client.chunkedBufferSender.WriteChunk(msgRef.msg._msg, ref output);
-            if (opcode == -1)
-            {
-                return;
-            }
-            SayInstant(new MsgReference((ushort)opcode, output, msgRef.client, _doChunked: false));
-        }
-
-        private void HandleEndChunkedBuffer(MsgReference msgRef)
-        {
-            MsgBody output = new MsgBody();
-            int opcode = msgRef.client.chunkedBufferSender.End(false, msgRef.msg._msg, ref output);
-            if (opcode == -1)
-            {
-                return;
-            }
-            SayInstant(new MsgReference((ushort)opcode, output, msgRef.client, _doChunked: false));
-        }
-
-        private void HandleEndChunkedBufferFailed(MsgReference msgRef)
-        {
-            MsgBody output = new MsgBody();
-            int opcode = msgRef.client.chunkedBufferSender.End(true, msgRef.msg._msg, ref output);
-            if (opcode == -1)
-            {
-                return;
-            }
-            SayInstant(new MsgReference((ushort)opcode, output, msgRef.client, _doChunked: false));
-        }
-
         private void HandleBeginChunkedBufferReceive(MsgReference msgRef)
         {
-            MsgBody output = new MsgBody();
-            int opcode = msgRef.client.chunkedBufferReceiver.Begin(msgRef.msg._msg, ref output);
-            if (opcode == -1)
+            if (!msgRef.client.chunkedBufferReceiver.Begin(msgRef.msg._msg))
             {
-                return;
+                SendDisconnect(msgRef.client, message: "Received invalid chunked buffer");
+                msgRef.client.Disconnect(true);
             }
-            SayInstant(new MsgReference((ushort)opcode, output, msgRef.client, _doChunked: false));
         }
 
         private void HandleChunkedBufferReceive(MsgReference msgRef)
         {
-            MsgBody output = new MsgBody();
-            int opcode = msgRef.client.chunkedBufferReceiver.ReceiveChunk(msgRef.msg._msg, ref output);
-            if (opcode == -1)
+            if (!msgRef.client.chunkedBufferReceiver.ReceiveChunk(msgRef.msg._msg))
             {
-                return;
+                SendDisconnect(msgRef.client, message: "Received invalid chunked buffer");
+                msgRef.client.Disconnect(true);
             }
-            SayInstant(new MsgReference((ushort)opcode, output, msgRef.client, _doChunked: false));
         }
 
         private void HandleEndChunkedBufferReceive(MsgReference msgRef)
         {
-            MsgBody output = new MsgBody();
             ushort packedOpcode;
             MsgBody packedBody;
-            int opcode = msgRef.client.chunkedBufferReceiver.End(msgRef.msg._msg, ref output, out packedOpcode, out packedBody);
-            if (opcode == -1)
+            if (!msgRef.client.chunkedBufferReceiver.End(msgRef.msg._msg, out packedOpcode, out packedBody))
             {
+                SendDisconnect(msgRef.client, message: "Received invalid chunked buffer");
+                msgRef.client.Disconnect(true);
                 return;
             }
-            SayInstant(new MsgReference((ushort)opcode, output, msgRef.client, _doChunked: false));
             readQueue.Enqueue(new MsgReference(packedOpcode, packedBody, msgRef.client, _channelRef: msgRef.channelRef, _matchData: msgRef.matchData));
         }
 
@@ -5561,6 +5409,7 @@ namespace _Emulator
                 // We are pretty sure the client has an unknown version if this is -1
                 Debug.LogWarning($"Disconnecting client: Version check failed, client sent invalid version");
                 SendDisconnect(client, message: $"Version mismatch detected, the host is using a newer version ({hostVersion})");
+                msg.client.Disconnect(false);
                 return;
             }
 
@@ -5571,6 +5420,7 @@ namespace _Emulator
                 Debug.LogWarning($"Disconnecting client: Version check failed, expected {hostVersion} but got {clientVersion}");
                 string relation = result < 0 ? "an older" : "a newer";
                 SendDisconnect(client, message: $"Version mismatch detected, the host is using {relation} version ({hostVersion})");
+                msg.client.Disconnect(false);
                 return;
             }
             if (debugHandle)

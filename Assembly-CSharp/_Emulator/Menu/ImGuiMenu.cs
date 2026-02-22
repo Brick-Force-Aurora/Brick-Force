@@ -490,7 +490,10 @@ namespace _Emulator
             if (!client.isHost)
             {
                 if (ImGui.MenuItem("Disconnect"))
+                {
                     ServerEmulator.instance.SendDisconnect(client);
+                    client.Disconnect(true);
+                }
                 ImGui.Separator();
             }
 

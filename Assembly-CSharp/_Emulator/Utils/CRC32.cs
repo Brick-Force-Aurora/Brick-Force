@@ -59,30 +59,64 @@ namespace _Emulator
             0xcdd70693, 0x54de5729, 0x23d967bf, 0xb3667a2e, 0xc4614ab8,
             0x5d681b02, 0x2a6f2b94, 0xb40bbe37, 0xc30c8ea1, 0x5a05df1b,
             0x2d02ef8d
-       };
+        };
 
-    public static int compute(byte[] data)
-    {
-        UInt32 crc = 0xffffffff;
-        for (int i = 0; i < data.Length; i++)
-            crc = (crc >> 8) ^ crctab[(crc & 0xff) ^ data[i]];
-        crc ^= 0xffffffff;
-        byte[] output = new byte[4];
+        public static int compute(byte[] data)
+        {
+            UInt32 crc = 0xffffffff;
+            for (int i = 0; i < data.Length; i++)
+                crc = (crc >> 8) ^ crctab[(crc & 0xff) ^ data[i]];
+            crc ^= 0xffffffff;
+            byte[] output = new byte[4];
 
-        output[0] = (byte)(crc >> 24);
-        output[1] = (byte)(crc >> 16);
-        output[2] = (byte)(crc >> 8);
-        output[3] = (byte)(crc);
+            output[0] = (byte)(crc >> 24);
+            output[1] = (byte)(crc >> 16);
+            output[2] = (byte)(crc >> 8);
+            output[3] = (byte)(crc);
 
-        int abs = Math.Abs(BitConverter.ToInt32(output, 0));
+            int abs = Math.Abs(BitConverter.ToInt32(output, 0));
 
-        return abs;
-    }
+            return abs;
+        }
+
+        public static int compute(byte[] data, int offset, int length)
+        {
+            UInt32 crc = 0xffffffff;
+            for (int i = offset; i < length; i++)
+                crc = (crc >> 8) ^ crctab[(crc & 0xff) ^ data[i]];
+            crc ^= 0xffffffff;
+            byte[] output = new byte[4];
+
+            output[0] = (byte)(crc >> 24);
+            output[1] = (byte)(crc >> 16);
+            output[2] = (byte)(crc >> 8);
+            output[3] = (byte)(crc);
+
+            int abs = Math.Abs(BitConverter.ToInt32(output, 0));
+
+            return abs;
+        }
 
         public static uint computeUnsigned(byte[] data)
         {
             UInt32 crc = 0xffffffff;
             for (int i = 0; i < data.Length; i++)
+                crc = (crc >> 8) ^ crctab[(crc & 0xff) ^ data[i]];
+            crc ^= 0xffffffff;
+            byte[] output = new byte[4];
+
+            output[0] = (byte)(crc >> 24);
+            output[1] = (byte)(crc >> 16);
+            output[2] = (byte)(crc >> 8);
+            output[3] = (byte)(crc);
+
+            return BitConverter.ToUInt32(output, 0);
+        }
+
+        public static uint computeUnsigned(byte[] data, int offset, int length)
+        {
+            UInt32 crc = 0xffffffff;
+            for (int i = offset; i < length; i++)
                 crc = (crc >> 8) ^ crctab[(crc & 0xff) ^ data[i]];
             crc ^= 0xffffffff;
             byte[] output = new byte[4];

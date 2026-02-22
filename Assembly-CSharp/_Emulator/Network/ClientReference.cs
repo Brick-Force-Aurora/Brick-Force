@@ -45,14 +45,15 @@ namespace _Emulator
         public MatchData matchData;
         public ChannelReference channel;
         public ChunkedBufferReceiver chunkedBufferReceiver = new ChunkedBufferReceiver();
-        public ChunkedBufferSender chunkedBufferSender = new ChunkedBufferSender();
         public int lastOpenedChestSeq = -1;
         public bool isVersionSetUp = false;
 
+        public readonly ServerEmulator emulator;
         private readonly object dataLock = new object();
 
-        public ClientReference(Socket _socket, string _name = "", int _seq = -1)
+        public ClientReference(ServerEmulator emulator, Socket _socket, string _name = "", int _seq = -1)
         {
+            this.emulator = emulator;
             lastHeartBeatTime = float.MaxValue;
             loginToleranceTime = 0f;
             socket = _socket;
@@ -65,9 +66,9 @@ namespace _Emulator
             isLoaded = false;
             isHost = false;
             // First person to join with 127.0.0.1 is host
-            if (!ServerEmulator.instance.hasHost && ip.Equals("127.0.0.1"))
+            if (!emulator.hasHost && ip.Equals("127.0.0.1"))
             {
-                ServerEmulator.instance.hasHost = true;
+                emulator.hasHost = true;
                 isHost = true;
             }
             isVersionSetUp = false;
@@ -76,8 +77,9 @@ namespace _Emulator
             SetupChunkedBuffers();
         }
 
-        public ClientReference(CSteamID _steamID, string _name = "", int _seq = -1)
+        public ClientReference(ServerEmulator emulator, CSteamID _steamID, string _name = "", int _seq = -1)
         {
+            this.emulator = emulator;
             lastHeartBeatTime = float.MaxValue;
             loginToleranceTime = 0f;
             steamID = _steamID;
@@ -97,7 +99,6 @@ namespace _Emulator
         private void SetupChunkedBuffers()
         {
             chunkedBufferReceiver.IsServer = true;
-            chunkedBufferSender.IsServer = true;
         }
 
         public bool Disconnect(bool send = true)
@@ -110,7 +111,7 @@ namespace _Emulator
             {
                 try
                 {
-                    ServerEmulator.instance.SendLeave(this);
+                    emulator.SendLeave(this);
                 }
                 catch (Exception ex)
                 {
@@ -120,9 +121,9 @@ namespace _Emulator
                 try
                 {
                     if (isSteam)
-                        ServerEmulator.instance.SendSlotDataSteam(matchData);
+                        emulator.SendSlotDataSteam(matchData);
                     else
-                        ServerEmulator.instance.SendSlotData(matchData);
+                        emulator.SendSlotData(matchData);
                 }
                 catch (Exception ex)
                 {
@@ -196,7 +197,7 @@ namespace _Emulator
 
                 try
                 {
-                    bool removed = ServerEmulator.instance.clientList.Remove(this);
+                    bool removed = emulator.clientList.Remove(this);
                     Debug.Log("[Disconnect] clientList.Remove(" + idInfo + ") => " + removed);
                     return removed;
                 }
@@ -238,6 +239,16 @@ namespace _Emulator
                 return name + "-" + seq + "-" + steamID;
             else
                 return name + "-" + seq + "-" + ip;
+        }
+
+        internal void WritePacketTcp(Msg4Send send)
+        {
+            socket.BeginSend(send.Buffer, 0, send.Buffer.Length, SocketFlags.None, emulator.SendCallback, null);
+        }
+
+        internal void WritePacketSteam(Msg4Send send)
+        {
+            SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, steamID, send);
         }
     }
 }

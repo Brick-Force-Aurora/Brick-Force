@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Sockets;
 using System.Reflection;
 using _Emulator.Network;
 using Steamworks;
@@ -27,7 +28,6 @@ namespace _Emulator
         private volatile bool receivedAnswer = false, awaitingConnectedAnswer = false;
 
         public ChunkedBufferReceiver chunkedBufferReceiver = new ChunkedBufferReceiver();
-        public ChunkedBufferSender chunkedBufferSender = new ChunkedBufferSender();
 
         public readonly Version clientVersion;
 
@@ -57,10 +57,6 @@ namespace _Emulator
             registerCustom(ExtensionOpcodes.opSlotDataSteamAck, HandleReceiveSlotDataSteam);
             registerCustom(ExtensionOpcodes.opBulkBrickAck, HandleBulkBrickAck);
             registerCustom(ExtensionOpcodes.opBulkBrickFailAck, HandleBulkBrickFailAck);
-            registerCustom(ExtensionOpcodes.opBeginChunkedBufferAck, HandleBeginChunkedBuffer);
-            registerCustom(ExtensionOpcodes.opChunkedBufferAck, HandleChunkedBuffer);
-            registerCustom(ExtensionOpcodes.opEndChunkedBufferAck, HandleEndChunkedBuffer);
-            registerCustom(ExtensionOpcodes.opEndChunkedBufferFailedAck, HandleEndChunkedBufferFailed);
             registerCustom(ExtensionOpcodes.opBeginChunkedBufferReq, HandleBeginChunkedBufferReceive);
             registerCustom(ExtensionOpcodes.opChunkedBufferReq, HandleChunkedBufferReceive);
             registerCustom(ExtensionOpcodes.opEndChunkedBufferReq, HandleEndChunkedBufferReceive);
@@ -125,6 +121,51 @@ namespace _Emulator
                 ShopEmulator shop = new ShopEmulator();
                 //shop.LoadAndSave();
                 shop.ParseData();
+            }
+        }
+
+        public void SendPacket(ushort id, MsgBody msgBody, bool doChunked)
+        {
+            if (isSteam)
+            {
+                SteamNetworkingManager.instance.SendMessageToHost(new Msg4Send(id, uint.MaxValue, uint.MaxValue, msgBody, CSNetManager.Instance.Sock.GetSendKey()));
+                return;
+            }
+
+            SockTcp sock = CSNetManager.Instance.Sock;
+            if (sock == null || sock._writeQueue == null)
+            {
+                return;
+            }
+
+            if (!doChunked || msgBody.Offset <= ChunkedBufferReceiver.MAX_CHUNK_LENGTH)
+            {
+                EnqueuePacket(sock, new Msg4Send(id, uint.MaxValue, uint.MaxValue, msgBody, sock.GetSendKey()));
+                return;
+            }
+
+            msgBody.SendChunked(id, sock.GetSendKey(), "Client", (send) => EnqueuePacket(sock, send));
+        }
+
+        private void EnqueuePacket(SockTcp sock, Msg4Send send)
+        {
+            if (sock._writeQueue.Count > 0)
+            {
+                sock._writeQueue.Enqueue(send);
+                return;
+            }
+            sock._writeQueue.Enqueue(send);
+            try
+            {
+                if (sock._sock != null)
+                {
+                    sock._sock.BeginSend(send.Buffer, 0, send.Buffer.Length, SocketFlags.None, sock.SendCallback, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("Error, " + ex.Message.ToString());
+                sock.Close();
             }
         }
 
@@ -399,86 +440,34 @@ namespace _Emulator
 
         private void HandleBeginChunkedBufferReceive(MsgBody body)
         {
-            MsgBody output = new MsgBody();
-            int opcode = chunkedBufferReceiver.Begin(body, ref output);
-            if (opcode == -1)
+            if (!chunkedBufferReceiver.Begin(body))
             {
-                return;
+                Disconnect("Received invalid chunked buffer from server");
             }
-            Say((ushort)opcode, output, false);
         }
 
         private void HandleChunkedBufferReceive(MsgBody body)
         {
-            MsgBody output = new MsgBody();
-            int opcode = chunkedBufferReceiver.ReceiveChunk(body, ref output);
-            if (opcode == -1)
+            if (!chunkedBufferReceiver.ReceiveChunk(body))
             {
-                return;
+                Disconnect("Received invalid chunked buffer from server");
             }
-            Say((ushort)opcode, output, false);
         }
 
         private void HandleEndChunkedBufferReceive(MsgBody body)
         {
-            MsgBody output = new MsgBody();
             ushort packedOpcode;
             MsgBody packedBody;
-            int opcode = chunkedBufferReceiver.End(body, ref output, out packedOpcode, out packedBody);
-            if (opcode == -1)
+            if (!chunkedBufferReceiver.End(body, out packedOpcode, out packedBody))
             {
+                Disconnect("Received invalid chunked buffer from server");
                 return;
             }
-            Say((ushort)opcode, output, false);
             lock (CSNetManager.Instance.Sock)
             {
                 CSNetManager.Instance.Sock._readQueue.Enqueue(new Msg2Handle(packedOpcode, packedBody));
             }
 
-        }
-
-        private void HandleBeginChunkedBuffer(MsgBody body)
-        {
-            MsgBody output = new MsgBody();
-            int opcode = chunkedBufferSender.WriteChunk(body, ref output);
-            if (opcode == -1)
-            {
-                return;
-            }
-            Say((ushort)opcode, output, false);
-        }
-
-        private void HandleChunkedBuffer(MsgBody body)
-        {
-            MsgBody output = new MsgBody();
-            int opcode = chunkedBufferSender.WriteChunk(body, ref output);
-            if (opcode == -1)
-            {
-                return;
-            }
-            Say((ushort)opcode, output, false);
-        }
-
-        private void HandleEndChunkedBuffer(MsgBody body)
-        {
-            MsgBody output = new MsgBody();
-            int opcode = chunkedBufferSender.End(false, body, ref output);
-            if (opcode == -1)
-            {
-                return;
-            }
-            Say((ushort)opcode, output, false);
-        }
-
-        private void HandleEndChunkedBufferFailed(MsgBody body)
-        {
-            MsgBody output = new MsgBody();
-            int opcode = chunkedBufferSender.End(true, body, ref output);
-            if (opcode == -1)
-            {
-                return;
-            }
-            Say((ushort)opcode, output, false);
         }
 
         private void HandleConnected(MsgBody msg)

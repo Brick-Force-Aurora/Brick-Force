@@ -14,10 +14,6 @@
         opBeginChunkedBufferReq = 1008,
         opChunkedBufferReq = 1009,
         opEndChunkedBufferReq = 1010,
-        opBeginChunkedBufferAck = 1011,
-        opChunkedBufferAck = 1012,
-        opEndChunkedBufferAck = 1013,
-        opEndChunkedBufferFailedAck = 1014,
 
         opRendezvousInfoSteamAck = 1015,
         opEnterSteamAck = 1016,
