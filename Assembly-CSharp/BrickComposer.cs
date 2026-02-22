@@ -639,7 +639,7 @@ public class BrickComposer : WeaponFunction
 				}
 				else if (currentBrick.maxInstancePerMap > 0 && BrickManager.Instance.CountLimitedBrick(currentBrick.GetIndex()) >= currentBrick.maxInstancePerMap)
 				{
-					SystemMsgManager.Instance.ShowMessage(StringMgr.Instance.Get("BRICK_COUNT_EXCEED_PRE") + currentBrick.maxInstancePerMap + StringMgr.Instance.Get("BRICK_COUNT_EXCEED_POST"));
+					SystemMsgManager.Instance.ShowMessage(StringMgr.Instance.Get("BRICK_COUNT_EXCEED_PRE") + " " + currentBrick.maxInstancePerMap + " " + StringMgr.Instance.Get("BRICK_COUNT_EXCEED_POST"));
 					MissFireSound();
 				}
 				else

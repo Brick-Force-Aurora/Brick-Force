@@ -616,7 +616,7 @@ namespace _Emulator
             int result = 0;
             if (slot < 33 || slot > 44)
             {
-                MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("FAIL_TO_RESET_MAP_SLOT"));
+                Actor.Instance.ShowDelayedMessage(StringMgr.Instance.Get("FAIL_TO_RESET_MAP_SLOT"));
             }
             else
             {
@@ -685,10 +685,36 @@ namespace _Emulator
 
         public void hSockTcpSaveMapReq(int slot, byte[] thumbnail)
         {
-            MsgBody msgBody = new MsgBody();
+            /*MsgBody msgBody = new MsgBody();
             msgBody.Write(slot);
 			msgBody.Write(thumbnail);
-            CSNetManager.Instance.Sock.Say(39, msgBody);
+            CSNetManager.Instance.Sock.Say(39, msgBody);*/
+            UserMapInfo umi = UserMapInfoManager.Instance.Get(slot);
+            if (RoomManager.Instance.Master != MyInfoManager.Instance.Seq)
+            {
+                Actor.Instance.ShowDelayedMessage(string.Format(StringMgr.Instance.Get("SAVE_FAIL"), umi.Alias));
+                return;
+            }
+            Texture2D thumb = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
+            DateTime time = DateTime.Now;
+            thumb.LoadImage(thumbnail);
+            thumb.Apply();
+            umi.Thumbnail = thumb;
+            umi.SaveCache();
+            UserMapInfoManager.Instance.AddOrUpdate(
+                slot,
+                umi.Alias,
+                umi.BrickCount,
+                time,
+                umi.Premium
+            );
+            UserMapInfoManager.Instance.SetThumbnail(slot, thumb);
+            UserMapInfoManager.Instance.CurMapName = umi.Alias;
+            UserMap map = BrickManager.Instance.userMap;
+            map.Save(slot, map.skybox);
+            umi.Alias = UserMapInfoManager.Instance.CurMapName;
+            Actor.Instance.ShowDelayedMessage(string.Format(StringMgr.Instance.Get("SAVE_SUCCESS"), umi.Alias));
+            MyInfoManager.Instance.IsModified = false;
         }
 
 		public void hSockTcpSay(ushort id, MsgBody msgBody, bool doChunked = true)
