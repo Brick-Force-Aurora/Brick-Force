@@ -72,6 +72,10 @@ namespace _Emulator
 
         void Update()
         {
+            if (RoomManager.Instance == null)
+            {
+                return;
+            }
             if (RoomManager.Instance.CurrentRoomType != Room.ROOM_TYPE.MAP_EDITOR)
             {
                 if (cleared)

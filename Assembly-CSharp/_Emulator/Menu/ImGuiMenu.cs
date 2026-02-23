@@ -70,8 +70,7 @@ namespace _Emulator
         {
             ImGui.SetNextWindowSizeConstraints(new Vector2(windowWidth * dpiScale, windowMinHeight * dpiScale), new Vector2(windowWidth * dpiScale, windowMaxHeight * dpiScale));
             bool visible = isVisible;
-            var ver = ClientExtension.GetGithubVersionOrUnknown();
-            ImGui.Begin($"Brick-Force Aurora v{ver}", ref visible, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoBringToFrontOnFocus);
+            ImGui.Begin($"Brick-Force Aurora v{Core.VersionStr}", ref visible, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoBringToFrontOnFocus);
             {
                 ImGui.BeginTabBar("##MenuTabs");
                 {
@@ -491,8 +490,7 @@ namespace _Emulator
             {
                 if (ImGui.MenuItem("Disconnect"))
                 {
-                    ServerEmulator.instance.SendDisconnect(client);
-                    client.Disconnect(true);
+                    client.Disconnect("Disconnected by host");
                 }
                 ImGui.Separator();
             }

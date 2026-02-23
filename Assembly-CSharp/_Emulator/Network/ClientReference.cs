@@ -49,11 +49,15 @@ namespace _Emulator
         public bool isVersionSetUp = false;
 
         public readonly ServerEmulator emulator;
+        public readonly byte sendKey;
         private readonly object dataLock = new object();
+
+        private readonly Action<MsgReference> sendMessage;
 
         public ClientReference(ServerEmulator emulator, Socket _socket, string _name = "", int _seq = -1)
         {
             this.emulator = emulator;
+            this.sendKey = emulator.sendKey;
             lastHeartBeatTime = float.MaxValue;
             loginToleranceTime = 0f;
             socket = _socket;
@@ -74,12 +78,14 @@ namespace _Emulator
             isVersionSetUp = false;
             recvBuf = new Msg4Recv(new byte[8192]);
             isSteam = false;
-            SetupChunkedBuffers();
+            chunkedBufferReceiver.IsServer = true;
+            sendMessage = SendMessageToTCP;
         }
 
         public ClientReference(ServerEmulator emulator, CSteamID _steamID, string _name = "", int _seq = -1)
         {
             this.emulator = emulator;
+            this.sendKey = emulator.sendKey;
             lastHeartBeatTime = float.MaxValue;
             loginToleranceTime = 0f;
             steamID = _steamID;
@@ -93,22 +99,93 @@ namespace _Emulator
             isVersionSetUp = false;
             recvBuf = new Msg4Recv(new byte[8192]);
             isSteam = true;
-            SetupChunkedBuffers();
-        }
-
-        private void SetupChunkedBuffers()
-        {
             chunkedBufferReceiver.IsServer = true;
+            sendMessage = SendMessageToSteam;
         }
 
-        public bool Disconnect(bool send = true)
+
+        public void Send(MsgReference msgRef)
+        {
+            sendMessage(msgRef);
+        }
+
+        private void SendMessageToSteam(MsgReference msgRef)
+        {
+            if (!msgRef.doChunked || msgRef.msg._msg.Offset <= ChunkedBufferReceiver.MAX_CHUNK_LENGTH)
+            {
+                WritePacketSteam(new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey));
+                return;
+            }
+            msgRef.msg._msg.SendChunked(msgRef.msg._id, sendKey, "Server", WritePacketSteam);
+        }
+
+        private void SendMessageToTCP(MsgReference msgRef)
+        {
+            if (!msgRef.doChunked || msgRef.msg._msg.Offset <= ChunkedBufferReceiver.MAX_CHUNK_LENGTH)
+            {
+                WritePacketTcp(new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey));
+                return;
+            }
+            msgRef.msg._msg.SendChunked(msgRef.msg._id, sendKey, "Server", WritePacketTcp);
+        }
+
+        public void Disconnect(string message = null, bool serverPrefix = true)
+        {
+            MsgBody body = new MsgBody();
+            if (message != null)
+            {
+                if (serverPrefix)
+                {
+                    message = "Disconnected from server:\n" + message;
+                }
+                body.Write(message);
+            }
+            Send(new MsgReference(ExtensionOpcodes.opDisconnectAck, body, this));
+        }
+
+        public bool CloseClient()
         {
             string idInfo = isSteam
                 ? ("SteamID=" + steamID.m_SteamID)
                 : (socket != null ? socket.RemoteEndPoint.ToString() : "Socket=null");
 
-            if (send && isLoaded)
+            bool removed = false;
+            lock (emulator.dataLock)
             {
+                try
+                {
+                    if (matchData != null)
+                        matchData.RemoveClient(this);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[Disconnect] matchData.RemoveClient failed for " + idInfo + "\n" + ex);
+                }
+
+                try
+                {
+                    if (channel != null)
+                        channel.RemoveClient(this);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[Disconnect] channel.RemoveClient failed for " + idInfo + "\n" + ex);
+                }
+
+                try
+                {
+                    removed = emulator.clientList.Remove(this);
+                    Debug.Log("[Disconnect] clientList.Remove(" + idInfo + ") => " + removed);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[Disconnect] clientList.Remove failed for " + idInfo + "\n" + ex);
+                }
+            }
+
+            if (isLoaded)
+            {
+                // TODO: THIS IS NOT ENOUGH APPARENTLY
                 try
                 {
                     emulator.SendLeave(this);
@@ -159,7 +236,10 @@ namespace _Emulator
                     if (socket != null)
                     {
                         Debug.Log("[Disconnect] Closing TCP socket for " + idInfo);
-                        socket.Shutdown(SocketShutdown.Both);
+                        if (!socket.Connected)
+                        {
+                            socket.Shutdown(SocketShutdown.Both);
+                        }
                         socket.Close();
                     }
                     else
@@ -173,41 +253,7 @@ namespace _Emulator
                 }
             }
 
-            lock (dataLock)
-            {
-                try
-                {
-                    if (matchData != null)
-                        matchData.RemoveClient(this);
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError("[Disconnect] matchData.RemoveClient failed for " + idInfo + "\n" + ex);
-                }
-
-                try
-                {
-                    if (channel != null)
-                        channel.RemoveClient(this);
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError("[Disconnect] channel.RemoveClient failed for " + idInfo + "\n" + ex);
-                }
-
-                try
-                {
-                    bool removed = emulator.clientList.Remove(this);
-                    Debug.Log("[Disconnect] clientList.Remove(" + idInfo + ") => " + removed);
-                    return removed;
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError("[Disconnect] clientList.Remove failed for " + idInfo + "\n" + ex);
-                }
-            }
-
-            return false;
+            return removed;
         }
 
         public bool AssignSlot(SlotData _slot)
@@ -241,14 +287,36 @@ namespace _Emulator
                 return name + "-" + seq + "-" + ip;
         }
 
-        internal void WritePacketTcp(Msg4Send send)
+        internal void WritePacketTcp(Msg4Send msg)
         {
-            socket.BeginSend(send.Buffer, 0, send.Buffer.Length, SocketFlags.None, emulator.SendCallback, null);
+            if (!socket.Connected)
+            {
+                CloseClient();
+                return;
+            }
+            // ExtensionOpcodes.opDisconnectAck = 1007
+            if (msg.id == 1007)
+            {
+                // Send disconnect packet synchronously so we know when it was sent fully
+                socket.Send(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None);
+                CloseClient();
+                return;
+            }
+            socket.BeginSend(msg.Buffer, 0, msg.Buffer.Length, SocketFlags.None, SendCallback, null);
         }
 
-        internal void WritePacketSteam(Msg4Send send)
+        private void SendCallback(IAsyncResult result)
         {
-            SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, steamID, send);
+            socket.EndSend(result);
+        }
+
+        private void WritePacketSteam(Msg4Send msg)
+        {
+            SteamNetworkingManager.instance.SendMessageToUser(SteamNetworkingChannel.ToClient, steamID, msg);
+            if (msg.id == 1007)
+            {
+                CloseClient();
+            }
         }
     }
 }

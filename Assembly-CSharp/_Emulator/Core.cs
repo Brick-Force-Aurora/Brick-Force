@@ -1,9 +1,35 @@
-﻿using UnityEngine;
+﻿using System.IO;
+using UnityEngine;
 
 namespace _Emulator
 {
-    class Core
+    public class Core
     {
+        private static Version _version;
+        private static string _versionString;
+        public static Version Version {
+            get
+            {
+                if (_version == null)
+                {
+                    _version = GetGithubVersionOrUnknown();
+                    Debug.Log($"Aurora Version: {_version}");
+                }
+                return _version;
+            }
+        }
+        public static string VersionStr
+        {
+            get
+            {
+                if (_versionString == null)
+                {
+                    _versionString = Version.ToString();
+                }
+                return _versionString;
+            }
+        }
+
         public static Core instance = new Core();
         private GameObject coreObject;
 
@@ -96,6 +122,49 @@ namespace _Emulator
                     }
                     tAccessory.functionFactor = functionFactor;
                 }
+            }
+        }
+
+        private static Version GetGithubVersionOrUnknown()
+        {
+            try
+            {
+                string path = Path.GetFullPath(
+                    Path.Combine(Application.dataPath, "../launcher_data.dat")
+                );
+
+                if (!File.Exists(path))
+                {
+                    Debug.LogWarning("launcher_data.dat not found at: " + path);
+                    return Version.UNKNOWN;
+                }
+
+                using (var fs = File.OpenRead(path))
+                using (var br = new BinaryReader(fs))
+                {
+                    // Uses your NBT reader extension method
+                    CompoundTag root = br.ReadAsNbt().Value;
+
+                    if (root == null || !root.Has("version", TagType.INT_ARRAY))
+                    {
+                        Debug.LogWarning("NBT key 'version' not found or not INT_ARRAY in launcher_data.dat");
+                        return Version.UNKNOWN;
+                    }
+
+                    // Directly access the stored IntArrayTag
+                    int[] components = root.GetIntArray("version");
+                    if (components.Length != 4)
+                    {
+                        Debug.LogWarning("NBT 'version' array missing/invalid");
+                        return Version.UNKNOWN;
+                    }
+                    return Version.From(components);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("Failed to read launcher version (launcher_data.dat): " + ex.Message);
+                return Version.UNKNOWN;
             }
         }
     }

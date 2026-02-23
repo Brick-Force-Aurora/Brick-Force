@@ -8,6 +8,7 @@ public class Msg4Send
 		INCOMPLETE
 	}
 
+	public readonly ushort id; // AURORA: Add id
 	private byte[] _buffer;
 
 	private int _io;
@@ -28,7 +29,9 @@ public class Msg4Send
 
 	public Msg4Send(ushort id, uint meta, uint src, MsgBody msgBody, byte sendKey)
 	{
-		uint offset = (uint)msgBody.Offset;
+		this.id = id;
+
+        uint offset = (uint)msgBody.Offset;
 		byte b = 0;
 		if (sendKey == 255)
 		{

@@ -168,7 +168,7 @@ namespace _Emulator.Network.Gamemodes
                     body.Write(matchData.clientList[i].data.xp);
                     body.Write((long)0); //buff
                 }
-                ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_CAPTURE_THE_FLAG_END_ACK, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam));
+                ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_CAPTURE_THE_FLAG_END_ACK, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam, matchData.channel, matchData));
             }
 
             if (ServerEmulator.instance.debugSend)

@@ -24,11 +24,11 @@ namespace _Emulator
     public class ServerEmulator : MonoBehaviour
     {
         public static ServerEmulator instance;
-        private readonly object dataLock = new object();
+        internal readonly object dataLock = new object();
         public List<ClientReference> clientList = new List<ClientReference>();
         private Socket serverSocket;
         private byte recvKey = byte.MaxValue;
-        private byte sendKey = byte.MaxValue;
+        public readonly byte sendKey = byte.MaxValue;
         internal Queue<MsgReference> readQueue = new Queue<MsgReference>();
         private Queue<MsgReference> writeQueue = new Queue<MsgReference>();
         private int curSeq = 0;
@@ -43,7 +43,6 @@ namespace _Emulator
         private float lastUpdateTime = 0f;
         public List<KeyValuePair<int, RegMap>> regMaps = new List<KeyValuePair<int, RegMap>>();
         private bool waitForShutDown = false;
-        public readonly Version hostVersion;
 
         public readonly IGameMode[] gameModes;
         public readonly BuildMapEdit buildMapEdit;
@@ -57,16 +56,10 @@ namespace _Emulator
         public readonly PlayTeamDeathMatch playTeamDeathMatch;
         public readonly PlayZombie playZombie;
 
-        private readonly Action<ClientReference, MsgReference> sendToSteam;
-        private readonly Action<ClientReference, MsgReference> sendToTCP;
-
-        private Action<ClientReference, MsgReference> sendMessage;
-
         private readonly Dictionary<ushort, Action<MsgReference>> _handlers = new Dictionary<ushort, Action<MsgReference>>();
 
         public ServerEmulator()
         {
-            hostVersion = ClientExtension.GetGithubVersionOrUnknown();
             gameModes = new IGameMode[10];
             gameModes[(int)ROOM_TYPE.MAP_EDITOR] = buildMapEdit = new BuildMapEdit(this);
             gameModes[(int)ROOM_TYPE.BND] = playBuildAndDestroy = new PlayBuildAndDestroy(this);
@@ -78,9 +71,6 @@ namespace _Emulator
             gameModes[(int)ROOM_TYPE.BUNGEE] = playFreefall = new PlayFreefall(this);
             gameModes[(int)ROOM_TYPE.TEAM_MATCH] = playTeamDeathMatch = new PlayTeamDeathMatch(this);
             gameModes[(int)ROOM_TYPE.ZOMBIE] = playZombie = new PlayZombie(this);
-
-            sendToSteam = SendMessageToSteam;
-            sendToTCP = SendMessageToTCP;
         }
         private void RegisterHandlers()
         {
@@ -213,7 +203,6 @@ namespace _Emulator
             hasHost = false;
             try
             {
-                sendMessage = sendToTCP;
                 if (serverSocket == null)
                 {
                     serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -243,7 +232,6 @@ namespace _Emulator
             hasHost = false;
             lastUpdateTime = Time.time;
             serverCreated = true;
-            sendMessage = sendToSteam;
             Debug.Log("Server set to Steam");
 
             //Pulls all loaded RegMaps into the emulator
@@ -262,11 +250,11 @@ namespace _Emulator
                     if (HandleClientAccepted(client))
                         clientSocket.BeginReceive(client.recvBuf.Buffer, client.recvBuf.Io, client.recvBuf.Buffer.Length - client.recvBuf.Io, SocketFlags.None, new AsyncCallback(ReceiveCallback), client);
                     else
-                        SendDisconnect(client);
+                        client.Disconnect("Couldn't accept new client");
                 }
 
                 else
-                    SendDisconnect(client);
+                    client.Disconnect("Join rejected");
             }
 
             catch (Exception ex)
@@ -309,12 +297,6 @@ namespace _Emulator
             }
         }
 
-        internal void SendCallback(IAsyncResult result)
-        {
-            Socket clientSocket = (Socket)result.AsyncState;
-            clientSocket.EndSend(result);
-        }
-
         public void AcceptSteam(CSteamID steamID)
         {
             if (!serverCreated || !isSteam || !SteamManager.Initialized)
@@ -330,11 +312,11 @@ namespace _Emulator
                     if (!Config.instance.blockConnections)
                     {
                         if (!HandleClientAccepted(client))
-                            SendDisconnect(client);
+                            client.Disconnect("Couldn't accept new client");
                     }
 
                     else
-                        SendDisconnect(client);
+                        client.Disconnect("Join rejected");
                 }
             }
         }
@@ -385,36 +367,11 @@ namespace _Emulator
             }
         }
 
-        private void SendMessageToSteam(ClientReference clientRef, MsgReference msgRef)
-        {
-            if (!msgRef.doChunked || msgRef.msg._msg.Offset <= ChunkedBufferReceiver.MAX_CHUNK_LENGTH)
-            {
-                clientRef.WritePacketSteam(new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey));
-                return;
-            }
-            msgRef.msg._msg.SendChunked(msgRef.msg._id, sendKey, "Server", clientRef.WritePacketSteam);
-        }
-
-        private void SendMessageToTCP(ClientReference clientRef, MsgReference msgRef)
-        {
-            if (!msgRef.doChunked || msgRef.msg._msg.Offset <= ChunkedBufferReceiver.MAX_CHUNK_LENGTH)
-            {
-                clientRef.WritePacketTcp(new Msg4Send(msgRef.msg._id, uint.MaxValue, uint.MaxValue, msgRef.msg._msg, sendKey));
-                return;
-            }
-            msgRef.msg._msg.SendChunked(msgRef.msg._id, sendKey, "Server", clientRef.WritePacketTcp);
-        }
-
-        private void UnicastMessage(MsgReference msgRef)
-        {
-            sendMessage(msgRef.client, msgRef);
-        }
-
         private void BroadcastToClientList(List<ClientReference> list, MsgReference msgRef)
         {
             for (int i = 0; i < list.Count; i++)
             {
-                sendMessage(list[i], msgRef);
+                list[i].Send(msgRef);
             }
         }
 
@@ -424,7 +381,7 @@ namespace _Emulator
             {
                 if (filter.Invoke(list[i]))
                     continue;
-                sendMessage(list[i], msgRef);
+                list[i].Send(msgRef);
             }
         }
 
@@ -482,13 +439,22 @@ namespace _Emulator
             return clientList.Exists(x => x.steamID == steamID);
         }
 
+        public void DisconnectAll(string message = null, bool serverPrefix = true)
+        {
+            ClientReference[] references = clientList.ToArray();
+            foreach (ClientReference reference in references) {
+                reference.Disconnect(message, serverPrefix);
+            }
+            clientList.Clear();
+        }
+
         public void ShutdownInit()
         {
             channelManager.Shutdown();
             channelManager = new EmulatorChannelManager();
             //matchData = new MatchData();
             curSeq = 0;
-            SendDisconnect(null, SendType.Broadcast);
+            DisconnectAll();
             waitForShutDown = true;
         }
 
@@ -525,7 +491,6 @@ namespace _Emulator
                     serverSocket = null;
                 }
                 ClearBuffers();
-                clientList.Clear();
                 serverCreated = false;
             }
         }
@@ -546,7 +511,6 @@ namespace _Emulator
                 writeQueue.Enqueue(msg);
             }
         }
-
         public void SayInstant(MsgReference msg)
         {
             lock (dataLock)
@@ -634,8 +598,7 @@ namespace _Emulator
                         clientRef.loginToleranceTime += delta;
                         continue;
                     }
-                    SendDisconnect(clientRef, message: "Login timedout");
-                    clientRef.Disconnect(false);
+                    clientRef.Disconnect("Login took too long");
                     if (ServerEmulator.instance.debugHandle)
                         Debug.Log("[Disconnect] Client login timed out: " + clientRef.GetIdentifier());
                     continue;
@@ -649,7 +612,7 @@ namespace _Emulator
                 {
                     if (ServerEmulator.instance.debugHandle)
                         Debug.Log("[Disconnect] Client timed out: " + clientRef.GetIdentifier());
-                    clientRef.Disconnect(true);
+                    clientRef.Disconnect("Client didn't respond for too long");
                     continue;
                 }
             }
@@ -776,7 +739,7 @@ namespace _Emulator
                 switch (msgRef.sendType)
                 {
                     case SendType.Unicast:
-                        UnicastMessage(msgRef);
+                        msgRef.client.Send(msgRef);
                         break;
 
                     case SendType.Broadcast:
@@ -828,7 +791,7 @@ namespace _Emulator
                     var existingClient = clientList.Find(x => x.steamID == client.steamID);
                     nonExisting = existingClient == null;
                     if (!nonExisting)
-                        nonExisting = existingClient.Disconnect(true);
+                        nonExisting = existingClient.CloseClient();
 
                     //nonExisting = !clientList.Exists(x => x.steamID == client.steamID);
                 }
@@ -867,8 +830,7 @@ namespace _Emulator
             if (!msgRef.client.isVersionSetUp)
             {
                 Debug.LogWarning($"Disconnecting client: Version check failed, client didn't send any version");
-                SendDisconnect(msgRef.client, message: $"Version mismatch detected, the host is using a newer version ({hostVersion})");
-                msgRef.client.Disconnect(false);
+                msgRef.client.Disconnect($"Version mismatch detected, the host is using a newer version ({Core.VersionStr})");
                 return;
             }
 
@@ -2324,7 +2286,7 @@ namespace _Emulator
 
         private void HandleDisconnect(MsgReference msgRef)
         {
-            msgRef.client.Disconnect();
+            msgRef.client.CloseClient();
         }
 
         private void HandleDelegateMasterRequest(MsgReference msgRef)
@@ -2793,16 +2755,6 @@ namespace _Emulator
 
             if (debugSend)
                 Debug.Log("Broadcasted SendEmptyTrain for room no: " + matchData.room.No);
-        }
-
-        public void SendDisconnect(ClientReference client, SendType sendType = SendType.Unicast, string message = null)
-        {
-            MsgBody body = new MsgBody();
-            if (message != null)
-            {
-                body.Write(message);
-            }
-            SayInstant(new MsgReference(ExtensionOpcodes.opDisconnectAck, body, client, sendType));
         }
 
         public void SendOpenDoor(int seq, MatchData matchData)
@@ -3635,7 +3587,6 @@ namespace _Emulator
             }
 
             Say(new MsgReference(ExtensionOpcodes.opSlotDataAck, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
-            Say(new MsgReference(ExtensionOpcodes.opSlotDataAck, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
                 Debug.Log("Broadcasted SendSlotData for room no: " + matchData.room.No);
@@ -3673,7 +3624,6 @@ namespace _Emulator
                 body.Write(0); //drpItem count
             }
 
-            //Say(new MsgReference(ExtensionOpcodes.opSlotDataSteamAck, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
             Say(new MsgReference(ExtensionOpcodes.opSlotDataSteamAck, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
@@ -4318,8 +4268,7 @@ namespace _Emulator
         {
             if (!msgRef.client.chunkedBufferReceiver.Begin(msgRef.msg._msg))
             {
-                SendDisconnect(msgRef.client, message: "Received invalid chunked buffer");
-                msgRef.client.Disconnect(true);
+                msgRef.client.Disconnect("Received invalid chunked buffer");
             }
         }
 
@@ -4327,8 +4276,7 @@ namespace _Emulator
         {
             if (!msgRef.client.chunkedBufferReceiver.ReceiveChunk(msgRef.msg._msg))
             {
-                SendDisconnect(msgRef.client, message: "Received invalid chunked buffer");
-                msgRef.client.Disconnect(true);
+                msgRef.client.Disconnect("Received invalid chunked buffer");
             }
         }
 
@@ -4338,8 +4286,7 @@ namespace _Emulator
             MsgBody packedBody;
             if (!msgRef.client.chunkedBufferReceiver.End(msgRef.msg._msg, out packedOpcode, out packedBody))
             {
-                SendDisconnect(msgRef.client, message: "Received invalid chunked buffer");
-                msgRef.client.Disconnect(true);
+                msgRef.client.Disconnect("Received invalid chunked buffer");
                 return;
             }
             readQueue.Enqueue(new MsgReference(packedOpcode, packedBody, msgRef.client, _channelRef: msgRef.channelRef, _matchData: msgRef.matchData));
@@ -5422,24 +5369,22 @@ namespace _Emulator
             {
                 // We are pretty sure the client has an unknown version if this is -1
                 Debug.LogWarning($"Disconnecting client: Version check failed, client sent invalid version");
-                SendDisconnect(client, message: $"Version mismatch detected, the host is using a newer version ({hostVersion})");
-                msg.client.Disconnect(false);
+                client.Disconnect($"Version mismatch detected, the host is using a newer version ({Core.VersionStr})");
                 return;
             }
 
             Version clientVersion = new Version(clientMajor, clientMinor, clientPatch, clientRevision);
-            int result = hostVersion.CompareTo(clientVersion);
+            int result = Core.Version.CompareTo(clientVersion);
             if (result != 0)
             {
-                Debug.LogWarning($"Disconnecting client: Version check failed, expected {hostVersion} but got {clientVersion}");
+                Debug.LogWarning($"Disconnecting client: Version check failed, expected {Core.VersionStr} but got {clientVersion}");
                 string relation = result < 0 ? "an older" : "a newer";
-                SendDisconnect(client, message: $"Version mismatch detected, the host is using {relation} version ({hostVersion})");
-                msg.client.Disconnect(false);
+                client.Disconnect($"Version mismatch detected, the host is using {relation} version ({Core.VersionStr})");
                 return;
             }
             if (debugHandle)
             {
-                Debug.Log($"Version check succeeded, got host version {hostVersion} and client version {clientVersion}");
+                Debug.Log($"Version check succeeded, got host version {Core.VersionStr} and client version {clientVersion}");
             }
             SayInstant(new MsgReference(ExtensionOpcodes.opVersionCheckAck, new MsgBody(), client));
         }

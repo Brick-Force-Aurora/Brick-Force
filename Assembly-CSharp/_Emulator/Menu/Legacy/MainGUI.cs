@@ -93,9 +93,7 @@ namespace _Emulator
             {
                 if (GUILayout.Button(ServerEmulator.instance.clientList[i].GetIdentifier()) && !ServerEmulator.instance.clientList[i].isHost)
                 {
-                    ClientReference clientRef = ServerEmulator.instance.clientList[i];
-                    ServerEmulator.instance.SendDisconnect(clientRef);
-                    clientRef.Disconnect(true);
+                    ServerEmulator.instance.clientList[i].Disconnect("Disconnected by host");
                 }
             }
         }

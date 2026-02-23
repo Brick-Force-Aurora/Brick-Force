@@ -69,7 +69,7 @@ namespace _Emulator.Network.Gamemodes
                     body.Write(matchData.clientList[i].data.xp);
                     body.Write((long)0); //buff
                 }
-                emulator.Say(new MsgReference((ushort)MessageId.CS_MISSION_END_ACK, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam));
+                emulator.Say(new MsgReference((ushort)MessageId.CS_MISSION_END_ACK, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam, matchData.channel, matchData));
             }
 
             if (emulator.debugSend)

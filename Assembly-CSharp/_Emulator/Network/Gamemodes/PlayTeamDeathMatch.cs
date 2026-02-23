@@ -71,7 +71,7 @@ namespace _Emulator
                     body.Write(matchData.clientList[i].data.xp);
                     body.Write((long)0); //buff
                 }
-                emulator.Say(new MsgReference(70, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam));
+                emulator.Say(new MsgReference(70, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam, matchData.channel, matchData));
             }
 
             if (emulator.debugSend)
