@@ -45,6 +45,7 @@ namespace _Emulator
         public bool useD3DPatternScan = true;
         public bool killThemida = false;
         public UnityDebugOption unityDebugOption = UnityDebugOption.unityDebugOff;
+        public string unityDebugIP = "127.0.0.1:56000";
 
         public Config()
         {
@@ -77,12 +78,13 @@ namespace _Emulator
                 data["max_num_rooms"] = maxNumRooms;
                 data["only_host_rooms"] = onlyHostRooms;
                 data["announce_lobby_to_friends"] = announceLobbyToFriends;
-                data["limitFPS"] = fpsLimit;
+                data["limit_fps"] = fpsLimit;
                 data["vsync"] = vsync;
-                data["followHooks"] = followHooks;
-                data["useD3DPatternScan"] = useD3DPatternScan;
-                data["killThemida"] = killThemida;
-                data["unityDebugOption"] = (int)unityDebugOption;
+                data["follow_hooks"] = followHooks;
+                data["use_d3d_pattern_scan"] = useD3DPatternScan;
+                data["kill_themida"] = killThemida;
+                data["unity_debug_option"] = (int)unityDebugOption;
+                data["unity_debug_ip"] = unityDebugIP;
 
                 StringBuilder stringBuilder = new StringBuilder();
                 JsonWriter writer = new JsonWriter(stringBuilder)
@@ -137,12 +139,13 @@ namespace _Emulator
                 try { maxNumRooms = (int)data["max_num_rooms"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
                 try { onlyHostRooms = (bool)data["only_host_rooms"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
                 try { announceLobbyToFriends = (bool)data["announce_lobby_to_friends"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
-                try { fpsLimit = (int)data["limitFPS"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { fpsLimit = (int)data["limit_fps"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
                 try { vsync = (bool)data["vsync"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
-                try { followHooks = (bool)data["followHooks"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
-                try { useD3DPatternScan = (bool)data["useD3DPatternScan"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
-                try { killThemida = (bool)data["killThemida"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
-                try { unityDebugOption = (UnityDebugOption)(int)data["unityDebugOption"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { followHooks = (bool)data["follow_hooks"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { useD3DPatternScan = (bool)data["use_d3d_pattern_scan"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { killThemida = (bool)data["kill_themida"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { unityDebugOption = (UnityDebugOption)(int)data["unity_debug_option"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { unityDebugIP = (string)data["unity_debug_ip"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
             }
 
             catch (Exception ex)

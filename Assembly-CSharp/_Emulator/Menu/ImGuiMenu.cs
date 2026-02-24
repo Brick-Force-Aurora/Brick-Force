@@ -28,6 +28,7 @@ namespace _Emulator
         private bool createFriendsOnly = false;
         private int createMaxSlots = 16;
         private string[] unityDebugComboItems = new string[] { "Off", "On", "On (Wait For Debugger)" };
+        private string unityDebugIPInput = string.Empty;
 
         void Initialize()
         {
@@ -486,6 +487,10 @@ namespace _Emulator
             }
 
             catch { }
+
+            ImGui.InputTextWithHint("##UnityDebugIPInput", "Enter Unity Debug IP:Port", ref Config.instance.unityDebugIP, 32);
+            ImGui.SameLine();
+            ImGui.Text("Unity Debug IP (Requires Restart)");
 
             ImGui.Separator();
 
