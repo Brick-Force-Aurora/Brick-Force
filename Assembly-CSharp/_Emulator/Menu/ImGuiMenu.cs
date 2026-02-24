@@ -27,6 +27,7 @@ namespace _Emulator
         private string customMessageInput = string.Empty;
         private bool createFriendsOnly = false;
         private int createMaxSlots = 16;
+        private string[] unityDebugComboItems = new string[] { "Off", "On", "On (Wait For Debugger)" };
 
         void Initialize()
         {
@@ -471,8 +472,20 @@ namespace _Emulator
             ImGui.Separator();
 
             ImGui.TextDisabled("Advanced");
-            ImGui.Checkbox("Follow Overlay Hooks", ref Config.instance.followHooks);
-            ImGui.Checkbox("Use D3D Pattern Scan", ref Config.instance.useD3DPatternScan);
+            ImGui.Checkbox("Follow Overlay Hooks (Requires Restart)", ref Config.instance.followHooks);
+            ImGui.Checkbox("Use D3D Pattern Scan (Requires Restart)", ref Config.instance.useD3DPatternScan);
+            ImGui.Checkbox("Kill Themida (Requires Restart)", ref Config.instance.killThemida);
+
+            try
+            {
+                int tempUnityDebugOption = (int)Config.instance.unityDebugOption;
+                ImGui.Combo("Enable Unity Debug Support (Requires Restart)", ref tempUnityDebugOption, unityDebugComboItems, unityDebugComboItems.Length);
+                Config.instance.unityDebugOption = (Config.UnityDebugOption)tempUnityDebugOption;
+                if (Config.instance.unityDebugOption == Config.UnityDebugOption.unityDebugWait)
+                    ImGui.TextDisabled("Warning: Game will not start anymore without attaching the Unity debugger to the running process!");
+            }
+
+            catch { }
 
             ImGui.Separator();
 

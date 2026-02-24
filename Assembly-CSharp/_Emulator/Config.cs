@@ -11,6 +11,13 @@ namespace _Emulator
 {
     class Config
     {
+        public enum UnityDebugOption : int
+        {
+            unityDebugOff = 0,
+            unityDebugOn,
+            unityDebugWait
+        }
+
         public static Config instance;
         //public JsonObject configData;
 
@@ -36,6 +43,8 @@ namespace _Emulator
         public int fpsLimit = -1;
         public bool followHooks = true;
         public bool useD3DPatternScan = true;
+        public bool killThemida = false;
+        public UnityDebugOption unityDebugOption = UnityDebugOption.unityDebugOff;
 
         public Config()
         {
@@ -72,6 +81,8 @@ namespace _Emulator
                 data["vsync"] = vsync;
                 data["followHooks"] = followHooks;
                 data["useD3DPatternScan"] = useD3DPatternScan;
+                data["killThemida"] = killThemida;
+                data["unityDebugOption"] = (int)unityDebugOption;
 
                 StringBuilder stringBuilder = new StringBuilder();
                 JsonWriter writer = new JsonWriter(stringBuilder)
@@ -130,6 +141,8 @@ namespace _Emulator
                 try { vsync = (bool)data["vsync"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
                 try { followHooks = (bool)data["followHooks"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
                 try { useD3DPatternScan = (bool)data["useD3DPatternScan"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { killThemida = (bool)data["killThemida"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
+                try { unityDebugOption = (UnityDebugOption)(int)data["unityDebugOption"]; } catch (Exception ex) { Debug.LogError(ex.Message); }
             }
 
             catch (Exception ex)
