@@ -188,7 +188,7 @@ Shows a preview of the area you are about to edit.
 
 ## How to debug (Visual Studio)
 - Make sure 'Visual Studio Tools for Unity' is installed for your Visual Studio installation.
-- To install, open Visual Studio Installer, click modify on your installation, select 'Game development with Unity' and click 'Modify' at the bottom right corner.
+- To install, open Visual Studio Installer, click 'Modify' on your installation, select 'Game development with Unity' and click 'Modify' at the bottom right corner.
 - Assembly-CSharp.dll has to be built with the 'Debug-mdb' build configuration to generate mono debug symbols required by the Unity debugger.
 - Inside the game config menu, make sure 'Kill Themida' is enabled, 'Enable Unity Debug Support' is not Off and 'Unity Debug IP' is a valid IPv4:Port combination.
 - Alternatively to 'Kill Themida', a clean [Unity 4.5.1 player_win.exe](https://download.unity3d.com/download_unity/UnitySetup-4.5.1.exe) can be used by extracting *UnitySetup-4.5.1.exe\Data\PlaybackEngines\windowsstandalonesupport\Variations\win32_nondevelopment\player_win.exe*, renaming it to BrickForce.exe and replacing the original BrickForce.exe with it.
