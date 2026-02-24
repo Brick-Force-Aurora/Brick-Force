@@ -21,6 +21,12 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
   </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug-mdb' ">
+    <OutputPath>bin\Debug\</OutputPath>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+  </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <OutputPath>bin\Release\</OutputPath>
     <DebugSymbols>true</DebugSymbols>
@@ -28,6 +34,12 @@
     <Optimize>true</Optimize>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <OutputPath>$(LocalAppData)\BrickForce Aurora\game\BrickForce_Data\Managed\</OutputPath>
+    <Prefer32Bit>false</Prefer32Bit>
+    <DefineConstants>
+    </DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug-mdb|AnyCPU'">
     <OutputPath>$(LocalAppData)\BrickForce Aurora\game\BrickForce_Data\Managed\</OutputPath>
     <Prefer32Bit>false</Prefer32Bit>
     <DefineConstants>
@@ -881,7 +893,6 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>
-    </PostBuildEvent>
+    <PostBuildEvent>if "$(ConfigurationName)" == "Debug-mdb" $(SolutionDir)Tools\pdb2mdb\pdb2mdb.exe "$(TargetPath)"</PostBuildEvent>
   </PropertyGroup>
 </Project>
