@@ -185,7 +185,30 @@ Shows a preview of the area you are about to edit.
 - Install the launcher and the game into the same folder where the Brick-Force repository folder is to resolve all dependencies.
 - Change Build output path to Brick-Force_Data/Managed in project properties to match original game folder.
 - If necessary, reimport any missing assembly references.
-- ~To Debug select the Brick-Force.exe as the external program.~ Regular debugging will crash due to Themida protection on BrickForce.exe by the original developer.
+
+## How to debug (Visual Studio)
+- Make sure 'Visual Studio Tools for Unity' is installed for your Visual Studio installation.
+- To install, open Visual Studio Installer, click modify on your installation, select 'Game development with Unity' and click 'Modify' at the bottom right corner.
+- Assembly-CSharp.dll has to be built with the 'Debug-mdb' build configuration to generate mono debug symbols required by the Unity debugger.
+- Inside the game config menu, make sure 'Kill Themida' is enabled, 'Enable Unity Debug Support' is not Off and 'Unity Debug IP' is a valid IPv4:Port combination.
+- Alternatively to 'Kill Themida', a clean [Unity 4.5.1 player_win.exe](https://download.unity3d.com/download_unity/UnitySetup-4.5.1.exe) can be used by extracting *UnitySetup-4.5.1.exe\Data\PlaybackEngines\windowsstandalonesupport\Variations\win32_nondevelopment\player_win.exe*, renaming it to BrickForce.exe and replacing the original BrickForce.exe with it.
+- When 'Enable Unity Debug Support' is set to 'On (Wait For Debugger)' the game will suspend shortly after launch and the window will not appear until the Unity debugger is attached.
+- Inside Visual Studio, while the game is running, click 'Debug' at the top menu bar, click 'Attach Unity Debugger', click 'Input IP' and enter the IPv4:Port combination from the 'Unity Debug IP' setting.
+- The debugger should attach and you should be able to use breakpoints.
+- Newer Visual Studio versions might have issues to display variable contents.
+
+## How to debug (dnSpy)
+- Download [dnSpy](https://github.com/dnSpy/dnSpy/releases/latest).
+- Inside dnSpy, drag and drop Assembly-CSharp.dll to decompile it.
+- Mono or .NET debug symbols are not required.
+- Inside the game config menu, make sure 'Enable Unity Debug Support' is not Off and 'Unity Debug IP' is a valid IPv4:Port combination.
+- 'Kill Themida' can be enabled, but dnSpy's anti-anti-debug features might be sufficient.
+- Alternatively to 'Kill Themida' or dnSpy's anti-anti-debug features, a clean [Unity 4.5.1 player_win.exe](https://download.unity3d.com/download_unity/UnitySetup-4.5.1.exe) can be used by extracting *UnitySetup-4.5.1.exe\Data\PlaybackEngines\windowsstandalonesupport\Variations\win32_nondevelopment\player_win.exe*, renaming it to BrickForce.exe and replacing the original BrickForce.exe with it.
+- When 'Enable Unity Debug Support' is set to 'On (Wait For Debugger)' the game will suspend shortly after launch and the window will not appear until the Unity debugger is attached.
+- Inside dnSpy, while the game is running, click 'Debug' at the top menu bar, click 'Start Debugging', set 'Debug engine' to 'Unity (Connect)' and enter the IPv4:Port combination from the 'Unity Debug IP' setting.
+- The debugger should attach and you should be able to use breakpoints.
+- You might have to reload Assembly-CSharp.dll into dnSpy to see changes in the file appear after compiling.
+- Other than Visual Studio, dnSpy should have no issues to display variable contents.
 
 ## Dependencies
 - [Brick-Force Base (Install with the BrickForce Aurora Launcher)](https://github.com/Brick-Force-Aurora/Launcher) (Root)
@@ -198,6 +221,8 @@ Shows a preview of the area you are about to edit.
 - [ICSharpCode.SharpZipLib.dll](https://github.com/icsharpcode/SharpZipLib) (BrickForce_Data\Managed)
 - [LitJSON.dll](https://github.com/LitJSON/litjson) (BrickForce_Data\Managed)
 - [d3d9helper.dll](https://github.com/Brick-Force-Aurora/d3d9helper) (Root)
+- [antithemida.dll](https://github.com/Brick-Force-Aurora/antithemida) (Root)
+- Patched mono.dll to load antithemida.dll. (BrickForce_Data\Mono)
 - Font.ttf (Any font to use in the menu, release uses [Noto Sans JP Semi Bold](https://fonts.google.com/noto/specimen/Noto+Sans+JP). (Root)
 
 ## Notes
