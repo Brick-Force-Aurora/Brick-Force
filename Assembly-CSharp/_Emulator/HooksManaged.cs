@@ -155,6 +155,14 @@ namespace _Emulator
         static MethodInfo hUserMapInfoManagerCreateBuildModeInfo = typeof(HooksManaged).GetMethod("hUserMapInfoManagerCreateBuildMode", BindingFlags.Public | BindingFlags.Instance);
         static ManagedHook UserMapInfoManagerCreateBuildModeHook;
 
+        static MethodInfo oDoPagePanel = typeof(DownloadMapFrame).GetMethod("DoPagePanel", BindingFlags.NonPublic | BindingFlags.Instance);
+        static MethodInfo hDoPagePanel = typeof(HooksManaged).GetMethod("hDownloadMapFrameDoPagePanel", BindingFlags.Public | BindingFlags.Static);
+        static ManagedHook DoPagePanelHook;
+
+        static MethodInfo oDownloadMapFrameOnGUI = typeof(DownloadMapFrame).GetMethod("OnGUI", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hDownloadMapFrameOnGUI = typeof(HooksManaged).GetMethod("hDownloadMapOnGUI", BindingFlags.Public | BindingFlags.Static);
+        static ManagedHook DownloadMapFrameOnGUIHook;
+
         private void hP2PManagerHandshake()
         {
             if (MyInfoManager.Instance.Status == 3 || MyInfoManager.Instance.Status == 4)
@@ -703,6 +711,317 @@ namespace _Emulator
             downloadMapFrame?.EndMapList();
         }
 
+        public static void hDownloadMapFrameDoPagePanel(DownloadMapFrame __instance, int length)
+        {
+            // no-op => no page UI, no page requests
+        }
+
+        static readonly BindingFlags BF = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+
+        static readonly FieldInfo f_scrollPosition = typeof(DownloadMapFrame).GetField("scrollPosition", BF);
+        static readonly FieldInfo f_chatView = typeof(DownloadMapFrame).GetField("chatView", BF);
+        static readonly FieldInfo f_selected = typeof(DownloadMapFrame).GetField("selected", BF);
+        static readonly FieldInfo f_lastClickTime = typeof(DownloadMapFrame).GetField("lastClickTime", BF);
+        static readonly FieldInfo f_page = typeof(DownloadMapFrame).GetField("page", BF);
+        static readonly FieldInfo f_crdRegMapRect = typeof(DownloadMapFrame).GetField("crdRegMapRect", BF);
+        static readonly FieldInfo f_crdRegMapRectTemp = typeof(DownloadMapFrame).GetField("crdRegMapRectTemp", BF);
+        static readonly FieldInfo f_crdMapSize = typeof(DownloadMapFrame).GetField("crdMapSize", BF);
+        static readonly FieldInfo f_crdMapOffset = typeof(DownloadMapFrame).GetField("crdMapOffset", BF);
+        static readonly FieldInfo f_crdAlias = typeof(DownloadMapFrame).GetField("crdAlias", BF);
+        static readonly FieldInfo f_crdBtns = typeof(DownloadMapFrame).GetField("crdBtns", BF);
+        static readonly FieldInfo f_crdBtns2 = typeof(DownloadMapFrame).GetField("crdBtns2", BF);
+        static readonly FieldInfo f_doubleClickTimeout = typeof(DownloadMapFrame).GetField("doubleClickTimeout", BF);
+        static readonly MethodInfo m_VerifyChatView = typeof(DownloadMapFrame).GetMethod("VerifyChatView", BF);
+        static readonly MethodInfo m_GetFirstEmptyUserSlot = typeof(DownloadMapFrame).GetMethod("GetFirstEmptyUserSlot", BF);
+        static readonly MethodInfo m_CopyRegMapToUserSlot = typeof(DownloadMapFrame).GetMethod("CopyRegMapToUserSlot", BF);
+
+        private static _Emulator.RegMapQuickFilter regMapFilter = new _Emulator.RegMapQuickFilter();
+
+        public static void hDownloadMapOnGUI(DownloadMapFrame __instance)
+        {
+            if (__instance == null) return;
+
+            // -------- read needed fields --------
+            var scrollPosition = (Vector2)(f_scrollPosition?.GetValue(__instance) ?? Vector2.zero);
+            bool chatView = (bool)(f_chatView?.GetValue(__instance) ?? false);
+            int selected = (int)(f_selected?.GetValue(__instance) ?? 0);
+            float lastClick = (float)(f_lastClickTime?.GetValue(__instance) ?? 0f);
+            float dblTimeout = (float)(f_doubleClickTimeout?.GetValue(__instance) ?? 0.2f);
+
+            Rect crdRegMapRect = (Rect)(f_crdRegMapRect?.GetValue(__instance) ?? new Rect(264f, 142f, 732f, 515f));
+            Rect crdRegMapRectTemp = (Rect)(f_crdRegMapRectTemp?.GetValue(__instance) ?? crdRegMapRect);
+            Vector2 crdMapSize = (Vector2)(f_crdMapSize?.GetValue(__instance) ?? new Vector2(150f, 196f));
+            Vector2 crdMapOffset = (Vector2)(f_crdMapOffset?.GetValue(__instance) ?? new Vector2(35f, 21f));
+            Vector2 crdAlias = (Vector2)(f_crdAlias?.GetValue(__instance) ?? new Vector2(5f, 174f));
+
+            var crdBtns = (Rect[])(f_crdBtns?.GetValue(__instance) ?? new Rect[0]);
+            var crdBtns2 = (Rect[])(f_crdBtns2?.GetValue(__instance) ?? new Rect[0]);
+
+            // -------- keep chat sizing behavior (from original) --------
+            m_VerifyChatView?.Invoke(__instance, null);
+            chatView = (bool)(f_chatView?.GetValue(__instance) ?? chatView);
+
+            if (chatView)
+                crdRegMapRect.height = 300f;
+            else
+                crdRegMapRect.height = crdRegMapRectTemp.height;
+
+            // write back updated rect (since we modified height)
+            f_crdRegMapRect?.SetValue(__instance, crdRegMapRect);
+
+            // -------- get FULL reg list (no paging) --------
+            // BEST: if you really have RegMapManager.Instance.ToArray(subTab) returning full list, use that.
+            // e.g.: RegMap[] reg = RegMapManager.Instance.ToArray( /*tab*/ 0 );
+            // Since subTab is private and you want mode selection disabled anyway, we just use ALL maps.
+            RegMap[] reg = RegMapManager.Instance.dicRegMap.Values.ToArray();
+
+            if (reg == null || reg.Length == 0)
+                return;
+
+            // -------- quick filter UI (position/sizing from your example) --------
+            // Place it above the map grid, but keep the original rects.
+            // Adjust these if you want; you said you have it set up already.
+            bool changed = regMapFilter.Draw(
+                new Vector2(800f, 90f),
+                new Rect(800f, 100f, 210f, 26f)
+            );
+
+            if (changed || regMapFilter.Indices == null || regMapFilter.Indices.Length == 0)
+            {
+                regMapFilter.Rebuild(reg);
+                selected = regMapFilter.ClampSelection(reg, selected);
+            }
+
+            int[] visible = regMapFilter.Indices;
+            int visibleCount = (visible != null) ? visible.Length : 0;
+            Debug.Log(visibleCount);
+            if (visibleCount <= 0)
+            {
+                // nothing matches filter => still draw empty scroll area (optional)
+                // Just persist selection + scroll and exit.
+                f_selected?.SetValue(__instance, selected);
+                f_scrollPosition?.SetValue(__instance, scrollPosition);
+                f_lastClickTime?.SetValue(__instance, lastClick);
+                return;
+            }
+
+            // -------- 4 columns like original (your DoRegMap example uses 3) --------
+            const int COLS = 4;
+
+            int rows = visibleCount / COLS;
+            if (visibleCount % COLS > 0) rows++;
+
+            Rect viewRect = new Rect(
+                0f, 0f,
+                crdMapSize.x * COLS + crdMapOffset.x * (COLS - 1),
+                crdMapSize.y * rows
+            );
+
+            if (rows > 1)
+                viewRect.height += crdMapOffset.y * (rows - 1);
+
+            // -------- scroll view render --------
+            scrollPosition = GUI.BeginScrollView(crdRegMapRect, scrollPosition, viewRect);
+
+            bool openDetail = false; // double click behavior like original
+
+            for (int r = 0; r < rows; r++)
+            {
+                for (int c = 0; c < COLS; c++)
+                {
+                    int idxVisible = COLS * r + c;
+                    if (idxVisible >= visibleCount) continue;
+
+                    int i = visible[idxVisible]; // index into reg[]
+
+                    Rect rect = new Rect(
+                        c * (crdMapSize.x + crdMapOffset.x),
+                        r * (crdMapSize.y + crdMapOffset.y),
+                        crdMapSize.x,
+                        crdMapSize.y
+                    );
+
+                    Rect thumbRect = new Rect(rect.x, rect.y, rect.width, rect.width + 4f);
+
+                    // thumbnail / blocked overlay (same as original)
+                    Texture2D thumb = (reg[i].Thumbnail != null) ? reg[i].Thumbnail : __instance.nonAvailable;
+
+                    if (!reg[i].Blocked)
+                    {
+                        TextureUtil.DrawTexture(thumbRect, thumb, ScaleMode.StretchToFill);
+                    }
+                    else
+                    {
+                        TextureUtil.DrawTexture(thumbRect, GlobalVars.Instance.iconBoxGray, ScaleMode.StretchToFill);
+
+                        float w = GlobalVars.Instance.iconLockSlot.width;
+                        float h = GlobalVars.Instance.iconLockSlot.height;
+                        float x = thumbRect.x + thumbRect.width / 2f - w / 2f;
+                        float y = thumbRect.y + thumbRect.height / 2f - h / 2f;
+                        TextureUtil.DrawTexture(new Rect(x, y, w, h), GlobalVars.Instance.iconLockSlot, ScaleMode.StretchToFill);
+                    }
+
+                    // click handling (select + double click opens detail)
+                    if (GlobalVars.Instance.MyButton(rect, string.Empty, "BoxMapSelectBorder"))
+                    {
+                        selected = i;
+
+                        if (reg[selected].Blocked)
+                            MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("NOTICE_BLOCK_MAP"));
+
+                        if (Time.time - lastClick > dblTimeout)
+                        {
+                            lastClick = Time.time;
+                        }
+                        else
+                        {
+                            openDetail = true;
+                        }
+                    }
+
+                    // "new map"/tags/abuse icons (same as original)
+                    DateTime d = reg[i].RegisteredDate;
+                    if (d.Year == DateTime.Today.Year && d.Month == DateTime.Today.Month && d.Day == DateTime.Today.Day)
+                    {
+                        TextureUtil.DrawTexture(new Rect(rect.x, rect.y,
+                            GlobalVars.Instance.iconNewmap.width,
+                            GlobalVars.Instance.iconNewmap.height),
+                            GlobalVars.Instance.iconNewmap, ScaleMode.StretchToFill);
+                    }
+                    else if ((reg[i].tagMask & 8) != 0)
+                    {
+                        TextureUtil.DrawTexture(new Rect(rect.x, rect.y,
+                            GlobalVars.Instance.iconglory.width,
+                            GlobalVars.Instance.iconglory.height),
+                            GlobalVars.Instance.iconglory, ScaleMode.StretchToFill);
+                    }
+                    else if ((reg[i].tagMask & 4) != 0)
+                    {
+                        TextureUtil.DrawTexture(new Rect(rect.x, rect.y,
+                            GlobalVars.Instance.iconMedal.width,
+                            GlobalVars.Instance.iconMedal.height),
+                            GlobalVars.Instance.iconMedal, ScaleMode.StretchToFill);
+                    }
+                    else if ((reg[i].tagMask & 2) != 0)
+                    {
+                        TextureUtil.DrawTexture(new Rect(rect.x, rect.y,
+                            GlobalVars.Instance.icongoldRibbon.width,
+                            GlobalVars.Instance.icongoldRibbon.height),
+                            GlobalVars.Instance.icongoldRibbon, ScaleMode.StretchToFill);
+                    }
+
+                    if (reg[i].IsAbuseMap())
+                    {
+                        float x2 = rect.x + rect.width - GlobalVars.Instance.iconDeclare.width;
+                        TextureUtil.DrawTexture(new Rect(x2, rect.y,
+                            GlobalVars.Instance.iconDeclare.width,
+                            GlobalVars.Instance.iconDeclare.height),
+                            GlobalVars.Instance.iconDeclare, ScaleMode.StretchToFill);
+                    }
+                    LabelUtil.TextOut(
+                        new Vector2(rect.x + crdAlias.x, rect.y + crdAlias.y - 18f),   // shift up a bit
+                        reg[i].Developer ?? "",
+                        "MiniLabel",
+                        GlobalVars.Instance.txtMainColor,
+                        GlobalVars.txtEmptyColor,
+                        TextAnchor.UpperLeft
+                    );
+                    // alias label (same placement from original)
+                    LabelUtil.TextOut(
+                        new Vector2(rect.x + crdAlias.x, rect.y + crdAlias.y),
+                        reg[i].Alias,
+                        "MiniLabel",
+                        GlobalVars.Instance.txtMainColor,
+                        GlobalVars.txtEmptyColor,
+                        TextAnchor.UpperLeft
+                    );
+
+                    // selection overlay
+                    if (selected == i)
+                        TextureUtil.DrawTexture(rect, __instance.selectedMapFrame, ScaleMode.StretchToFill);
+                }
+            }
+
+            GUI.EndScrollView();
+
+            // open detail dialog if double clicked
+            if (openDetail && selected >= 0 && selected < reg.Length)
+            {
+                ((MapDetailDlg)DialogManager.Instance.Popup(DialogManager.DIALOG_INDEX.MAP_DETAIL, exclusive: true))
+                    ?.InitDialog(reg[selected]);
+            }
+
+            // -------- keep the bottom buttons (LOAD TO SLOT / CREATE ROOM / DELETE) --------
+            if (selected >= 0 && selected < reg.Length)
+            {
+                // LOAD TO SLOT
+                Rect rc = (crdBtns.Length > 0) ? new Rect(crdBtns[0]) : new Rect(300f, 714f, 139f, 38f);
+                if (chatView && crdBtns2.Length > 0) rc = new Rect(crdBtns2[0]);
+
+                GUI.enabled = !reg[selected].Blocked;
+                GUIContent loadContent = new GUIContent("LOAD TO SLOT", GlobalVars.Instance.iconJoin);
+
+                if (GlobalVars.Instance.MyButton3(rc, loadContent, "BtnAction"))
+                {
+                    int slot = -1;
+                    if (m_GetFirstEmptyUserSlot != null)
+                        slot = (int)m_GetFirstEmptyUserSlot.Invoke(__instance, null);
+
+                    if (slot < 0)
+                    {
+                        MessageBoxMgr.Instance.AddMessage("No empty map slots available.");
+                    }
+                    else
+                    {
+                        bool ok = false;
+                        if (m_CopyRegMapToUserSlot != null)
+                            ok = (bool)m_CopyRegMapToUserSlot.Invoke(__instance, new object[] { reg[selected], slot });
+
+                        if (ok)
+                            SystemMsgManager.Instance.ShowMessage($"Loaded '{reg[selected].Alias}' into slot {slot}.");
+                        else
+                            MessageBoxMgr.Instance.AddMessage("Failed to load map into slot.");
+                    }
+                }
+
+                // CREATE ROOM
+                rc = (crdBtns.Length > 1) ? new Rect(crdBtns[1]) : new Rect(715f, 714f, 139f, 38f);
+                if (chatView && crdBtns2.Length > 1) rc = new Rect(crdBtns2[1]);
+
+                GUI.enabled = !reg[selected].Blocked;
+                GUIContent content = new GUIContent(StringMgr.Instance.Get("CREATE_ROOM").ToUpper(), GlobalVars.Instance.iconJoin);
+
+                if (ChannelManager.Instance.CurChannel.Mode != 3 && GlobalVars.Instance.MyButton3(rc, content, "BtnAction"))
+                {
+                    CreateRoomDialog dlg = (CreateRoomDialog)DialogManager.Instance.Popup(DialogManager.DIALOG_INDEX.CREATE_ROOM, exclusive: true);
+                    if (dlg != null && !dlg.InitDialog4TeamMatch(reg[selected].Map, reg[selected].ModeMask))
+                        DialogManager.Instance.Clear();
+                }
+
+                // DELETE
+                GUI.enabled = true;
+                rc = (crdBtns.Length > 2) ? new Rect(crdBtns[2]) : new Rect(859f, 714f, 139f, 38f);
+                if (chatView && crdBtns2.Length > 2) rc = new Rect(crdBtns2[2]);
+
+                GUIContent delContent = new GUIContent(StringMgr.Instance.Get("DELETE").ToUpper(), GlobalVars.Instance.iconGarbage);
+                if (GlobalVars.Instance.MyButton3(rc, delContent, "BtnAction"))
+                {
+                    CSNetManager.Instance.Sock.SendCS_DEL_DOWNLOAD_MAP_REQ(reg[selected].Map);
+                    selected = 0;
+                }
+
+                GUI.enabled = true;
+            }
+
+            // -------- write back state to instance --------
+            f_selected?.SetValue(__instance, selected);
+            f_scrollPosition?.SetValue(__instance, scrollPosition);
+            f_lastClickTime?.SetValue(__instance, lastClick);
+
+            // keep page stable so other code doesn't freak out (optional)
+            f_page?.SetValue(__instance, 1);
+        }
+
         public void hSockTcpSaveMapReq(int slot, byte[] thumbnail)
         {
             /*MsgBody msgBody = new MsgBody();
@@ -1013,6 +1332,10 @@ namespace _Emulator
             MapEditorOnLoadCompleteHook.ApplyHook();
             UserMapInfoManagerCreateBuildModeHook = new ManagedHook(oUserMapInfoManagerCreateBuildModeInfo, hUserMapInfoManagerCreateBuildModeInfo);
             UserMapInfoManagerCreateBuildModeHook.ApplyHook();
+            DoPagePanelHook = new ManagedHook(oDoPagePanel, hDoPagePanel);
+            DoPagePanelHook.ApplyHook();
+            DownloadMapFrameOnGUIHook = new ManagedHook(oDownloadMapFrameOnGUI, hDownloadMapFrameOnGUI);
+            DownloadMapFrameOnGUIHook.ApplyHook();
         }
     }
 }
