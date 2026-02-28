@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using UnityEngine;
 
 namespace _Emulator
@@ -66,6 +67,17 @@ namespace _Emulator
 
         void Update()
         {
+            while (ServerDebugger.TryDequeue(out var e))
+            {
+                logs.Add(new Log
+                {
+                    message = "[Emu] " + e.Message,
+                    stackTrace = e.StackTrace,
+                    type = e.Type
+                });
+                AppendToFile(e.Type, "[Emu] " + e.Message, e.StackTrace);
+            }
+
             if (Input.GetKeyDown(KeyCode.F8))
                 hidden = !hidden;
 
@@ -147,6 +159,23 @@ namespace _Emulator
                     {
                         writer.WriteLine(stackTrace);
                     }
+                }
+            }
+            catch (IOException ex)
+            {
+                Debug.LogError($"Failed to write log to file: {ex.Message}");
+            }
+        }
+
+        private void AppendToFile(LogType type, string message, string stackTrace)
+        {
+            try
+            {
+                using (var writer = new StreamWriter(logFileName, true))
+                {
+                    writer.WriteLine($"[{System.DateTime.Now}] [{type}] {message}");
+                    if (!string.IsNullOrEmpty(stackTrace))
+                        writer.WriteLine(stackTrace);
                 }
             }
             catch (IOException ex)
