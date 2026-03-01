@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Runtime.Remoting.Channels;
 using System.Text;
+using System.Threading;
 using Steamworks;
 using UnityEngine;
 
@@ -35,7 +36,7 @@ namespace _Emulator
         private bool shouldReceive = false;
 
         private Queue<LoopbackPacket> loopbackQueue = new Queue<LoopbackPacket>();
-        private readonly object loopbackLock = new object();
+        private readonly ReaderWriterLock loopbackLock = new ReaderWriterLock();
 
         public void StartReceive()
         {
@@ -93,24 +94,19 @@ namespace _Emulator
 
         private void HandleReceiveLoopback()
         {
-            lock (loopbackLock)
+            loopbackLock.AcquireReaderLock(1000);
+            try
             {
                 if (loopbackQueue.Count < 1)
                     return;
-
-                var packet = loopbackQueue.Peek();
+                loopbackLock.UpgradeToWriterLock(1000);
+                LoopbackPacket packet = loopbackQueue.Dequeue();
                 if (SteamManager.debug)
                     Debug.Log("Steam - Received " + packet.msg.Length + " bytes from " + packet.steamID + " (Loopback) via " + packet.channel);
-
-                try
-                {
-                    HandleMessage(packet.channel, packet.steamID, packet.msg);
-                }
-
-                finally
-                {
-                    loopbackQueue.Dequeue();
-                }
+                HandleMessage(packet.channel, packet.steamID, packet.msg);
+            } finally
+            {
+                loopbackLock.ReleaseLock();
             }
         }
 
@@ -166,14 +162,18 @@ namespace _Emulator
             {
                 if (steamID == SteamUser.GetSteamID()) // Queue locally instead of sending
                 {
-                    lock (loopbackLock)
+                    loopbackLock.AcquireWriterLock(1000);
+                    try
                     {
                         loopbackQueue.Enqueue(new LoopbackPacket(channel, steamID, msg));
                         if (SteamManager.debug)
                             Debug.Log("Steam - Sent " + msg.Length + " bytes to " + steamID + " (Loopback) via " + channel);
                     }
+                    finally
+                    {
+                        loopbackLock.ReleaseWriterLock();
+                    }
                 }
-
                 else
                 {
                     int sendFlags = channel == SteamNetworkingChannel.ToP2P ? 0 : 8;
