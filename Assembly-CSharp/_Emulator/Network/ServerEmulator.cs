@@ -20,7 +20,7 @@ namespace _Emulator
         private Socket serverSocket;
         private byte recvKey = byte.MaxValue;
         public readonly byte sendKey = byte.MaxValue;
-        internal Queue<MsgReference> readQueue = new Queue<MsgReference>();
+        private Queue<MsgReference> readQueue = new Queue<MsgReference>();
         private Queue<MsgReference> writeQueue = new Queue<MsgReference>();
         private int curSeq = 0;
         public bool debugHandle = false;
@@ -53,8 +53,9 @@ namespace _Emulator
 
         private Thread _worker;
         private volatile bool _workerRunning;
-        private readonly AutoResetEvent _wake = new AutoResetEvent(false);
-        private readonly Stopwatch _clock = Stopwatch.StartNew();
+
+        private readonly Action handleMessagesTcp, handleMessagesSteam;
+        private Action handleMessages;
 
         public ServerEmulator()
         {
@@ -69,6 +70,9 @@ namespace _Emulator
             gameModes[(int)ROOM_TYPE.BUNGEE] = playFreefall = new PlayFreefall(this);
             gameModes[(int)ROOM_TYPE.TEAM_MATCH] = playTeamDeathMatch = new PlayTeamDeathMatch(this);
             gameModes[(int)ROOM_TYPE.ZOMBIE] = playZombie = new PlayZombie(this);
+
+            handleMessagesTcp = HandleMessagesTcp;
+            handleMessagesSteam = HandleMessagesSteam;
         }
         private void RegisterHandlers()
         {
@@ -196,6 +200,7 @@ namespace _Emulator
             RegisterHandlers();
             isSteam = false;
             hasHost = false;
+            handleMessages = handleMessagesTcp;
             try
             {
                 if (serverSocket == null)
@@ -206,7 +211,6 @@ namespace _Emulator
                 serverSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 serverSocket.Listen(16);
                 serverSocket.BeginAccept(new AsyncCallback(AcceptCallback), null);
-                lastUpdateTime = _clock.Elapsed.TotalSeconds;
                 serverCreated = true;
                 StartWorker();
                 ServerDebugger.Log("Server created");
@@ -218,6 +222,17 @@ namespace _Emulator
             }
         }
 
+        public void SetupServerSteam()
+        {
+            RegisterHandlers();
+            isSteam = true;
+            hasHost = false;
+            handleMessages = handleMessagesSteam;
+            serverCreated = true;
+            StartWorker();
+            ServerDebugger.Log("Server set to Steam");
+        }
+
         private void StartWorker()
         {
             if (_workerRunning) return;
@@ -225,67 +240,239 @@ namespace _Emulator
             tItemManager = TItemManager.Instance;
             brickManager = BrickManager.Instance;
             _workerRunning = true;
-            _worker = new Thread(WorkerLoop)
-            {
-                IsBackground = true,
-                Name = "ServerEmulatorWorker"
-            };
+            _worker = new Thread(WorkerLoop);
+            _worker.IsBackground = true;
+            _worker.Name = "ServerEmulatorWorker";
             _worker.Start();
-            ServerDebugger.Log($"Worker started. ThreadId={Thread.CurrentThread.ManagedThreadId} Name={Thread.CurrentThread.Name} IsBackground={Thread.CurrentThread.IsBackground}");
         }
 
-        public void Stop()
-        {
-            _workerRunning = false;
-            _wake.Set();
-            _worker?.Join();
-        }
+        private const long MS = 10000L;
+        private volatile int tps = 0;
+        public int TPS { get => tps; }
 
         private void WorkerLoop()
         {
-            const double fixedInterval = 1.0 / 50.0;
-
-            double lastFixedTime = _clock.Elapsed.TotalSeconds;
-
-            while (_workerRunning)
+            ServerDebugger.Log($"Worker started. ThreadId={Thread.CurrentThread.ManagedThreadId} Name={Thread.CurrentThread.Name} IsBackground={Thread.CurrentThread.IsBackground}");
+            // Server should run at ~120 hz
+            // Every 2nd tick client updates should be handled
+            Stopwatch watch = new Stopwatch();
+            long delta = 0;
+            long frequency = (long)Math.Floor(Stopwatch.Frequency / 120d), remaining;
+            int tick = 0;
+            long second = 0;
+            watch.Start();
+            while (true)
             {
-                _wake.WaitOne(5);
-
-                if (!serverCreated)
-                    continue;
-
-                double now = _clock.Elapsed.TotalSeconds;
-
-                double delta = now - lastUpdateTime;
-
-                lock (dataLock)
+                delta = watch.ElapsedTicks;
+                second += delta;
+                if (second >= Stopwatch.Frequency)
                 {
-                    if (waitForShutDown && (clientList.Count == 0 || isSteam))
-                        ShutdownFinally();
-
-                    killLogTimer += delta;
-
-                    HandleMessages();
-                    SendMessages();
-
-                    while (now - lastFixedTime >= fixedInterval)
-                    {
-                        HandleClientUpdates();
-                        lastFixedTime += fixedInterval;
-                    }
+                    second -= Stopwatch.Frequency;
+                    tps = tick;
+                    tick = 0;
+                }
+                tick++;
+                watch.Reset();
+                watch.Start();
+                WorkerDoWork(tick, delta);
+                if (!_workerRunning)
+                {
+                    break;
+                }
+                remaining = frequency - watch.ElapsedTicks;
+                while (remaining > MS * 10)
+                {
+                    Thread.Sleep((int)(remaining - MS * 5));
+                    remaining = frequency - watch.ElapsedTicks;
+                }
+                if (remaining < MS)
+                {
+                    continue;
+                }
+                while (remaining > MS)
+                {
+                    Thread.SpinWait((int) (remaining * 0.025));
+                    remaining = frequency - watch.ElapsedTicks;
                 }
             }
         }
 
-        public void SetupServerSteam()
+        private void WorkerDoWork(int currentTick, float deltaTicks)
         {
-            RegisterHandlers();
-            isSteam = true;
-            hasHost = false;
-            lastUpdateTime = _clock.Elapsed.TotalSeconds;
-            serverCreated = true;
-            StartWorker();
-            ServerDebugger.Log("Server set to Steam");
+            float delta = deltaTicks / Stopwatch.Frequency;
+            if (waitForShutDown && (clientList.Count == 0 || isSteam))
+                ShutdownFinally();
+
+            killLogTimer += delta;
+
+            handleMessages();
+            if ((currentTick & 0b1) == 0b1)
+            {
+                HandleClientUpdates(delta);
+            }
+            SendMessages();
+        }
+
+        private void HandleClientUpdates(float delta)
+        {
+            // double time = _clock.Elapsed.TotalSeconds, delta = time - lastUpdateTime;
+            ClientReference clientRef;
+            for (int i = clientList.Count - 1; i >= 0; i--)
+            {
+                clientRef = clientList[i];
+                if (clientRef.isHost) { continue; }
+                // Handle dead clients
+                if (clientRef.seq == -1)
+                {
+                    if (clientRef.loginToleranceTime < 4f)
+                    {
+                        clientRef.loginToleranceTime += delta;
+                        continue;
+                    }
+                    clientRef.Disconnect("Login took too long");
+                    if (debugHandle)
+                        ServerDebugger.Log("[Disconnect] Client login timed out: " + clientRef.GetIdentifier());
+                    continue;
+                }
+                // Handle client heartbeat
+                clientRef.heartBeatToleranceTime += delta;
+                if (clientRef.didHeartBeat)
+                {
+                    clientRef.heartBeatToleranceTime = 0;
+                    clientRef.didHeartBeat = false;
+                }
+                else if (clientRef.heartBeatToleranceTime > 7.5f)
+                {
+                    if (debugHandle)
+                        ServerDebugger.Log("[Disconnect] Client timed out: " + clientRef.GetIdentifier());
+                    clientRef.Disconnect("Client didn't respond for too long");
+                    continue;
+                }
+            }
+            lastUpdateTime = 0;
+        }
+
+        private void HandleMessagesTcp()
+        {
+            lock (dataLock)
+            {
+                HandleMessages();
+            }
+        }
+        private void HandleMessagesSteam()
+        {
+            SteamNetworkingManager.instance.ServerChannel.Dequeue(ReceiveSteam);
+            HandleMessages();
+        }
+        private void HandleMessages()
+        {
+            if (readQueue.Count <= 0)
+                return;
+            MsgReference msgRef;
+            Action<MsgReference> handler;
+            while (readQueue.Count > 0)
+            {
+                msgRef = readQueue.Dequeue();
+                if (debugSend)
+                    ServerDebugger.Log($"[Verbose] Processing message ID: {msgRef.msg._id} from client: {msgRef.client.GetIdentifier()}");
+                if (_handlers.TryGetValue(msgRef.msg._id, out handler))
+                {
+                    try
+                    {
+                        handler(msgRef);
+                    }
+                    catch (Exception ex)
+                    {
+                        ServerDebugger.LogError("HandleMessages: " + ex.Message);
+                        ServerDebugger.LogError("HandleMessages StackTrace: " + ex.StackTrace);
+                    }
+                }
+                else
+                {
+                    ServerDebugger.LogWarning("No handler for message ID: " + msgRef.msg._id);
+                }
+            }
+        }
+
+        private void SendMessages()
+        {
+            if (writeQueue.Count < 1)
+                return;
+            while (writeQueue.Count > 0)
+            {
+                MsgReference msgRef = writeQueue.Dequeue();
+                try
+                {
+                    switch (msgRef.sendType)
+                    {
+                        case SendType.Unicast:
+                            msgRef.client.Send(msgRef);
+                            break;
+
+                        case SendType.Broadcast:
+                            BroadcastMessage(msgRef);
+                            break;
+
+                        case SendType.BroadcastChannel:
+                            BroadcastChannelMessage(msgRef);
+                            break;
+
+                        case SendType.BroadcastRoom:
+                            BroadcastRoomMessage(msgRef);
+                            break;
+
+                        case SendType.BroadcastRoomExclusive:
+                            BroadcastRoomMessageExclusive(msgRef);
+                            break;
+
+                        case SendType.BroadcastRedTeam:
+                            BroadcastRedTeamMessage(msgRef);
+                            break;
+
+                        case SendType.BroadcastBlueTeam:
+                            BroadcastBlueTeamMessage(msgRef);
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ServerDebugger.LogError("SendMessages: " + ex.Message);
+                    if (debugHandle)
+                        ServerDebugger.LogError("SendMessages StackTrace: " + ex.StackTrace);
+                }
+            }
+        }
+
+        private bool HandleClientAccepted(ClientReference client)
+        {
+            lock (dataLock)
+            {
+                bool nonExisting = false;
+                if (isSteam)
+                {
+                    var existingClient = clientList.Find(x => x.steamID == client.steamID);
+                    nonExisting = existingClient == null;
+                    if (!nonExisting)
+                        nonExisting = existingClient.CloseClient();
+
+                    //nonExisting = !clientList.Exists(x => x.steamID == client.steamID);
+                }
+                else
+                    nonExisting = !clientList.Exists(x => x.socket == client.socket) && (!Config.instance.oneClientPerIP || !clientList.Exists(x => x.ip == client.ip));
+
+                if (!Config.instance.blockConnections && clientList.Count < Config.instance.maxConnections && nonExisting)
+                {
+                    clientList.Add(client);
+                    SendConnected(client);
+                    return true;
+                }
+
+                else
+                {
+                    ServerDebugger.Log("HandleClientAccepted: Blocked Client " + client.GetIdentifier() + " from Connecting");
+                    return false;
+                }
+            }
         }
 
         private void AcceptCallback(IAsyncResult result)
@@ -333,9 +520,9 @@ namespace _Emulator
                         msgBody.Decrypt(recvKey);
                         lock (dataLock)
                         {
+                            ServerDebugger.Log("Enqueuing message");
                             readQueue.Enqueue(new MsgReference(new Msg2Handle(client.recvBuf.GetId(), msgBody), client, _channelRef: client.channel, _matchData: client.matchData));
                         }
-                        _wake.Set();
                     }
                     client.socket.BeginReceive(client.recvBuf.Buffer, client.recvBuf.Io, client.recvBuf.Buffer.Length - client.recvBuf.Io, SocketFlags.None, new AsyncCallback(ReceiveCallback), client);
                 }
@@ -387,7 +574,6 @@ namespace _Emulator
                 ServerDebugger.LogError("ReceiveSteam: msg length was " + msg.Length);
                 return;
             }
-
             try
             {
                 ClientReference client = FindClientBySteamID(steamID);
@@ -397,11 +583,7 @@ namespace _Emulator
                     recv._hdr.FromArray(recv.Buffer);
                     MsgBody msgBody = recv.Flush();
                     msgBody.Decrypt(recvKey);
-
-                    lock (dataLock)
-                    {
-                        readQueue.Enqueue(new MsgReference(new Msg2Handle(recv.GetId(), msgBody), client, _channelRef: client.channel, _matchData: client.matchData));
-                    }
+                    readQueue.Enqueue(new MsgReference(new Msg2Handle(recv.GetId(), msgBody), client, _channelRef: client.channel, _matchData: client.matchData));
                 } else
                 {
                     ServerDebugger.LogWarning("ReceiveSteam: no ClientReference for " + steamID + " (closing session)");
@@ -410,7 +592,6 @@ namespace _Emulator
                     return;
                 }
             }
-
             catch (Exception ex)
             {
                 ServerDebugger.LogError("ReceiveSteam: " + ex.Message);
@@ -542,6 +723,8 @@ namespace _Emulator
                 }
                 ClearBuffers();
                 serverCreated = false;
+                _workerRunning = false;
+                _worker = null;
             }
         }
 
@@ -556,27 +739,7 @@ namespace _Emulator
 
         public void Say(MsgReference msg)
         {
-            lock (dataLock)
-            {
-                writeQueue.Enqueue(msg);
-            }
-            _wake.Set();
-        }
-        public void SayInstant(MsgReference msg)
-        {
-            lock (dataLock)
-            {
-                writeQueue.Enqueue(msg);
-                SendMessages();
-            }
-            _wake.Set();
-        }
-
-        private void FixedUpdate()
-        {
-            if (!serverCreated)
-                return;
-            HandleClientUpdates();
+            writeQueue.Enqueue(msg);
         }
 
         public void Reset()
@@ -616,43 +779,6 @@ namespace _Emulator
                 SendRoomList(client);
             }
             SendCustomMessage("Reset By Host");
-        }
-
-        private void HandleClientUpdates()
-        {
-            double time = _clock.Elapsed.TotalSeconds, delta = time - lastUpdateTime;
-            ClientReference clientRef;
-            for (int i = clientList.Count - 1; i >= 0; i--)
-            {
-                clientRef = clientList[i];
-                if (clientRef.isHost) { continue; }
-                // Handle dead clients
-                if (clientRef.seq == -1)
-                {
-                    if (clientRef.loginToleranceTime < 4f)
-                    {
-                        clientRef.loginToleranceTime += (float)delta;
-                        continue;
-                    }
-                    clientRef.Disconnect("Login took too long");
-                    if (debugHandle)
-                        ServerDebugger.Log("[Disconnect] Client login timed out: " + clientRef.GetIdentifier());
-                    continue;
-                }
-                // Handle client heartbeat
-                if (clientRef.didHeartBeat)
-                {
-                    clientRef.lastHeartBeatTime = (float)time;
-                    clientRef.didHeartBeat = false;
-                } else if (time - clientRef.lastHeartBeatTime > 7.5f)
-                {
-                    if (debugHandle)
-                        ServerDebugger.Log("[Disconnect] Client timed out: " + clientRef.GetIdentifier());
-                    clientRef.Disconnect("Client didn't respond for too long");
-                    continue;
-                }
-            }
-            lastUpdateTime = time;
         }
 
         public bool GetGamestateStrings(out string roomType, out string roomStatus, out string mapAlias)
@@ -728,131 +854,10 @@ namespace _Emulator
 
             return result;
         }
-
-        private void HandleMessages()
-        {
-            if (readQueue.Count < 1)
-                return;
-
-            MsgReference msgRef = readQueue.Peek();
-
-            try
-            {   
-                if (debugSend)
-                    ServerDebugger.LogVerbose($"Processing message ID: {msgRef.msg._id} from client: {msgRef.client.GetIdentifier()}");
-                Action<MsgReference> handler;
-                if (_handlers.TryGetValue(msgRef.msg._id, out handler))
-                {
-                    handler(msgRef);
-                }
-                else
-                {
-                    ServerDebugger.LogWarning("No handler for message ID: " + msgRef.msg._id);
-                }
-            }
-
-            catch (Exception ex)
-            {
-                ServerDebugger.LogError("HandleMessages: " + ex.Message);
-                ServerDebugger.LogError("HandleMessages StackTrace: " + ex.StackTrace);
-            }
-
-            finally
-            {
-                readQueue.Dequeue();
-            }
-        }
-
-        private void SendMessages()
-        {
-            if (writeQueue.Count < 1)
-                return;
-
-            MsgReference msgRef = writeQueue.Peek();
-
-            try
-            {
-                switch (msgRef.sendType)
-                {
-                    case SendType.Unicast:
-                        msgRef.client.Send(msgRef);
-                        break;
-
-                    case SendType.Broadcast:
-                        BroadcastMessage(msgRef);
-                        break;
-
-                    case SendType.BroadcastChannel:
-                        BroadcastChannelMessage(msgRef);
-                        break;
-
-                    case SendType.BroadcastRoom:
-                        BroadcastRoomMessage(msgRef);
-                        break;
-
-                    case SendType.BroadcastRoomExclusive:
-                        BroadcastRoomMessageExclusive(msgRef);
-                        break;
-
-                    case SendType.BroadcastRedTeam:
-                        BroadcastRedTeamMessage(msgRef);
-                        break;
-
-                    case SendType.BroadcastBlueTeam:
-                        BroadcastBlueTeamMessage(msgRef);
-                        break;
-                }
-            }
-
-            catch (Exception ex)
-            {
-                ServerDebugger.LogError("SendMessages: " + ex.Message);
-                if (debugHandle)
-                    ServerDebugger.LogError("SendMessages StackTrace: " + ex.StackTrace);
-            }
-
-            finally
-            {
-                writeQueue.Dequeue();
-            }
-        }
-
-        private bool HandleClientAccepted(ClientReference client)
-        {
-            lock (dataLock)
-            {
-                bool nonExisting = false;
-                if (isSteam)
-                {
-                    var existingClient = clientList.Find(x => x.steamID == client.steamID);
-                    nonExisting = existingClient == null;
-                    if (!nonExisting)
-                        nonExisting = existingClient.CloseClient();
-
-                    //nonExisting = !clientList.Exists(x => x.steamID == client.steamID);
-                }
-                else
-                    nonExisting = !clientList.Exists(x => x.socket == client.socket) && (!Config.instance.oneClientPerIP || !clientList.Exists(x => x.ip == client.ip));
-
-                if (!Config.instance.blockConnections && clientList.Count < Config.instance.maxConnections && nonExisting)
-                {
-                    clientList.Add(client);
-                    SendConnected(client);
-                    return true;
-                }
-
-                else
-                {
-                    ServerDebugger.Log("HandleClientAccepted: Blocked Client " + client.GetIdentifier() + " from Connecting");
-                    return false;
-                }
-            }
-        }
-
         private void HandleAmIConnected(MsgReference msgRef)
         {
             msgRef.client.didHeartBeat = true;
-            SayInstant(new MsgReference(ExtensionOpcodes.opAmIConnectedAck, null, msgRef.client));
+            Say(new MsgReference(ExtensionOpcodes.opAmIConnectedAck, null, msgRef.client));
         }
 
         private void HandleHeartbeat(MsgReference msgRef)
@@ -5265,7 +5270,7 @@ namespace _Emulator
             client.isVersionSetUp = true;
             if (client.isHost)
             {
-                SayInstant(new MsgReference(ExtensionOpcodes.opVersionCheckAck, new MsgBody(), client));
+                Say(new MsgReference(ExtensionOpcodes.opVersionCheckAck, new MsgBody(), client));
                 return;
             }
 
@@ -5296,7 +5301,7 @@ namespace _Emulator
             {
                 ServerDebugger.Log($"Version check succeeded, got host version {Core.VersionStr} and client version {clientVersion}");
             }
-            SayInstant(new MsgReference(ExtensionOpcodes.opVersionCheckAck, new MsgBody(), client));
+            Say(new MsgReference(ExtensionOpcodes.opVersionCheckAck, new MsgBody(), client));
         }
     }
 }

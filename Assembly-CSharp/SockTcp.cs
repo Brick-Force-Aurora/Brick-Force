@@ -1440,10 +1440,10 @@ public class SockTcp
 					_onceASecond = 0f;
 					SendCS_HEARTBEAT_REQ(MyInfoManager.Instance.UseGmFunction());
 				}
-			}
-			lock (this)
-			{
-				while (_readQueue != null && _readQueue.Count > 0)
+            }
+            lock (this)
+            {
+                while (_readQueue != null && _readQueue.Count > 0)
 				{
 					Msg2Handle msg2Handle = (Msg2Handle)_readQueue.Peek();
 					//Debug.Log(msg2Handle._id);

@@ -819,6 +819,7 @@
     <Compile Include="_Emulator\Steam\SteamManager.cs" />
     <Compile Include="_Emulator\Steam\SteamNetworkingChannel.cs" />
     <Compile Include="_Emulator\Steam\SteamNetworkingManager.cs" />
+    <Compile Include="_Emulator\Steam\SteamChannelHandler.cs" />
     <Compile Include="_Emulator\Steam\SteamUtils.cs" />
     <Compile Include="_Emulator\Utils\BfUtils.cs" />
     <Compile Include="_Emulator\Utils\CRC32.cs" />

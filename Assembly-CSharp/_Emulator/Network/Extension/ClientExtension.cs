@@ -135,6 +135,7 @@ namespace _Emulator
                 return;
             }
 
+            Debug.Log("[Client] Sending " + id);
             if (!doChunked || msgBody.Offset <= ChunkedBufferReceiver.MAX_CHUNK_LENGTH)
             {
                 EnqueuePacket(sock, new Msg4Send(id, uint.MaxValue, uint.MaxValue, msgBody, sock.GetSendKey()));
@@ -266,10 +267,7 @@ namespace _Emulator
                     MsgBody msgBody = recv.Flush();
                     msgBody.Decrypt(CSNetManager.Instance.Sock.recvKey);
 
-                    lock (CSNetManager.Instance.Sock)
-                    {
-                        CSNetManager.Instance.Sock._readQueue.Enqueue(new Msg2Handle(recv.GetId(), msgBody));
-                    }
+                    QueueToSock(new Msg2Handle(recv.GetId(), msgBody));
                 }
             }
 
@@ -298,6 +296,17 @@ namespace _Emulator
             if (msgBody == null)
                 msgBody = new MsgBody();
             CSNetManager.Instance.Sock.Say(id, msgBody, doChunked);
+        }
+
+        public void QueueToSock(Msg2Handle msg)
+        {
+            Debug.Log("Queuing message: " + msg._id);
+            SockTcp sock = CSNetManager.Instance.Sock;
+            lock (sock)
+            {
+                sock._readQueue.Enqueue(msg);
+            }
+            Debug.Log("Queued message: " + msg._id);
         }
 
         public void UpdateLocalInventory()
@@ -460,11 +469,7 @@ namespace _Emulator
                 Disconnect("Received invalid chunked buffer from server");
                 return;
             }
-            lock (CSNetManager.Instance.Sock)
-            {
-                CSNetManager.Instance.Sock._readQueue.Enqueue(new Msg2Handle(packedOpcode, packedBody));
-            }
-
+            QueueToSock(new Msg2Handle(packedOpcode, packedBody));
         }
 
         private void HandleConnected(MsgBody msg)
