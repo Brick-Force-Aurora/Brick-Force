@@ -284,12 +284,6 @@ namespace _Emulator
                 CSteamID steamID = new CSteamID();
                 steamID.m_SteamID = pLobbyEnter.m_ulSteamIDLobby;
 
-                CSNetManager.Instance.Sock = new SockTcp();
-                CSNetManager.Instance.Sock.Init();
-                CSNetManager.Instance.SwitchAfter = new SockTcp();
-                CSNetManager.Instance.SwitchAfter.Init();
-                SteamNetworkingManager.instance.StartReceive();
-
                 SteamMatchmaking.SetLobbyMemberData(steamID, SteamConstants.memberNameKey, SteamFriends.GetPersonaName());
                 lock (currentLobbyLock)
                 {
@@ -305,6 +299,11 @@ namespace _Emulator
                         ServerEmulator.instance.AcceptSteam(SteamUser.GetSteamID());
                     }
                 }
+
+                // Don't create SwitchAfter here, for some reason this messes with the multithreaded design
+                CSNetManager.Instance.Sock = new SockTcp();
+                CSNetManager.Instance.Sock.Init();
+                SteamNetworkingManager.instance.StartReceive();
 
                 ClientExtension.instance.LoadServerSteam();
             }

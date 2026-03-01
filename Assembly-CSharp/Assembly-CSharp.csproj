@@ -810,6 +810,8 @@
     <Compile Include="_Emulator\Network\ServerEmulator.cs" />
     <Compile Include="_Emulator\Network\SlotData.cs" />
     <Compile Include="_Emulator\Network\TreasureChestManager.cs" />
+    <Compile Include="_Emulator\Steam\Handler\ImmediateSteamChannelHandler.cs" />
+    <Compile Include="_Emulator\Steam\Handler\QueuedSteamChannelHandler.cs" />
     <Compile Include="_Emulator\Steam\SteamFriend.cs" />
     <Compile Include="_Emulator\Steam\SteamFriendsManager.cs" />
     <Compile Include="_Emulator\Steam\SteamConstants.cs" />
@@ -819,7 +821,7 @@
     <Compile Include="_Emulator\Steam\SteamManager.cs" />
     <Compile Include="_Emulator\Steam\SteamNetworkingChannel.cs" />
     <Compile Include="_Emulator\Steam\SteamNetworkingManager.cs" />
-    <Compile Include="_Emulator\Steam\SteamChannelHandler.cs" />
+    <Compile Include="_Emulator\Steam\Handler\SteamChannelHandler.cs" />
     <Compile Include="_Emulator\Steam\SteamUtils.cs" />
     <Compile Include="_Emulator\Utils\BfUtils.cs" />
     <Compile Include="_Emulator\Utils\CRC32.cs" />
@@ -828,6 +830,7 @@
     <Compile Include="_Emulator\Utils\NBTReaderExtension.cs" />
     <Compile Include="_Emulator\Utils\ReaderExtension.cs" />
     <Compile Include="_Emulator\Utils\RegMapQuickFilter.cs" />
+    <Compile Include="_Emulator\Utils\ClientDebugger.cs" />
     <Compile Include="_Emulator\Utils\ServerDebugger.cs" />
     <Compile Include="_Emulator\Utils\UMIQuickFilter.cs" />
     <Compile Include="_Emulator\Utils\Utils.cs" />

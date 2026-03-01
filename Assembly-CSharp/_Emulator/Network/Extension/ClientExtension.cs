@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
-using _Emulator.Network;
 using Steamworks;
 using UnityEngine;
 using static Room;
@@ -135,7 +134,7 @@ namespace _Emulator
                 return;
             }
 
-            Debug.Log("[Client] Sending " + id);
+            ClientDebugger.LogVerbose($"Sending {id}");
             if (!doChunked || msgBody.Offset <= ChunkedBufferReceiver.MAX_CHUNK_LENGTH)
             {
                 EnqueuePacket(sock, new Msg4Send(id, uint.MaxValue, uint.MaxValue, msgBody, sock.GetSendKey()));
@@ -250,10 +249,12 @@ namespace _Emulator
                 return;
             }
 
-            if (CSNetManager.Instance.Sock == null)
+            SockTcp sock = CSNetManager.Instance.Sock;
+            if (sock == null)
             {
-                CSNetManager.Instance.Sock = new SockTcp();
-                CSNetManager.Instance.Sock.Init();
+                sock = new SockTcp();
+                sock.Init();
+                CSNetManager.Instance.Sock = sock;
                 Debug.LogError("ReceiveSteam (Client): Sock was null");
             }
 
@@ -265,9 +266,9 @@ namespace _Emulator
                     Msg4Recv recv = new Msg4Recv(msg);
                     recv._hdr.FromArray(recv.Buffer);
                     MsgBody msgBody = recv.Flush();
-                    msgBody.Decrypt(CSNetManager.Instance.Sock.recvKey);
+                    msgBody.Decrypt(sock.recvKey);
 
-                    QueueToSock(new Msg2Handle(recv.GetId(), msgBody));
+                    QueueToSock(new Msg2Handle(recv.GetId(), msgBody), sock);
                 }
             }
 
@@ -298,10 +299,13 @@ namespace _Emulator
             CSNetManager.Instance.Sock.Say(id, msgBody, doChunked);
         }
 
-        public void QueueToSock(Msg2Handle msg)
+        public void QueueToSock(Msg2Handle msg, SockTcp sock = null)
         {
             Debug.Log("Queuing message: " + msg._id);
-            SockTcp sock = CSNetManager.Instance.Sock;
+            if (sock == null)
+            {
+                sock = CSNetManager.Instance.Sock;
+            }
             lock (sock)
             {
                 sock._readQueue.Enqueue(msg);

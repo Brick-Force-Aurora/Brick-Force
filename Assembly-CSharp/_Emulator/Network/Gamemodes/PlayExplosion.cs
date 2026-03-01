@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using Debug = UnityEngine.Debug;
 
-namespace _Emulator.Network.Gamemodes
+namespace _Emulator
 {
     //Also known as BlastMode / Defusion
     public class PlayExplosion : IGameMode
@@ -33,7 +33,7 @@ namespace _Emulator.Network.Gamemodes
             room.isBreakInto = Convert.ToBoolean(parameters[4]);
             match.isBalance = Convert.ToBoolean(parameters[5]);
             room.isWanted = Convert.ToBoolean(parameters[6]);
-            room.isDropItem = Convert.ToBoolean(parameters[7]);
+            room.isDropItem = /*Convert.ToBoolean(parameters[7]);*/ false;
             match.useBuildGun = false;
         }
 

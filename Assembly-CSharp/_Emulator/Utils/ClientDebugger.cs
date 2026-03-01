@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace _Emulator
 {
-    public static class ServerDebugger
+    public static class ClientDebugger
     {
         public struct Entry
         {
@@ -18,46 +18,45 @@ namespace _Emulator
 
         public static void Log(string msg)
         {
-            Enqueue(LogType.Log, "[Server] " + msg, null);
+            Enqueue(LogType.Log, "[Client] " + msg, null);
         }
-
 
         public static void Log(long msg)
         {
-            Enqueue(LogType.Log, "[Server] " + msg.ToString(), null);
+            Enqueue(LogType.Log, "[Client] " + msg.ToString(), null);
         }
 
         public static void LogVerbose(string msg)
         {
-            Enqueue(LogType.Log, "[Verbose/Server] " + msg, null);
+            Enqueue(LogType.Log, "[Verbose/Client] " + msg, null);
         }
 
         public static void LogWarning(string msg)
         {
-            Enqueue(LogType.Warning, "[Warning/Server] " + msg, null);
+            Enqueue(LogType.Warning, "[Warning/Client] " + msg, null);
         }
 
         public static void LogWarning(bool b)
         {
-            Enqueue(LogType.Warning, "[Warning/Server] " + b.ToString(), null);
+            Enqueue(LogType.Warning, "[Warning/Client] " + b.ToString(), null);
         }
 
         public static void LogError(string msg)
         {
-            Enqueue(LogType.Error, "[Error/Server] " + msg, "");
+            Enqueue(LogType.Error, "[Error/Client] " + msg, "");
         }
 
         public static void LogError(Exception ex)
         {
             if (ex == null)
             {
-                Enqueue(LogType.Exception, "[Error/Server] Exception was null", "");
+                Enqueue(LogType.Exception, "[Error/Client] Exception was null", "");
                 return;
             }
 
             Enqueue(
                 LogType.Exception,
-                "[Error/Server]" + ex.Message,
+                "[Error/Client]" + ex.Message,
                 ex.StackTrace ?? ""
             );
         }

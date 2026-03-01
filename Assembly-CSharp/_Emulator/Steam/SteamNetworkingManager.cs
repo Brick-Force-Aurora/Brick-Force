@@ -6,7 +6,6 @@ using System.Runtime.InteropServices;
 using System.Runtime.Remoting.Channels;
 using System.Text;
 using System.Threading;
-using _Emulator.Steam;
 using Steamworks;
 using UnityEngine;
 using static Mono.Xml.MiniParser;
@@ -25,9 +24,9 @@ namespace _Emulator
         private SteamChannelHandler[] handlers;
         private readonly SteamNetworkingChannel[] channels = (SteamNetworkingChannel[]) Enum.GetValues(typeof(SteamNetworkingChannel));
 
-        public SteamChannelHandler ServerChannel
+        public QueuedSteamChannelHandler ServerChannel
         {
-            get => handlers[(int)SteamNetworkingChannel.ToHost];
+            get => (QueuedSteamChannelHandler) handlers[(int)SteamNetworkingChannel.ToHost];
         }
 
         public void StartReceive()
@@ -43,9 +42,10 @@ namespace _Emulator
         void Awake()
         {
             handlers = new SteamChannelHandler[4];
-            for (int i = 1; i < handlers.Length; i++) {
-                handlers[i] = new SteamChannelHandler((SteamNetworkingChannel)i);
-            }
+            Action<SteamNetworkingChannel, SteamChannelHandler> register = (ch, handler) => handlers[(int)ch] = handler;
+            register(SteamNetworkingChannel.ToHost, new QueuedSteamChannelHandler());
+            register(SteamNetworkingChannel.ToClient, new ImmediateSteamChannelHandler(ClientExtension.instance.ReceiveSteam));
+            register(SteamNetworkingChannel.ToP2P, new ImmediateSteamChannelHandler(P2PExtension.instance.ReceiveSteam));
         }
 
         void OnEnable()
@@ -61,7 +61,6 @@ namespace _Emulator
             if (shouldReceive && SteamManager.Initialized)
             {
                 HandleReceiveNetwork();
-                HandleClientMessages();
             }
         }
 
@@ -93,13 +92,11 @@ namespace _Emulator
                         Marshal.DestroyStructure(receiveBuffers[i], typeof(SteamNetworkingMessage_t));
                     }
                 }
+                if (handler is ImmediateSteamChannelHandler immediate)
+                {
+                    immediate.Dequeue();
+                }
             }
-        }
-
-        private void HandleClientMessages()
-        {
-            handlers[(int)SteamNetworkingChannel.ToClient].Dequeue(ClientExtension.instance.ReceiveSteam);
-            handlers[(int)SteamNetworkingChannel.ToP2P].Dequeue(P2PExtension.instance.ReceiveSteam);
         }
 
         public void SendInitMessageToHost()

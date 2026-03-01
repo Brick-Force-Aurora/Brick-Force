@@ -77,6 +77,16 @@ namespace _Emulator
                 });
                 AppendToFile(e.Type, e.Message, e.StackTrace);
             }
+            while (ClientDebugger.TryDequeue(out var e))
+            {
+                logs.Add(new Log
+                {
+                    message = e.Message,
+                    stackTrace = e.StackTrace,
+                    type = e.Type
+                });
+                AppendToFile(e.Type, e.Message, e.StackTrace);
+            }
 
             if (Input.GetKeyDown(KeyCode.F8))
                 hidden = !hidden;
