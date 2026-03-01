@@ -613,7 +613,7 @@ namespace _Emulator
             // Create & register RegMap ONLY here
             RegMap regMap = new RegMap(
                 hashId,
-                MyInfoManager.Instance.name + "@Aurora",
+                MyInfoManager.Instance.Nickname + "@Aurora",
                 mapName,
                 time,
                 modeMask,
