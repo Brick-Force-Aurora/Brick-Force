@@ -33,7 +33,6 @@ namespace _Emulator
         private double killLogTimer = 0f;
         private double lastUpdateTime = 0f;
         public List<KeyValuePair<int, RegMap>> regMaps = new List<KeyValuePair<int, RegMap>>();
-        private RegMapManager regMapManager;
         private BrickManager brickManager;
         private TItemManager tItemManager;
         private bool waitForShutDown = false;
@@ -101,7 +100,6 @@ namespace _Emulator
             register(MessageId.CS_KILL_LOG_REQ, HandleKillLogRequest);
             register(MessageId.CS_SET_STATUS_REQ, HandleSetStatusRequest);
             register(MessageId.CS_START_REQ, HandleStartRequest);
-            register(MessageId.CS_CHANGE_USERMAP_ALIAS_REQ, HandleChangeUserMapAliasRequest);
             register(MessageId.CS_RESPAWN_TICKET_REQ, HandleRespawnTicketRequest);
             register(MessageId.CS_TIMER_REQ, HandleTimer);
             register(MessageId.CS_MATCH_COUNTDOWN_REQ, HandleMatchCountdown);
@@ -223,8 +221,7 @@ namespace _Emulator
         private void StartWorker()
         {
             if (_workerRunning) return;
-            regMapManager = RegMapManager.Instance;
-            regMaps = regMapManager.dicRegMap.ToList();
+            regMaps = RegMapManager.Instance.dicRegMap.ToList();
             tItemManager = TItemManager.Instance;
             brickManager = BrickManager.Instance;
             _workerRunning = true;
