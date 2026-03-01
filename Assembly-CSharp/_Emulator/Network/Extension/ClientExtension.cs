@@ -134,7 +134,6 @@ namespace _Emulator
                 return;
             }
 
-            ClientDebugger.LogVerbose($"Sending {id}");
             if (!doChunked || msgBody.Offset <= ChunkedBufferReceiver.MAX_CHUNK_LENGTH)
             {
                 EnqueuePacket(sock, new Msg4Send(id, uint.MaxValue, uint.MaxValue, msgBody, sock.GetSendKey()));
@@ -301,7 +300,6 @@ namespace _Emulator
 
         public void QueueToSock(Msg2Handle msg, SockTcp sock = null)
         {
-            Debug.Log("Queuing message: " + msg._id);
             if (sock == null)
             {
                 sock = CSNetManager.Instance.Sock;
@@ -310,7 +308,6 @@ namespace _Emulator
             {
                 sock._readQueue.Enqueue(msg);
             }
-            Debug.Log("Queued message: " + msg._id);
         }
 
         public void UpdateLocalInventory()
