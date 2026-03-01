@@ -18,40 +18,46 @@ namespace _Emulator
 
         public static void Log(string msg)
         {
-            Enqueue(LogType.Log, msg, null);
+            Enqueue(LogType.Log, "[Server]" + msg, null);
         }
+
 
         public static void Log(long msg)
         {
-            Enqueue(LogType.Log, msg.ToString(), null);
+            Enqueue(LogType.Log, "[Server]" + msg.ToString(), null);
+        }
+
+        public static void LogVerbose(string msg)
+        {
+            Enqueue(LogType.Log, "[Verbose/Server]" + msg, null);
         }
 
         public static void LogWarning(string msg)
         {
-            Enqueue(LogType.Warning, msg, null);
+            Enqueue(LogType.Warning, "[Warning/Server]" + msg, null);
         }
 
         public static void LogWarning(bool b)
         {
-            Enqueue(LogType.Warning, b.ToString(), null);
+            Enqueue(LogType.Warning, "[Warning/Server]" + b.ToString(), null);
         }
 
         public static void LogError(string msg)
         {
-            Enqueue(LogType.Error, msg, "");
+            Enqueue(LogType.Error, "[Error/Server]" + msg, "");
         }
 
         public static void LogError(Exception ex)
         {
             if (ex == null)
             {
-                Enqueue(LogType.Exception, "Exception was null", "");
+                Enqueue(LogType.Exception, "[Error/Server] Exception was null", "");
                 return;
             }
 
             Enqueue(
                 LogType.Exception,
-                ex.Message,
+                "[Error/Server]" + ex.Message,
                 ex.StackTrace ?? ""
             );
         }

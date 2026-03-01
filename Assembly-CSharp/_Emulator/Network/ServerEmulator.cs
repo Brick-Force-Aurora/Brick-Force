@@ -344,7 +344,6 @@ namespace _Emulator
             catch (Exception ex)
             {
                 ServerDebugger.LogError(ex);
-                ServerDebugger.LogError("ReceiveCallback: " + ex.Message);
             }
         }
 
@@ -636,7 +635,7 @@ namespace _Emulator
                         continue;
                     }
                     clientRef.Disconnect("Login took too long");
-                    if (ServerEmulator.instance.debugHandle)
+                    if (debugHandle)
                         ServerDebugger.Log("[Disconnect] Client login timed out: " + clientRef.GetIdentifier());
                     continue;
                 }
@@ -647,7 +646,7 @@ namespace _Emulator
                     clientRef.didHeartBeat = false;
                 } else if (time - clientRef.lastHeartBeatTime > 7.5f)
                 {
-                    if (ServerEmulator.instance.debugHandle)
+                    if (debugHandle)
                         ServerDebugger.Log("[Disconnect] Client timed out: " + clientRef.GetIdentifier());
                     clientRef.Disconnect("Client didn't respond for too long");
                     continue;
@@ -740,7 +739,7 @@ namespace _Emulator
             try
             {   
                 if (debugSend)
-                    ServerDebugger.Log($"[Verbose] Processing message ID: {msgRef.msg._id} from client: {msgRef.client.GetIdentifier()}");
+                    ServerDebugger.LogVerbose($"Processing message ID: {msgRef.msg._id} from client: {msgRef.client.GetIdentifier()}");
                 Action<MsgReference> handler;
                 if (_handlers.TryGetValue(msgRef.msg._id, out handler))
                 {
@@ -920,7 +919,7 @@ namespace _Emulator
             }
 
             if (debugPing)
-                ServerDebugger.Log("HandleTimer from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.LogVerbose("HandleTimer from: " + msgRef.client.GetIdentifier());
             if (matchData.room.type == Room.ROOM_TYPE.BND)
             {
                 if (matchData.repeat <= 0)
@@ -1096,7 +1095,7 @@ namespace _Emulator
             Say(new MsgReference(432, body, client));
 
             if (debugSend)
-                ServerDebugger.Log("SendRegisteredMaps to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendRegisteredMaps to: " + client.GetIdentifier());
         }
 
         private void HandleRequestUserMaps(MsgReference msgRef)
@@ -1113,7 +1112,7 @@ namespace _Emulator
         private void HandleRequestUserList(MsgReference msgRef)
         {
             if (debugPing)
-                ServerDebugger.Log("HandleRequestUserList from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.LogVerbose("HandleRequestUserList from: " + msgRef.client.GetIdentifier());
 
             SendUserList(msgRef.client);
         }
@@ -2516,7 +2515,7 @@ namespace _Emulator
             Say(new MsgReference(16, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                ServerDebugger.Log("SendDelBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendDelBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
         }
 
         public void SendAddBrick(ClientReference client, BrickInst brick)
@@ -2536,7 +2535,7 @@ namespace _Emulator
             Say(new MsgReference(14, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                ServerDebugger.Log("SendAddBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendAddBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
         }
 
         public void SendCacheBrick(ClientReference client, MatchData matchData = null, SendType sendType = SendType.Unicast)
@@ -2594,7 +2593,7 @@ namespace _Emulator
                 Say(new MsgReference(21, body, client, sendType, matchData.channel, matchData, _doChunked: false));
             }
             if (debugSend)
-                ServerDebugger.Log("SendCacheBrick with " + chunkCount + " chunks to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendCacheBrick with " + chunkCount + " chunks to: " + client.GetIdentifier());
         }
 
         public void SendCacheBrickDone(ClientReference client, MatchData matchData = null, SendType sendType = SendType.Unicast)
@@ -2609,7 +2608,7 @@ namespace _Emulator
             body.Write(userMap.skybox);
             Say(new MsgReference(22, body, client, sendType, matchData.channel, matchData));
             if (debugSend)
-                ServerDebugger.Log("SendCacheBrickDone for map " + userMap.map + " to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendCacheBrickDone for map " + userMap.map + " to: " + client.GetIdentifier());
         }
 
         public void SendCopyright(ClientReference client)
@@ -2624,7 +2623,7 @@ namespace _Emulator
             Say(new MsgReference(53, body, client));
 
             if (debugSend)
-                ServerDebugger.Log("SendCopyRight to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendCopyRight to: " + client.GetIdentifier());
         }
 
         public void SendPremiumItems(ClientReference client)
@@ -2678,10 +2677,10 @@ namespace _Emulator
             if (debugSend)
             {
                 if (sendType == SendType.BroadcastRoom)
-                    ServerDebugger.Log("Broadcasted SendGetCannon for room no: " + matchData.room.No);
+                    ServerDebugger.LogVerbose("Broadcasted SendGetCannon for room no: " + matchData.room.No);
 
                 else
-                    ServerDebugger.Log("SendGetCannon to: " + client.GetIdentifier());
+                    ServerDebugger.LogVerbose("SendGetCannon to: " + client.GetIdentifier());
             }
         }
 
@@ -2694,7 +2693,7 @@ namespace _Emulator
             Say(new MsgReference(161, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                ServerDebugger.Log("Broadcasted SendEmptyCannon for room no: " + matchData.room.No);
+                ServerDebugger.LogVerbose("Broadcasted SendEmptyCannon for room no: " + matchData.room.No);
         }
 
         public void SendGetTrain(int seq, int trainId, MatchData matchData, ClientReference client = null, SendType sendType = SendType.BroadcastRoom)
@@ -2709,10 +2708,10 @@ namespace _Emulator
             if (debugSend)
             {
                 if (sendType == SendType.BroadcastRoom)
-                    ServerDebugger.Log("Broadcasted SendGetTrain for room no: " + matchData.room.No);
+                    ServerDebugger.LogVerbose("Broadcasted SendGetTrain for room no: " + matchData.room.No);
 
                 else
-                    ServerDebugger.Log("SendGetTrain to: " + client.GetIdentifier());
+                    ServerDebugger.LogVerbose("SendGetTrain to: " + client.GetIdentifier());
             }
         }
 
@@ -2725,7 +2724,7 @@ namespace _Emulator
             Say(new MsgReference(554, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                ServerDebugger.Log("Broadcasted SendEmptyTrain for room no: " + matchData.room.No);
+                ServerDebugger.LogVerbose("Broadcasted SendEmptyTrain for room no: " + matchData.room.No);
         }
 
         public void SendOpenDoor(int seq, MatchData matchData)
@@ -3880,7 +3879,7 @@ namespace _Emulator
             Say(new MsgReference(467, body, client, sendType));
 
             if (debugPing)
-                ServerDebugger.Log("SendUserList to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendUserList to: " + client.GetIdentifier());
         }
 
         public void SendRoamout(ClientReference client, int src, SendType sendType = SendType.Unicast)
@@ -3891,7 +3890,7 @@ namespace _Emulator
             Say(new MsgReference(144, body, client, sendType));
 
             if (debugSend)
-                ServerDebugger.Log("SendRoamout to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendRoamout to: " + client.GetIdentifier());
         }
 
         public void SendRoamin(ClientReference client, int dest, SendType sendType = SendType.Unicast)
@@ -3902,7 +3901,7 @@ namespace _Emulator
             Say(new MsgReference(146, body, client, sendType));
 
             if (debugSend)
-                ServerDebugger.Log("SendRoamin to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendRoamin to: " + client.GetIdentifier());
         }
 
         public void SendConnected(ClientReference client)
@@ -3911,7 +3910,7 @@ namespace _Emulator
             Say(new MsgReference(ExtensionOpcodes.opConnectedAck, body, client));
 
             if (debugSend)
-                ServerDebugger.Log("SendConnected to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendConnected to: " + client.GetIdentifier());
         }
 
         public void SendAllDownloadedMaps(ClientReference client)
@@ -3957,7 +3956,7 @@ namespace _Emulator
             }
 
             if (debugSend)
-                ServerDebugger.Log("SendAllDownloadedMaps to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendAllDownloadedMaps to: " + client.GetIdentifier());
         }
 
         public void SendAllUserMaps(ClientReference client)
@@ -4002,7 +4001,7 @@ namespace _Emulator
             }
 
             if (debugSend)
-                ServerDebugger.Log("SendAllUserMaps to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendAllUserMaps to: " + client.GetIdentifier());
         }
 
 
@@ -4147,7 +4146,7 @@ namespace _Emulator
             Say(new MsgReference(426, body, client));
 
             if (debugSend)
-                ServerDebugger.Log("SendDownloadedMaps to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendDownloadedMaps to: " + client.GetIdentifier());
         }
 
         public void SendRegisteredMaps(ClientReference client, int page)
@@ -4186,7 +4185,7 @@ namespace _Emulator
             Say(new MsgReference(428, body, client));
 
             if (debugSend)
-                ServerDebugger.Log("SendRegisteredMaps to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendRegisteredMaps to: " + client.GetIdentifier());
         }
 
         public void SendUserMaps(ClientReference client, int page)
@@ -4217,7 +4216,7 @@ namespace _Emulator
             Say(new MsgReference(430, body, client));
 
             if (debugSend)
-                ServerDebugger.Log("SendUserMaps to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendUserMaps to: " + client.GetIdentifier());
         }
 
         public void SendCustomMessage(string message, ClientReference client = null, SendType sendType = SendType.Broadcast)
@@ -4238,7 +4237,7 @@ namespace _Emulator
             Say(new MsgReference(64, body, client));
 
             if (debugSend)
-                ServerDebugger.Log("SendRespawnTicket to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendRespawnTicket to: " + client.GetIdentifier());
         }
 
         private void HandleBeginChunkedBufferReceive(MsgReference msgRef)
@@ -4876,7 +4875,7 @@ namespace _Emulator
             Say(new MsgReference(480, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                ServerDebugger.Log("SendBatchDeleteBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendBatchDeleteBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
         }
 
         public void HandleMissionPointRequest(MsgReference msgRef)
@@ -4894,7 +4893,7 @@ namespace _Emulator
             Say(new MsgReference(509, body, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                ServerDebugger.Log("HandleMissionPointRequest for room no " + matchData.room.No + " " + msgRef.client.GetIdentifier());
+                ServerDebugger.LogVerbose("HandleMissionPointRequest for room no " + matchData.room.No + " " + msgRef.client.GetIdentifier());
         }
 
         public void HandleCoreHPReq(MsgReference msgRef)
@@ -4916,7 +4915,7 @@ namespace _Emulator
             Say(new MsgReference(181, body, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                ServerDebugger.Log("HandleCoreHPReq for room no " + matchData.room.No + " " + msgRef.client.GetIdentifier());
+                ServerDebugger.LogVerbose("HandleCoreHPReq for room no " + matchData.room.No + " " + msgRef.client.GetIdentifier());
         }
 
         private void HandleInflictedDamage(MsgReference msgRef)

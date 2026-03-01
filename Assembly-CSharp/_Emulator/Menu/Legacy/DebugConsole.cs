@@ -71,11 +71,11 @@ namespace _Emulator
             {
                 logs.Add(new Log
                 {
-                    message = "[Emu] " + e.Message,
+                    message = e.Message,
                     stackTrace = e.StackTrace,
                     type = e.Type
                 });
-                AppendToFile(e.Type, "[Emu] " + e.Message, e.StackTrace);
+                AppendToFile(e.Type, e.Message, e.StackTrace);
             }
 
             if (Input.GetKeyDown(KeyCode.F8))
