@@ -585,16 +585,42 @@ namespace _Emulator
 
         public void hSockTcpRegisterReq(int slot, ushort modeMask, int regHow, int point, int downloadFee, byte[] thumbnail, string msgEval)
 		{
-			MsgBody msgBody = new MsgBody();
-			msgBody.Write(slot);
-			msgBody.Write(modeMask);
-			msgBody.Write(regHow);
-			msgBody.Write(point);
-			msgBody.Write(downloadFee);
-			msgBody.Write(msgEval);
-            msgBody.Write(thumbnail);
-            CSNetManager.Instance.Sock.Say(51, msgBody);
-		}
+            UserMapInfo umi = UserMapInfoManager.Instance.Get(slot);
+
+            // Thumbnail for the registered map
+            Texture2D thumbnailTex = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
+            thumbnailTex.LoadImage(thumbnail);
+            thumbnailTex.Apply();
+
+            DateTime time = DateTime.Now;
+            int hashId = MapGenerator.instance.GetHashIdForTime(time);
+
+            // Create & register RegMap ONLY here
+            RegMap regMap = new RegMap(
+                hashId,
+                ClientExtension.instance.name + "@Aurora",
+                umi.Alias,
+                time,
+                modeMask,
+                true, false,
+                0, 0, 0, 0, 0, 0, 0,
+                false
+            );
+
+            regMap.Thumbnail = thumbnailTex;
+
+            RegMapManager.Instance.Add(regMap);
+            RegMapManager.Instance.SetThumbnail(regMap.map, thumbnailTex);
+
+            // Save registered files under the RegMap ID (separate from user slot file)
+            regMap.Save();
+
+            MsgBody body = new MsgBody();
+
+            body.Write(umi.slot);
+            body.Write((int)regMap.ModeMask);
+            CSNetManager.Instance.Sock.HandleCS_REGISTER_ACK(body);
+        }
 
         public void hUserMapReq(int page)
         {
@@ -650,7 +676,6 @@ namespace _Emulator
             {
                 try
                 {
-                    // Keep this EXACTLY consistent with wherever your client actually stores these files.
                     string cacheDir = Path.Combine(Application.dataPath, "Resources/Cache");
 
                     string geom = Path.Combine(cacheDir, "downloaded" + slot + ".geometry");

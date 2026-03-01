@@ -33,6 +33,9 @@ namespace _Emulator
         private double killLogTimer = 0f;
         private double lastUpdateTime = 0f;
         public List<KeyValuePair<int, RegMap>> regMaps = new List<KeyValuePair<int, RegMap>>();
+        private RegMapManager regMapManager;
+        private BrickManager brickManager;
+        private TItemManager tItemManager;
         private bool waitForShutDown = false;
 
         public readonly IGameMode[] gameModes;
@@ -94,12 +97,10 @@ namespace _Emulator
             register(MessageId.CS_MORPH_BRICK_REQ, HandleMorphBrickRequest);
             register(MessageId.CS_EQUIP_REQ, HandleEquipRequest);
             register(MessageId.CS_UNEQUIP_REQ, HandleUnequipRequest);
-            register(MessageId.CS_SAVE_REQ, HandleSaveMap);
             register(MessageId.CS_LOAD_COMPLETE_REQ, HandleLoadComplete);
             register(MessageId.CS_KILL_LOG_REQ, HandleKillLogRequest);
             register(MessageId.CS_SET_STATUS_REQ, HandleSetStatusRequest);
             register(MessageId.CS_START_REQ, HandleStartRequest);
-            register(MessageId.CS_REGISTER_REQ, HandleRegisterMapRequest);
             register(MessageId.CS_CHANGE_USERMAP_ALIAS_REQ, HandleChangeUserMapAliasRequest);
             register(MessageId.CS_RESPAWN_TICKET_REQ, HandleRespawnTicketRequest);
             register(MessageId.CS_TIMER_REQ, HandleTimer);
@@ -217,14 +218,15 @@ namespace _Emulator
             {
                 ServerDebugger.LogError("SetupServer: " + ex.Message);
             }
-
-            //Pulls all loaded RegMaps into the emulator
-            regMaps = RegMapManager.Instance.dicRegMap.ToList();
         }
 
         private void StartWorker()
         {
             if (_workerRunning) return;
+            regMapManager = RegMapManager.Instance;
+            regMaps = regMapManager.dicRegMap.ToList();
+            tItemManager = TItemManager.Instance;
+            brickManager = BrickManager.Instance;
             _workerRunning = true;
             _worker = new Thread(WorkerLoop)
             {
@@ -287,9 +289,6 @@ namespace _Emulator
             serverCreated = true;
             StartWorker();
             ServerDebugger.Log("Server set to Steam");
-
-            //Pulls all loaded RegMaps into the emulator
-            regMaps = RegMapManager.Instance.dicRegMap.ToList();
         }
 
         private void AcceptCallback(IAsyncResult result)
@@ -1608,7 +1607,7 @@ namespace _Emulator
             sbyte premium = 0; // isPremium 0 || 1
             int durability = 100; //Durability int.MaxValue = Permanent
 
-            TItem template = TItemManager.Instance.dic.FirstOrDefault(x => x.Value.code == code).Value;
+            TItem template = tItemManager.dic.FirstOrDefault(x => x.Value.code == code).Value;
             if (template == null)
             {
                 SendCustomMessage("Item doesn't exist.", msgRef.client, SendType.Unicast);
@@ -1951,7 +1950,7 @@ namespace _Emulator
                 msgRef.msg._msg.Read(out sbyte toolSlot);
 
                 // Fetch the item template
-                TItem template = TItemManager.Instance.Get<TItem>(code);
+                TItem template = tItemManager.Get<TItem>(code);
                 if (template != null)
                 {
                     try
@@ -2211,7 +2210,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out long seq);
             msgRef.msg._msg.Read(out string code);
 
-            Item item = MyInfoManager.Instance.inventory[seq];
+            Item item = msgRef.client.inventory.equipment.Find((t) => t.Seq == seq);
 
             ServerDebugger.LogWarning("Found Item: " + item.Code + item.IsAmount + " amount: " + item.Amount);
             item.Amount = item.Amount - 1;
@@ -2220,7 +2219,7 @@ namespace _Emulator
             if (!item.EnoughToConsume)
             {
                 ServerDebugger.LogWarning("Remove Item");
-                MyInfoManager.Instance.inventory.Remove(item.Seq);
+                msgRef.client.inventory.equipment.Remove(item);
             }
             TSpecial special = (TSpecial)item.Template;
             int forcePoints = msgRef.client.data.forcePoints = msgRef.client.data.forcePoints + int.Parse(special.param);
@@ -2479,7 +2478,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out byte z);
             msgRef.msg._msg.Read(out byte rot);
 
-            Brick brick = BrickManager.Instance.GetBrick(brickIndex);
+            Brick brick = brickManager.GetBrick(brickIndex);
             if (brick == null || (brick.maxInstancePerMap > 0 && matchData.cachedMap.CountLimitedBrick(brickIndex) >= brick.maxInstancePerMap))
             {
                 return;
@@ -2506,73 +2505,6 @@ namespace _Emulator
             List<int> morphes = new List<int>();
             if (matchData.cachedMap.DelBrickInst(seq, ref morphes))
                 SendDelBrick(msgRef.client, seq);
-        }
-
-        private void HandleRegisterMapRequest(MsgReference msgRef)
-        {
-            /*MatchData matchData = msgRef.matchData;
-
-            if (debugHandle)
-                ServerDebugger.Log("HandleRegisterMap from: " + msgRef.client.GetIdentifier());
-
-            msgRef.msg._msg.Read(out int slot);
-            msgRef.msg._msg.Read(out ushort modeMask);
-            msgRef.msg._msg.Read(out int regHow);
-            msgRef.msg._msg.Read(out int point);
-            msgRef.msg._msg.Read(out int downloadFee);
-            msgRef.msg._msg.Read(out string msgEval);
-            msgRef.msg._msg.Read(out byte[] textureBuffer);
-
-            if (slot != matchData.cachedMap.map)
-            {
-                ServerDebugger.LogWarning($"HandleRegisterMapRequest: map mismatch. req={slot} cached={matchData.cachedMap.map}");
-                return;
-            }
-
-            // Thumbnail for the registered map
-            Texture2D thumbnail = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
-            thumbnail.LoadImage(textureBuffer);
-            thumbnail.Apply();
-
-            DateTime time = DateTime.Now;
-            int hashId = MapGenerator.instance.GetHashIdForTime(time);
-
-            // Create & register RegMap ONLY here
-            RegMap regMap = new RegMap(
-                hashId,
-                msgRef.client.name + "@Aurora",
-                matchData.cachedUMI.Alias,
-                time,
-                modeMask,
-                true, false,
-                0, 0, 0, 0, 0, 0, 0,
-                false
-            );
-
-            regMap.Thumbnail = thumbnail;
-
-            RegMapManager.Instance.Add(regMap);
-            RegMapManager.Instance.SetThumbnail(regMap.map, thumbnail);
-
-            // Save registered files under the RegMap ID (separate from user slot file)
-            regMap.Save();
-            matchData.cachedMap.Save(hashId, matchData.cachedMap.skybox);
-
-            // Keep the user slot as-is; optionally link regMap for current session info
-            matchData.cachedUMI.regMap = regMap;   // ok to remember it's registered now
-                                                   // DO NOT do: cachedUMI.slot = hashId
-                                                   // DO NOT do: cachedMap.map = hashId
-
-            // Pull current map list into the emulator (registered list changed)
-            regMaps = RegMapManager.Instance.dicRegMap.ToList();
-
-            MsgBody body = new MsgBody();
-
-            body.Write(matchData.cachedUMI.slot);
-            body.Write((int)regMap.ModeMask);
-
-            Say(new MsgReference(52, body, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));*/
-            ServerDebugger.LogError("Registering is currently disabled because of missing Texture2D dependency!");
         }
 
         public void SendDelBrick(ClientReference client, int brickSeq)
@@ -4396,7 +4328,7 @@ namespace _Emulator
                     return;
                 }
 
-                Brick b = BrickManager.Instance.GetBrick(brickIndex); 
+                Brick b = brickManager.GetBrick(brickIndex); 
                 if (b == null)
                 {
                     ServerDebugger.LogWarning($"LINE_REQ: unknown brick index={brickIndex}");
@@ -4461,7 +4393,7 @@ namespace _Emulator
 
             if (!flag.IsSet(OperationFlag.Delete))
             {
-                Brick targetBrick = BrickManager.Instance.GetBrick(targetIndex);
+                Brick targetBrick = brickManager.GetBrick(targetIndex);
                 if (targetBrick == null)
                 {
                     ServerDebugger.LogWarning($"BULK_REQ: unknown target brick index={targetIndex}");
@@ -4476,7 +4408,7 @@ namespace _Emulator
             }
             if ((flag.IsSet(OperationFlag.OnlySource) && !flag.IsSet(OperationFlag.ExcludeSourceType)) || (!flag.IsSet(OperationFlag.OnlySource) && flag.IsSet(OperationFlag.ExcludeSourceType)))
             {
-                Brick sourceBrick = BrickManager.Instance.GetBrick(sourceIndex);
+                Brick sourceBrick = brickManager.GetBrick(sourceIndex);
                 if (sourceBrick == null)
                 {
                     ServerDebugger.LogWarning($"BULK_REQ: unknown source brick index={sourceIndex}");
@@ -4676,7 +4608,7 @@ namespace _Emulator
                     return;
                 }
 
-                Brick newBrick = BrickManager.Instance.GetBrick(brickIndex);
+                Brick newBrick = brickManager.GetBrick(brickIndex);
                 if (newBrick == null)
                 {
                     ServerDebugger.LogWarning($"REPLACE_REQ: unknown brick index={brickIndex}");
@@ -4752,57 +4684,6 @@ namespace _Emulator
                 }
                 bi.Code = code;
             }
-        }
-
-        private void HandleSaveMap(MsgReference msgRef)
-        {
-            /*msgRef.msg._msg.Read(out int slot);
-            msgRef.msg._msg.Read(out byte[] textureBuffer);
-
-            MatchData matchData = msgRef.matchData;
-
-            DateTime time = DateTime.Now;
-
-            // Generate ModeMask (if you still want it saved/used locally, keep it here; otherwise remove)
-            ushort modeMask = GenerateModeMask(matchData.cachedMap.dic);
-
-            // Load thumbnail from chunked buffer (local slot thumbnail)
-            Texture2D thumbnail = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
-            thumbnail.LoadImage(textureBuffer);
-            thumbnail.Apply();
-            if (debugSend) ServerDebugger.Log("Load Thumbnail (SaveMap)");
-
-            // IMPORTANT: Do NOT touch RegMapManager here.
-            // Only update the user map metadata (UMI) for this slot.
-            // (Alias/BrickCount come from cachedUMI; adjust if you store alias elsewhere.)
-            UserMapInfoManager.Instance.AddOrUpdate(
-                slot,
-                matchData.cachedUMI.Alias,
-                matchData.cachedUMI.BrickCount,
-                time,
-                0 // premium
-            );
-            UserMapInfoManager.Instance.SetThumbnail(slot, thumbnail);
-            UserMapInfoManager.Instance.CurMapName = matchData.cachedUMI.Alias;
-
-            // Update current working map references WITHOUT registering
-            matchData.cachedMap.map = slot;          // working map id stays "slot"
-            matchData.cachedUMI.slot = slot;         // slot stays 1..12
-            matchData.cachedUMI.regMap = null;       // NOT registered on save
-
-            // Save files as user-slot files (local)
-            // geometry: downloaded{slot}.geometry
-            matchData.cachedMap.Save(slot, matchData.cachedMap.skybox);
-
-            // if you have a cache save method for UMI on server-side:
-            //matchData.cachedUMI.SaveCache();
-            // If not, UserMapInfoManager probably handles it; otherwise add it there.
-
-            MsgBody msgBody = new MsgBody();
-            msgBody.Write(slot);
-            msgBody.Write(0);
-            Say(new MsgReference(40, msgBody, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));*/
-            ServerDebugger.LogError("Saving is currently disabled because of missing Texture2D dependency!");
         }
 
         private void HandleChangeEditorPermissionRequest(MsgReference msgRef)
@@ -5281,7 +5162,7 @@ namespace _Emulator
             TcTItem reward = tc.TcTItemToArray()[index];
 
             // 3. Load template from TItemManager
-            TItem template = TItemManager.Instance.Get<TItem>(reward.code.ToString());
+            TItem template = tItemManager.Get<TItem>(reward.code.ToString());
             if (template == null)
             {
                 MsgBody fail = new MsgBody();
