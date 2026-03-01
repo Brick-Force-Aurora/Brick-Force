@@ -1,6 +1,4 @@
-﻿using _Emulator.Network.Gamemodes;
-using _Emulator.Network;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -31,7 +29,7 @@ namespace _Emulator
             room.isBreakInto = Convert.ToBoolean(parameters[4]);
             match.isBalance = Convert.ToBoolean(parameters[5]);
             room.isWanted = Convert.ToBoolean(parameters[6]);
-            room.isDropItem = Convert.ToBoolean(parameters[7]);
+            room.isDropItem = /*Convert.ToBoolean(parameters[7]);*/ false;
             match.useBuildGun = false;
         }
 

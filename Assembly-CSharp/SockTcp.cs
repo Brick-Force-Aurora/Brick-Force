@@ -1440,10 +1440,10 @@ public class SockTcp
 					_onceASecond = 0f;
 					SendCS_HEARTBEAT_REQ(MyInfoManager.Instance.UseGmFunction());
 				}
-			}
-			lock (this)
-			{
-				while (_readQueue != null && _readQueue.Count > 0)
+            }
+            lock (this)
+            {
+                while (_readQueue != null && _readQueue.Count > 0)
 				{
 					Msg2Handle msg2Handle = (Msg2Handle)_readQueue.Peek();
 					//Debug.Log(msg2Handle._id);
@@ -3629,6 +3629,7 @@ public class SockTcp
 		Say(65, msgBody);
 	}
 
+	// Hooked
 	public void SendCS_CHANGE_USERMAP_ALIAS_REQ(int slot, string alias)
 	{
 		MsgBody msgBody = new MsgBody();
@@ -4534,7 +4535,7 @@ public class SockTcp
 		MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("FAIL_TO_UPDATE_SCRIPT"));
 	}
 
-	private void HandleCS_REGISTER_ACK(MsgBody msg)
+	public void HandleCS_REGISTER_ACK(MsgBody msg)
 	{
 		msg.Read(out byte val);
 		msg.Read(out int val2);
@@ -6777,7 +6778,7 @@ public class SockTcp
 		}
 	}
 
-	private void HandleCS_CHANGE_USERMAP_ALIAS_ACK(MsgBody msg)
+	public void HandleCS_CHANGE_USERMAP_ALIAS_ACK(MsgBody msg)
 	{
 		msg.Read(out int val);
 		msg.Read(out sbyte val2);

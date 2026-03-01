@@ -1,6 +1,4 @@
 ﻿using _Emulator;
-using _Emulator.Network.Gamemodes;
-using Microsoft.SqlServer.Server;
 using System;
 using System.Collections;
 using System.Collections.Generic;

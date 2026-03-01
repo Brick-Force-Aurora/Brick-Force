@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
-using _Emulator.Network;
 using Steamworks;
 using UnityEngine;
 using static Room;
@@ -249,10 +248,12 @@ namespace _Emulator
                 return;
             }
 
-            if (CSNetManager.Instance.Sock == null)
+            SockTcp sock = CSNetManager.Instance.Sock;
+            if (sock == null)
             {
-                CSNetManager.Instance.Sock = new SockTcp();
-                CSNetManager.Instance.Sock.Init();
+                sock = new SockTcp();
+                sock.Init();
+                CSNetManager.Instance.Sock = sock;
                 Debug.LogError("ReceiveSteam (Client): Sock was null");
             }
 
@@ -264,12 +265,9 @@ namespace _Emulator
                     Msg4Recv recv = new Msg4Recv(msg);
                     recv._hdr.FromArray(recv.Buffer);
                     MsgBody msgBody = recv.Flush();
-                    msgBody.Decrypt(CSNetManager.Instance.Sock.recvKey);
+                    msgBody.Decrypt(sock.recvKey);
 
-                    lock (CSNetManager.Instance.Sock)
-                    {
-                        CSNetManager.Instance.Sock._readQueue.Enqueue(new Msg2Handle(recv.GetId(), msgBody));
-                    }
+                    QueueToSock(new Msg2Handle(recv.GetId(), msgBody), sock);
                 }
             }
 
@@ -298,6 +296,18 @@ namespace _Emulator
             if (msgBody == null)
                 msgBody = new MsgBody();
             CSNetManager.Instance.Sock.Say(id, msgBody, doChunked);
+        }
+
+        public void QueueToSock(Msg2Handle msg, SockTcp sock = null)
+        {
+            if (sock == null)
+            {
+                sock = CSNetManager.Instance.Sock;
+            }
+            lock (sock)
+            {
+                sock._readQueue.Enqueue(msg);
+            }
         }
 
         public void UpdateLocalInventory()
@@ -460,11 +470,7 @@ namespace _Emulator
                 Disconnect("Received invalid chunked buffer from server");
                 return;
             }
-            lock (CSNetManager.Instance.Sock)
-            {
-                CSNetManager.Instance.Sock._readQueue.Enqueue(new Msg2Handle(packedOpcode, packedBody));
-            }
-
+            QueueToSock(new Msg2Handle(packedOpcode, packedBody));
         }
 
         private void HandleConnected(MsgBody msg)

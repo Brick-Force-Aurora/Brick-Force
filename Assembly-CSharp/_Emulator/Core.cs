@@ -1,5 +1,7 @@
 ﻿using System.IO;
+using System.Threading;
 using UnityEngine;
+using static Mono.Security.X509.X520;
 
 namespace _Emulator
 {
@@ -42,7 +44,7 @@ namespace _Emulator
             InventoryGUI.instance = coreObject.AddComponent<InventoryGUI>();
             ConfigGUI.instance = coreObject.AddComponent<ConfigGUI>();
             DebugConsole.instance = coreObject.AddComponent<DebugConsole>();
-            ServerEmulator.instance = coreObject.AddComponent<ServerEmulator>();
+            ServerEmulator.instance = new ServerEmulator();
             SteamManager.Instance = coreObject.AddComponent<SteamManager>();
             SteamLobbyManager.instance = coreObject.AddComponent<SteamLobbyManager>();
             SteamNetworkingManager.instance = coreObject.AddComponent<SteamNetworkingManager>();
@@ -54,6 +56,7 @@ namespace _Emulator
             SetupBuildConfig();
             SetupOperationProcessor();
             RegisterCommands();
+            Debug.Log($"[Unity] Main thread id = {Thread.CurrentThread.ManagedThreadId} Name ={ Thread.CurrentThread.Name} IsBackground ={ Thread.CurrentThread.IsBackground}");
         }
 
         private void SetupOperationProcessor()

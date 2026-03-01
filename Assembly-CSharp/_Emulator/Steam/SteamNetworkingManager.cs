@@ -5,37 +5,29 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Runtime.Remoting.Channels;
 using System.Text;
+using System.Threading;
 using Steamworks;
 using UnityEngine;
+using static Mono.Xml.MiniParser;
 
 namespace _Emulator
 {
     [DisallowMultipleComponent]
     public class SteamNetworkingManager : MonoBehaviour
     {
-        internal class LoopbackPacket
-        {
-            public LoopbackPacket(SteamNetworkingChannel _channel, CSteamID _steamID, byte[] _msg)
-            {
-                channel = _channel;
-                steamID = _steamID;
-                msg = new byte[_msg.Length];
-                Array.Copy(_msg, msg, msg.Length);
-            }
-
-            public SteamNetworkingChannel channel;
-            public CSteamID steamID = CSteamID.Nil;
-            public byte[] msg;
-        }
-
         public static SteamNetworkingManager instance;
 
         private Callback<SteamNetworkingMessagesSessionRequest_t> m_CallbackSessionRequest;
 
         private bool shouldReceive = false;
 
-        private Queue<LoopbackPacket> loopbackQueue = new Queue<LoopbackPacket>();
-        private readonly object loopbackLock = new object();
+        private SteamChannelHandler[] handlers;
+        private readonly SteamNetworkingChannel[] channels = (SteamNetworkingChannel[]) Enum.GetValues(typeof(SteamNetworkingChannel));
+
+        public QueuedSteamChannelHandler ServerChannel
+        {
+            get => (QueuedSteamChannelHandler) handlers[(int)SteamNetworkingChannel.ToHost];
+        }
 
         public void StartReceive()
         {
@@ -45,6 +37,15 @@ namespace _Emulator
         public void EndReceive()
         {
             shouldReceive = false;
+        }
+
+        void Awake()
+        {
+            handlers = new SteamChannelHandler[4];
+            Action<SteamNetworkingChannel, SteamChannelHandler> register = (ch, handler) => handlers[(int)ch] = handler;
+            register(SteamNetworkingChannel.ToHost, new QueuedSteamChannelHandler());
+            register(SteamNetworkingChannel.ToClient, new ImmediateSteamChannelHandler(ClientExtension.instance.ReceiveSteam));
+            register(SteamNetworkingChannel.ToP2P, new ImmediateSteamChannelHandler(P2PExtension.instance.ReceiveSteam));
         }
 
         void OnEnable()
@@ -60,16 +61,21 @@ namespace _Emulator
             if (shouldReceive && SteamManager.Initialized)
             {
                 HandleReceiveNetwork();
-                HandleReceiveLoopback();
             }
         }
 
         private void HandleReceiveNetwork()
         {
-            foreach (SteamNetworkingChannel channel in Enum.GetValues(typeof(SteamNetworkingChannel)))
+            foreach (SteamNetworkingChannel channel in channels)
             {
+                SteamChannelHandler handler = handlers[(int)channel];
                 IntPtr[] receiveBuffers = new IntPtr[16];
                 int nMessages = SteamNetworkingMessages.ReceiveMessagesOnChannel((int)channel, receiveBuffers, receiveBuffers.Length);
+                if (handler == null)
+                {
+                    // We ignore this channel :)
+                    continue;
+                }
                 for (int i = 0; i < nMessages; i++)
                 {
                     try
@@ -77,64 +83,19 @@ namespace _Emulator
                         SteamNetworkingMessage_t steamMsg = (SteamNetworkingMessage_t)Marshal.PtrToStructure(receiveBuffers[i], typeof(SteamNetworkingMessage_t));
                         byte[] msg = new byte[steamMsg.m_cbSize];
                         Marshal.Copy(steamMsg.m_pData, msg, 0, msg.Length);
-
                         if (SteamManager.debug)
                             Debug.Log("Steam - Received " + msg.Length + " bytes from " + steamMsg.m_identityPeer.GetSteamID() + " via " + channel);
-
-                        HandleMessage(channel, steamMsg.m_identityPeer.GetSteamID(), msg);
+                        handler.Enqueue(steamMsg.m_identityPeer.GetSteamID(), msg);
                     }
                     finally
                     {
                         Marshal.DestroyStructure(receiveBuffers[i], typeof(SteamNetworkingMessage_t));
                     }
                 }
-            }
-        }
-
-        private void HandleReceiveLoopback()
-        {
-            lock (loopbackLock)
-            {
-                if (loopbackQueue.Count < 1)
-                    return;
-
-                var packet = loopbackQueue.Peek();
-                if (SteamManager.debug)
-                    Debug.Log("Steam - Received " + packet.msg.Length + " bytes from " + packet.steamID + " (Loopback) via " + packet.channel);
-
-                try
+                if (handler is ImmediateSteamChannelHandler immediate)
                 {
-                    HandleMessage(packet.channel, packet.steamID, packet.msg);
+                    immediate.Dequeue();
                 }
-
-                finally
-                {
-                    loopbackQueue.Dequeue();
-                }
-            }
-        }
-
-        private void HandleMessage(SteamNetworkingChannel channel, CSteamID steamID, byte[] msg)
-        {
-            switch (channel)
-            {
-                case SteamNetworkingChannel.ToHost:
-                    {
-                        ServerEmulator.instance.ReceiveSteam(steamID, msg);
-                        break;
-                    }
-
-                case SteamNetworkingChannel.ToClient:
-                    {
-                        ClientExtension.instance.ReceiveSteam(steamID, msg);
-                        break;
-                    }
-
-                case SteamNetworkingChannel.ToP2P:
-                    {
-                        P2PExtension.instance.ReceiveSteam(steamID, msg);
-                        break;
-                    }
             }
         }
 
@@ -166,14 +127,12 @@ namespace _Emulator
             {
                 if (steamID == SteamUser.GetSteamID()) // Queue locally instead of sending
                 {
-                    lock (loopbackLock)
+                    SteamChannelHandler handler = handlers[(int)channel];
+                    if (handler != null)
                     {
-                        loopbackQueue.Enqueue(new LoopbackPacket(channel, steamID, msg));
-                        if (SteamManager.debug)
-                            Debug.Log("Steam - Sent " + msg.Length + " bytes to " + steamID + " (Loopback) via " + channel);
+                        handler.Enqueue(steamID, msg);
                     }
                 }
-
                 else
                 {
                     int sendFlags = channel == SteamNetworkingChannel.ToP2P ? 0 : 8;
@@ -186,8 +145,6 @@ namespace _Emulator
                     {
                         Marshal.Copy(msg, 0, ptr, msg.Length);
                         var result = SteamNetworkingMessages.SendMessageToUser(ref identityRemote, ptr, (uint)msg.Length, sendFlags, (int)channel);
-                        if (SteamManager.debug)
-                            Debug.Log("Steam - Sent " + msg.Length + " bytes to " + steamID + " via " + channel + " | " + result);
                     }
                     finally
                     {

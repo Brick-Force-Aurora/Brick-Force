@@ -65,6 +65,8 @@ public class UserMap
 
 	public bool IsPortalMove;
 
+	public bool IsClientside = true; // AURORA: Required to be added in order to determine if map is clientside or not
+
     public UserMap()
 	{
 		dic = new Dictionary<int, BrickInst>();
@@ -652,7 +654,7 @@ public class UserMap
 						{
 							byCoord.Code |= Brick.shadowCodeSet[0];
 							morphes.Add(byCoord.Seq);
-							if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
+							if (IsClientside && RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily & Add clientside check
                             {
 								CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(byCoord.Seq, byCoord.Code);
 							}
@@ -662,7 +664,7 @@ public class UserMap
 					{
 						byCoord.Code &= Brick.shadowCodeReset[0];
 						morphes.Add(byCoord.Seq);
-						if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
+						if (IsClientside && RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily & Add clientside check
                         {
 							CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(byCoord.Seq, byCoord.Code);
 						}
@@ -682,7 +684,7 @@ public class UserMap
 								{
 									byCoord.Code |= Brick.shadowCodeSet[(int)Brick.opposite[(int)dIR]];
 									morphes.Add(byCoord.Seq);
-									if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
+									if (IsClientside && RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily & Add clientside check
                                     {
 										CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(byCoord.Seq, byCoord.Code);
 									}
@@ -692,7 +694,7 @@ public class UserMap
 							{
 								byCoord.Code &= Brick.shadowCodeReset[(int)Brick.opposite[(int)dIR]];
 								morphes.Add(byCoord.Seq);
-								if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
+								if (IsClientside && RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily & Add clientside check
                                 {
 									CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(byCoord.Seq, byCoord.Code);
 								}
@@ -720,7 +722,7 @@ public class UserMap
 		if (brick.meshOptimize)
 		{
 			brickInst.Code = CalcMeshAndShadowCode(seq, x, y, z);
-			if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
+			if (IsClientside && RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily & Add clientside check
             {
 				CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(brickInst.Seq, brickInst.Code);
 			}
@@ -732,8 +734,8 @@ public class UserMap
 					byCoord.Code &= Brick.meshCodeReset[(int)Brick.opposite[(int)dIR]];
 					byCoord.Code &= Brick.shadowCodeReset[(int)Brick.opposite[(int)dIR]];
 					morphes.Add(byCoord.Seq);
-					if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
-					{
+					if (IsClientside && RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily & Add clientside check
+                    {
 						CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(byCoord.Seq, byCoord.Code);
 					}
 				}
@@ -826,32 +828,37 @@ public class UserMap
 		{
 			RemoveSpawner(spawnerType, posX, posY, posZ);
 		}
-		GameObject gameObject = GameObject.Find("Main");
-		string empty = string.Empty;
-		switch (spawnerType)
-		{
-		case Brick.SPAWNER_TYPE.RED_TEAM_SPAWNER:
-			if (null != gameObject)
-			{
-				empty = string.Format(StringMgr.Instance.Get("NOTICE_SPONER_02"), StringMgr.Instance.Get("N90_RED_TEAM_SPAWNER"), BrickManager.Instance.CountLimitedBrick(brick.GetIndex()) - 1, brick.maxInstancePerMap);
-				gameObject.BroadcastMessage("OnChat", new ChatText(ChatText.CHAT_TYPE.SYSTEM, 0, string.Empty, empty));
-			}
-			break;
-		case Brick.SPAWNER_TYPE.BLUE_TEAM_SPAWNER:
-			if (null != gameObject)
-			{
-				empty = string.Format(StringMgr.Instance.Get("NOTICE_SPONER_02"), StringMgr.Instance.Get("N90_BLUE_TEAM_SPAWNER"), BrickManager.Instance.CountLimitedBrick(brick.GetIndex()) - 1, brick.maxInstancePerMap);
-				gameObject.BroadcastMessage("OnChat", new ChatText(ChatText.CHAT_TYPE.SYSTEM, 0, string.Empty, empty));
-			}
-			break;
-		case Brick.SPAWNER_TYPE.SINGLE_SPAWNER:
-			if (null != gameObject)
-			{
-				empty = string.Format(StringMgr.Instance.Get("NOTICE_SPONER_02"), StringMgr.Instance.Get("N90_SINGLE_SPAWNER"), BrickManager.Instance.CountLimitedBrick(brick.GetIndex()) - 1, brick.maxInstancePerMap);
-				gameObject.BroadcastMessage("OnChat", new ChatText(ChatText.CHAT_TYPE.SYSTEM, 0, string.Empty, empty));
-			}
-			break;
-		}
+		// AURORA - Start: Add clientside checks
+		if (IsClientside)
+        {
+            GameObject gameObject = GameObject.Find("Main");
+            string empty = string.Empty;
+            switch (spawnerType)
+            {
+                case Brick.SPAWNER_TYPE.RED_TEAM_SPAWNER:
+                    if (null != gameObject)
+                    {
+                        empty = string.Format(StringMgr.Instance.Get("NOTICE_SPONER_02"), StringMgr.Instance.Get("N90_RED_TEAM_SPAWNER"), BrickManager.Instance.CountLimitedBrick(brick.GetIndex()) - 1, brick.maxInstancePerMap);
+                        gameObject.BroadcastMessage("OnChat", new ChatText(ChatText.CHAT_TYPE.SYSTEM, 0, string.Empty, empty));
+                    }
+                    break;
+                case Brick.SPAWNER_TYPE.BLUE_TEAM_SPAWNER:
+                    if (null != gameObject)
+                    {
+                        empty = string.Format(StringMgr.Instance.Get("NOTICE_SPONER_02"), StringMgr.Instance.Get("N90_BLUE_TEAM_SPAWNER"), BrickManager.Instance.CountLimitedBrick(brick.GetIndex()) - 1, brick.maxInstancePerMap);
+                        gameObject.BroadcastMessage("OnChat", new ChatText(ChatText.CHAT_TYPE.SYSTEM, 0, string.Empty, empty));
+                    }
+                    break;
+                case Brick.SPAWNER_TYPE.SINGLE_SPAWNER:
+                    if (null != gameObject)
+                    {
+                        empty = string.Format(StringMgr.Instance.Get("NOTICE_SPONER_02"), StringMgr.Instance.Get("N90_SINGLE_SPAWNER"), BrickManager.Instance.CountLimitedBrick(brick.GetIndex()) - 1, brick.maxInstancePerMap);
+                        gameObject.BroadcastMessage("OnChat", new ChatText(ChatText.CHAT_TYPE.SYSTEM, 0, string.Empty, empty));
+                    }
+                    break;
+            }
+        }
+		// AURORA - End
 		if (dic[seq].Template == 163)
 		{
 			RemovePortal(1, posX, posY, posZ);
@@ -887,7 +894,7 @@ public class UserMap
 						byCoord.Code |= Brick.shadowCodeSet[(int)Brick.opposite[(int)dIR]];
 					}
 					morphes.Add(byCoord.Seq);
-					if (RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily
+					if (IsClientside && RoomManager.Instance.Master == MyInfoManager.Instance.Seq && !MyInfoManager.Instance.AuroraTemporarilyDisableBrickNetworkUpdates) // AURORA: Disable network traffic temporarily & add clientside check
 					{
 						CSNetManager.Instance.Sock.SendCS_MORPH_BRICK_REQ(byCoord.Seq, byCoord.Code);
 					}
@@ -923,8 +930,8 @@ public class UserMap
 		{
 			GlobalVars.Instance.vDefenseEnd = new Vector3((float)(int)x, (float)(int)y, (float)(int)z);
 		}
-		if (template == 191)
-		{
+		if (template == 191 && IsClientside) // AURORA: Add clientside check
+        {
 			BrickManager.Instance.AddDoorTDic(seq, new Vector3((float)(int)x, (float)(int)y, (float)(int)z));
 		}
 		switch (template)
@@ -1512,8 +1519,12 @@ public class UserMap
 	}
 
 	public void CheckRedPortalAlphaBlending(int seq, bool add)
-	{
-		if (portalReds.Count == 1)
+    {
+        if (!IsClientside) // AURORA: Add clientside check
+        {
+            return;
+        }
+        if (portalReds.Count == 1)
 		{
 			GameObject brickObject = BrickManager.Instance.GetBrickObject(seq);
 			if (!(brickObject == null))
@@ -1554,8 +1565,12 @@ public class UserMap
 	}
 
 	public void CheckBluePortalAlphaBlending(int seq, bool add)
-	{
-		if (portalBlues.Count == 1)
+    {
+        if (!IsClientside) // AURORA: Add clientside check
+        {
+            return;
+        }
+        if (portalBlues.Count == 1)
 		{
 			GameObject brickObject = BrickManager.Instance.GetBrickObject(seq);
 			if (!(brickObject == null))
@@ -1597,6 +1612,10 @@ public class UserMap
 
 	public void CheckNeutralPortalAlphaBlending(int seq, bool add)
 	{
+		if (!IsClientside) // AURORA: Add clientside check
+        {
+			return;
+		} 
 		if (portalNeutrals.Count == 1)
 		{
 			GameObject brickObject = BrickManager.Instance.GetBrickObject(seq);

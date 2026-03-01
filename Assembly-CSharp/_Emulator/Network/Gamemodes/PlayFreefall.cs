@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 
-namespace _Emulator.Network.Gamemodes
+namespace _Emulator
 {
     // Also known as Bungee
     public class PlayFreefall : IGameMode
@@ -30,7 +30,7 @@ namespace _Emulator.Network.Gamemodes
             room.isBreakInto = Convert.ToBoolean(parameters[4]);
             match.isBalance = Convert.ToBoolean(parameters[5]);
             room.isWanted = Convert.ToBoolean(parameters[6]);
-            room.isDropItem = Convert.ToBoolean(parameters[7]);
+            room.isDropItem = /*Convert.ToBoolean(parameters[7]);*/ false;
             match.CacheMap(emulator.regMaps.Find(x => x.Value.Map == room.map).Value, new UserMapInfo(0, 0));
             match.useBuildGun = true;
         }

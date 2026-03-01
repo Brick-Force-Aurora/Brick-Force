@@ -1,27 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
-using System.Security.Policy;
-using System.Text.RegularExpressions;
-using _Emulator.Network;
-using _Emulator.Network.Gamemodes;
+using System.Threading;
 using Steamworks;
-using UnityEngine;
-using static MyInfoManager;
 using static Room;
-using static TItem;
-using static WindowSystemManager;
-using Debug = UnityEngine.Debug;
 
 namespace _Emulator
 {
-    public class ServerEmulator : MonoBehaviour
+    public class ServerEmulator
     {
         public static ServerEmulator instance;
         internal readonly object dataLock = new object();
@@ -29,7 +19,7 @@ namespace _Emulator
         private Socket serverSocket;
         private byte recvKey = byte.MaxValue;
         public readonly byte sendKey = byte.MaxValue;
-        internal Queue<MsgReference> readQueue = new Queue<MsgReference>();
+        private Queue<MsgReference> readQueue = new Queue<MsgReference>();
         private Queue<MsgReference> writeQueue = new Queue<MsgReference>();
         private int curSeq = 0;
         public bool debugHandle = false;
@@ -39,9 +29,11 @@ namespace _Emulator
         public bool isSteam = false;
         public bool hasHost = false;
         public EmulatorChannelManager channelManager = new EmulatorChannelManager();
-        private float killLogTimer = 0f;
-        private float lastUpdateTime = 0f;
+        private double killLogTimer = 0f;
+        private double lastUpdateTime = 0f;
         public List<KeyValuePair<int, RegMap>> regMaps = new List<KeyValuePair<int, RegMap>>();
+        private BrickManager brickManager;
+        private TItemManager tItemManager;
         private bool waitForShutDown = false;
 
         public readonly IGameMode[] gameModes;
@@ -58,6 +50,12 @@ namespace _Emulator
 
         private readonly Dictionary<ushort, Action<MsgReference>> _handlers = new Dictionary<ushort, Action<MsgReference>>();
 
+        private Thread _worker;
+        private volatile bool _workerRunning;
+
+        private readonly Action handleMessagesTcp, handleMessagesSteam;
+        private Action handleMessages;
+
         public ServerEmulator()
         {
             gameModes = new IGameMode[10];
@@ -71,6 +69,9 @@ namespace _Emulator
             gameModes[(int)ROOM_TYPE.BUNGEE] = playFreefall = new PlayFreefall(this);
             gameModes[(int)ROOM_TYPE.TEAM_MATCH] = playTeamDeathMatch = new PlayTeamDeathMatch(this);
             gameModes[(int)ROOM_TYPE.ZOMBIE] = playZombie = new PlayZombie(this);
+
+            handleMessagesTcp = HandleMessagesTcp;
+            handleMessagesSteam = HandleMessagesSteam;
         }
         private void RegisterHandlers()
         {
@@ -98,13 +99,10 @@ namespace _Emulator
             register(MessageId.CS_MORPH_BRICK_REQ, HandleMorphBrickRequest);
             register(MessageId.CS_EQUIP_REQ, HandleEquipRequest);
             register(MessageId.CS_UNEQUIP_REQ, HandleUnequipRequest);
-            register(MessageId.CS_SAVE_REQ, HandleSaveMap);
             register(MessageId.CS_LOAD_COMPLETE_REQ, HandleLoadComplete);
             register(MessageId.CS_KILL_LOG_REQ, HandleKillLogRequest);
             register(MessageId.CS_SET_STATUS_REQ, HandleSetStatusRequest);
             register(MessageId.CS_START_REQ, HandleStartRequest);
-            register(MessageId.CS_REGISTER_REQ, HandleRegisterMapRequest);
-            register(MessageId.CS_CHANGE_USERMAP_ALIAS_REQ, HandleChangeUserMapAliasRequest);
             register(MessageId.CS_RESPAWN_TICKET_REQ, HandleRespawnTicketRequest);
             register(MessageId.CS_TIMER_REQ, HandleTimer);
             register(MessageId.CS_MATCH_COUNTDOWN_REQ, HandleMatchCountdown);
@@ -181,7 +179,7 @@ namespace _Emulator
                     continue;
                 }
                 string name = Enum.GetName(messageIdType, id);
-                _handlers[mapId] = msgRef => Debug.LogWarning($"Client {msgRef.client.GetIdentifier()} sent unhandled packet: {name} ({mapId})");
+                _handlers[mapId] = msgRef => ServerDebugger.LogWarning($"Client {msgRef.client.GetIdentifier()} sent unhandled packet: {name} ({mapId})");
             }
             messageIdType = typeof(ExtensionOpcodes);
             foreach (ExtensionOpcodes id in Enum.GetValues(messageIdType))
@@ -192,7 +190,7 @@ namespace _Emulator
                     continue;
                 }
                 string name = Enum.GetName(messageIdType, id);
-                _handlers[mapId] = msgRef => Debug.LogWarning($"Client {msgRef.client.GetIdentifier()} sent unhandled packet: {name} ({mapId})");
+                _handlers[mapId] = msgRef => ServerDebugger.LogWarning($"Client {msgRef.client.GetIdentifier()} sent unhandled packet: {name} ({mapId})");
             }
         }
 
@@ -201,6 +199,7 @@ namespace _Emulator
             RegisterHandlers();
             isSteam = false;
             hasHost = false;
+            handleMessages = handleMessagesTcp;
             try
             {
                 if (serverSocket == null)
@@ -211,18 +210,15 @@ namespace _Emulator
                 serverSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 serverSocket.Listen(16);
                 serverSocket.BeginAccept(new AsyncCallback(AcceptCallback), null);
-                lastUpdateTime = Time.time;
                 serverCreated = true;
-                Debug.Log("Server created");
+                StartWorker();
+                ServerDebugger.Log("Server created");
             }
 
             catch (Exception ex)
             {
-                Debug.LogError("SetupServer: " + ex.Message);
+                ServerDebugger.LogError("SetupServer: " + ex.Message);
             }
-
-            //Pulls all loaded RegMaps into the emulator
-            regMaps = RegMapManager.Instance.dicRegMap.ToList();
         }
 
         public void SetupServerSteam()
@@ -230,12 +226,252 @@ namespace _Emulator
             RegisterHandlers();
             isSteam = true;
             hasHost = false;
-            lastUpdateTime = Time.time;
+            handleMessages = handleMessagesSteam;
             serverCreated = true;
-            Debug.Log("Server set to Steam");
+            StartWorker();
+            ServerDebugger.Log("Server set to Steam");
+        }
 
-            //Pulls all loaded RegMaps into the emulator
+        private void StartWorker()
+        {
+            if (_workerRunning) return;
             regMaps = RegMapManager.Instance.dicRegMap.ToList();
+            tItemManager = TItemManager.Instance;
+            brickManager = BrickManager.Instance;
+            _workerRunning = true;
+            _worker = new Thread(WorkerLoop);
+            _worker.IsBackground = true;
+            _worker.Name = "ServerEmulatorWorker";
+            _worker.Start();
+        }
+
+        private const long MS = 10000L;
+        private volatile int tps = 0;
+        public int TPS { get => tps; }
+
+        private void WorkerLoop()
+        {
+            ServerDebugger.Log($"Worker started. ThreadId={Thread.CurrentThread.ManagedThreadId} Name={Thread.CurrentThread.Name} IsBackground={Thread.CurrentThread.IsBackground}");
+            // Server should run at ~120 hz
+            // Every 2nd tick client updates should be handled
+            Stopwatch watch = new Stopwatch();
+            long delta = 0;
+            long frequency = (long)Math.Floor(Stopwatch.Frequency / 120d), remaining;
+            int tick = 0;
+            long second = 0;
+            watch.Start();
+            while (true)
+            {
+                delta = watch.ElapsedTicks;
+                second += delta;
+                if (second >= Stopwatch.Frequency)
+                {
+                    second -= Stopwatch.Frequency;
+                    tps = tick;
+                    tick = 0;
+                }
+                tick++;
+                watch.Reset();
+                watch.Start();
+                WorkerDoWork(tick, delta);
+                if (!_workerRunning)
+                {
+                    break;
+                }
+                remaining = frequency - watch.ElapsedTicks;
+                while (remaining > MS * 10)
+                {
+                    Thread.Sleep((int)(remaining - MS * 5));
+                    remaining = frequency - watch.ElapsedTicks;
+                }
+                if (remaining < MS)
+                {
+                    continue;
+                }
+                while (remaining > MS)
+                {
+                    Thread.SpinWait((int) (remaining * 0.025));
+                    remaining = frequency - watch.ElapsedTicks;
+                }
+            }
+        }
+
+        private void WorkerDoWork(int currentTick, float deltaTicks)
+        {
+            float delta = deltaTicks / Stopwatch.Frequency;
+            if (waitForShutDown && (clientList.Count == 0 || isSteam))
+                ShutdownFinally();
+
+            killLogTimer += delta;
+
+            handleMessages();
+            if ((currentTick & 0b1) == 0b1)
+            {
+                HandleClientUpdates(delta);
+            }
+            SendMessages();
+        }
+
+        private void HandleClientUpdates(float delta)
+        {
+            // double time = _clock.Elapsed.TotalSeconds, delta = time - lastUpdateTime;
+            ClientReference clientRef;
+            for (int i = clientList.Count - 1; i >= 0; i--)
+            {
+                clientRef = clientList[i];
+                if (clientRef.isHost) { continue; }
+                // Handle dead clients
+                if (clientRef.seq == -1)
+                {
+                    if (clientRef.loginToleranceTime < 4f)
+                    {
+                        clientRef.loginToleranceTime += delta;
+                        continue;
+                    }
+                    clientRef.Disconnect("Login took too long");
+                    if (debugHandle)
+                        ServerDebugger.Log("[Disconnect] Client login timed out: " + clientRef.GetIdentifier());
+                    continue;
+                }
+                // Handle client heartbeat
+                clientRef.heartBeatToleranceTime += delta;
+                if (clientRef.didHeartBeat)
+                {
+                    clientRef.heartBeatToleranceTime = 0;
+                    clientRef.didHeartBeat = false;
+                }
+                else if (clientRef.heartBeatToleranceTime > 7.5f)
+                {
+                    if (debugHandle)
+                        ServerDebugger.Log("[Disconnect] Client timed out: " + clientRef.GetIdentifier());
+                    clientRef.Disconnect("Client didn't respond for too long");
+                    continue;
+                }
+            }
+            lastUpdateTime = 0;
+        }
+
+        private void HandleMessagesTcp()
+        {
+            lock (dataLock)
+            {
+                HandleMessages();
+            }
+        }
+        private void HandleMessagesSteam()
+        {
+            SteamNetworkingManager.instance.ServerChannel.Dequeue(ReceiveSteam);
+            HandleMessages();
+        }
+        private void HandleMessages()
+        {
+            if (readQueue.Count <= 0)
+                return;
+            MsgReference msgRef;
+            Action<MsgReference> handler;
+            while (readQueue.Count > 0)
+            {
+                msgRef = readQueue.Dequeue();
+                if (debugSend)
+                    ServerDebugger.Log($"[Verbose] Processing message ID: {msgRef.msg._id} from client: {msgRef.client.GetIdentifier()}");
+                if (_handlers.TryGetValue(msgRef.msg._id, out handler))
+                {
+                    try
+                    {
+                        handler(msgRef);
+                    }
+                    catch (Exception ex)
+                    {
+                        ServerDebugger.LogError("HandleMessages: " + ex.Message);
+                        ServerDebugger.LogError("HandleMessages StackTrace: " + ex.StackTrace);
+                    }
+                }
+                else
+                {
+                    ServerDebugger.LogWarning("No handler for message ID: " + msgRef.msg._id);
+                }
+            }
+        }
+
+        private void SendMessages()
+        {
+            if (writeQueue.Count < 1)
+                return;
+            while (writeQueue.Count > 0)
+            {
+                MsgReference msgRef = writeQueue.Dequeue();
+                try
+                {
+                    switch (msgRef.sendType)
+                    {
+                        case SendType.Unicast:
+                            msgRef.client.Send(msgRef);
+                            break;
+
+                        case SendType.Broadcast:
+                            BroadcastMessage(msgRef);
+                            break;
+
+                        case SendType.BroadcastChannel:
+                            BroadcastChannelMessage(msgRef);
+                            break;
+
+                        case SendType.BroadcastRoom:
+                            BroadcastRoomMessage(msgRef);
+                            break;
+
+                        case SendType.BroadcastRoomExclusive:
+                            BroadcastRoomMessageExclusive(msgRef);
+                            break;
+
+                        case SendType.BroadcastRedTeam:
+                            BroadcastRedTeamMessage(msgRef);
+                            break;
+
+                        case SendType.BroadcastBlueTeam:
+                            BroadcastBlueTeamMessage(msgRef);
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ServerDebugger.LogError("SendMessages: " + ex.Message);
+                    if (debugHandle)
+                        ServerDebugger.LogError("SendMessages StackTrace: " + ex.StackTrace);
+                }
+            }
+        }
+
+        private bool HandleClientAccepted(ClientReference client)
+        {
+            lock (dataLock)
+            {
+                bool nonExisting = false;
+                if (isSteam)
+                {
+                    var existingClient = clientList.Find(x => x.steamID == client.steamID);
+                    nonExisting = existingClient == null;
+                    if (!nonExisting)
+                        nonExisting = existingClient.CloseClient();
+
+                    //nonExisting = !clientList.Exists(x => x.steamID == client.steamID);
+                }
+                else
+                    nonExisting = !clientList.Exists(x => x.socket == client.socket) && (!Config.instance.oneClientPerIP || !clientList.Exists(x => x.ip == client.ip));
+
+                if (!Config.instance.blockConnections && clientList.Count < Config.instance.maxConnections && nonExisting)
+                {
+                    clientList.Add(client);
+                    SendConnected(client);
+                    return true;
+                }
+
+                else
+                {
+                    ServerDebugger.Log("HandleClientAccepted: Blocked Client " + client.GetIdentifier() + " from Connecting");
+                    return false;
+                }
+            }
         }
 
         private void AcceptCallback(IAsyncResult result)
@@ -259,7 +495,7 @@ namespace _Emulator
 
             catch (Exception ex)
             {
-                Debug.LogError("AcceptCallback: " + ex.Message);
+                ServerDebugger.LogError("AcceptCallback: " + ex.Message);
             }
 
             finally
@@ -283,6 +519,7 @@ namespace _Emulator
                         msgBody.Decrypt(recvKey);
                         lock (dataLock)
                         {
+                            ServerDebugger.Log("Enqueuing message");
                             readQueue.Enqueue(new MsgReference(new Msg2Handle(client.recvBuf.GetId(), msgBody), client, _channelRef: client.channel, _matchData: client.matchData));
                         }
                     }
@@ -292,8 +529,7 @@ namespace _Emulator
 
             catch (Exception ex)
             {
-                Debug.LogError(ex);
-                Debug.LogError("ReceiveCallback: " + ex.Message);
+                ServerDebugger.LogError(ex);
             }
         }
 
@@ -328,16 +564,15 @@ namespace _Emulator
 
             if (msg == null)
             {
-                Debug.LogError("ReceiveSteam: msg was null");
+                ServerDebugger.LogError("ReceiveSteam: msg was null");
                 return;
             }
 
             if (msg.Length < 15)
             {
-                Debug.LogError("ReceiveSteam: msg length was " + msg.Length);
+                ServerDebugger.LogError("ReceiveSteam: msg length was " + msg.Length);
                 return;
             }
-
             try
             {
                 ClientReference client = FindClientBySteamID(steamID);
@@ -347,23 +582,18 @@ namespace _Emulator
                     recv._hdr.FromArray(recv.Buffer);
                     MsgBody msgBody = recv.Flush();
                     msgBody.Decrypt(recvKey);
-
-                    lock (dataLock)
-                    {
-                        readQueue.Enqueue(new MsgReference(new Msg2Handle(recv.GetId(), msgBody), client, _channelRef: client.channel, _matchData: client.matchData));
-                    }
+                    readQueue.Enqueue(new MsgReference(new Msg2Handle(recv.GetId(), msgBody), client, _channelRef: client.channel, _matchData: client.matchData));
                 } else
                 {
-                    Debug.LogWarning("ReceiveSteam: no ClientReference for " + steamID + " (closing session)");
+                    ServerDebugger.LogWarning("ReceiveSteam: no ClientReference for " + steamID + " (closing session)");
                     if (SteamManager.Initialized && SteamNetworkingManager.instance != null)
                         SteamNetworkingManager.instance.CloseSessionWithUser(steamID);
                     return;
                 }
             }
-
             catch (Exception ex)
             {
-                Debug.LogError("ReceiveSteam: " + ex.Message);
+                ServerDebugger.LogError("ReceiveSteam: " + ex.Message);
             }
         }
 
@@ -419,7 +649,7 @@ namespace _Emulator
         {
             ClientReference client = clientList.Find(x => x.socket == clientSocket);
             if (client == null)
-                Debug.LogError("FindClientBySocket: Could not find ClientReference for client: " + clientSocket.RemoteEndPoint.ToString());
+                ServerDebugger.LogError("FindClientBySocket: Could not find ClientReference for client: " + clientSocket.RemoteEndPoint.ToString());
             return client;
         }
 
@@ -427,7 +657,7 @@ namespace _Emulator
         {
             ClientReference client = clientList.Find(x => x.steamID == steamID);
             if (client == null)
-                Debug.LogError("FindClientBySteamID: Could not find ClientReference for client: " + steamID);
+                ServerDebugger.LogError("FindClientBySteamID: Could not find ClientReference for client: " + steamID);
             return client;
         }
 
@@ -475,23 +705,25 @@ namespace _Emulator
                     }
                     catch (SocketException sockEx)
                     {
-                        Debug.LogError("Encountered SocketException during Shutdown: " + sockEx.Message);
+                        ServerDebugger.LogError("Encountered SocketException during Shutdown: " + sockEx.Message);
                     }
                     catch (ObjectDisposedException objDisEx)
                     {
-                        Debug.LogError("Encountered ObjectDisposedException during Shutdown: " + objDisEx.Message);
+                        ServerDebugger.LogError("Encountered ObjectDisposedException during Shutdown: " + objDisEx.Message);
                     }
                     try
                     {
                         serverSocket.Close();
                     }
                     catch(Exception ex) {
-                        Debug.LogError("Encountered Excpetion during Shutdown: " + ex.Message);
+                        ServerDebugger.LogError("Encountered Excpetion during Shutdown: " + ex.Message);
                     }
                     serverSocket = null;
                 }
                 ClearBuffers();
                 serverCreated = false;
+                _workerRunning = false;
+                _worker = null;
             }
         }
 
@@ -506,41 +738,7 @@ namespace _Emulator
 
         public void Say(MsgReference msg)
         {
-            lock (dataLock)
-            {
-                writeQueue.Enqueue(msg);
-            }
-        }
-        public void SayInstant(MsgReference msg)
-        {
-            lock (dataLock)
-            {
-                writeQueue.Enqueue(msg);
-                SendMessages();
-            }
-        }
-
-        private void Update()
-        {
-            if (!serverCreated)
-                return;
-
-            lock (dataLock)
-            {
-                if (waitForShutDown && (clientList.Count == 0 || isSteam))
-                    ShutdownFinally();
-
-                killLogTimer += Time.deltaTime;
-                HandleMessages();
-                SendMessages();
-            }
-        }
-
-        private void FixedUpdate()
-        {
-            if (!serverCreated)
-                return;
-            HandleClientUpdates();
+            writeQueue.Enqueue(msg);
         }
 
         public void Reset()
@@ -580,43 +778,6 @@ namespace _Emulator
                 SendRoomList(client);
             }
             SendCustomMessage("Reset By Host");
-        }
-
-        private void HandleClientUpdates()
-        {
-            float time = Time.time, delta = time - lastUpdateTime;
-            ClientReference clientRef;
-            for (int i = clientList.Count - 1; i >= 0; i--)
-            {
-                clientRef = clientList[i];
-                if (clientRef.isHost) { continue; }
-                // Handle dead clients
-                if (clientRef.seq == -1)
-                {
-                    if (clientRef.loginToleranceTime < 4f)
-                    {
-                        clientRef.loginToleranceTime += delta;
-                        continue;
-                    }
-                    clientRef.Disconnect("Login took too long");
-                    if (ServerEmulator.instance.debugHandle)
-                        Debug.Log("[Disconnect] Client login timed out: " + clientRef.GetIdentifier());
-                    continue;
-                }
-                // Handle client heartbeat
-                if (clientRef.didHeartBeat)
-                {
-                    clientRef.lastHeartBeatTime = time;
-                    clientRef.didHeartBeat = false;
-                } else if (time - clientRef.lastHeartBeatTime > 7.5f)
-                {
-                    if (ServerEmulator.instance.debugHandle)
-                        Debug.Log("[Disconnect] Client timed out: " + clientRef.GetIdentifier());
-                    clientRef.Disconnect("Client didn't respond for too long");
-                    continue;
-                }
-            }
-            lastUpdateTime = time;
         }
 
         public bool GetGamestateStrings(out string roomType, out string roomStatus, out string mapAlias)
@@ -692,131 +853,10 @@ namespace _Emulator
 
             return result;
         }
-
-        private void HandleMessages()
-        {
-            if (readQueue.Count < 1)
-                return;
-
-            MsgReference msgRef = readQueue.Peek();
-
-            try
-            {   
-                if (debugSend)
-                    Debug.Log($"[Verbose] Processing message ID: {msgRef.msg._id} from client: {msgRef.client.GetIdentifier()}");
-                Action<MsgReference> handler;
-                if (_handlers.TryGetValue(msgRef.msg._id, out handler))
-                {
-                    handler(msgRef);
-                }
-                else
-                {
-                    Debug.LogWarning("No handler for message ID: " + msgRef.msg._id);
-                }
-            }
-
-            catch (Exception ex)
-            {
-                Debug.LogError("HandleMessages: " + ex.Message);
-                Debug.LogError("HandleMessages StackTrace: " + ex.StackTrace);
-            }
-
-            finally
-            {
-                readQueue.Dequeue();
-            }
-        }
-
-        private void SendMessages()
-        {
-            if (writeQueue.Count < 1)
-                return;
-
-            MsgReference msgRef = writeQueue.Peek();
-
-            try
-            {
-                switch (msgRef.sendType)
-                {
-                    case SendType.Unicast:
-                        msgRef.client.Send(msgRef);
-                        break;
-
-                    case SendType.Broadcast:
-                        BroadcastMessage(msgRef);
-                        break;
-
-                    case SendType.BroadcastChannel:
-                        BroadcastChannelMessage(msgRef);
-                        break;
-
-                    case SendType.BroadcastRoom:
-                        BroadcastRoomMessage(msgRef);
-                        break;
-
-                    case SendType.BroadcastRoomExclusive:
-                        BroadcastRoomMessageExclusive(msgRef);
-                        break;
-
-                    case SendType.BroadcastRedTeam:
-                        BroadcastRedTeamMessage(msgRef);
-                        break;
-
-                    case SendType.BroadcastBlueTeam:
-                        BroadcastBlueTeamMessage(msgRef);
-                        break;
-                }
-            }
-
-            catch (Exception ex)
-            {
-                Debug.LogError("SendMessages: " + ex.Message);
-                if (debugHandle)
-                    Debug.LogError("SendMessages StackTrace: " + ex.StackTrace);
-            }
-
-            finally
-            {
-                writeQueue.Dequeue();
-            }
-        }
-
-        private bool HandleClientAccepted(ClientReference client)
-        {
-            lock (dataLock)
-            {
-                bool nonExisting = false;
-                if (isSteam)
-                {
-                    var existingClient = clientList.Find(x => x.steamID == client.steamID);
-                    nonExisting = existingClient == null;
-                    if (!nonExisting)
-                        nonExisting = existingClient.CloseClient();
-
-                    //nonExisting = !clientList.Exists(x => x.steamID == client.steamID);
-                }
-                else
-                    nonExisting = !clientList.Exists(x => x.socket == client.socket) && (!Config.instance.oneClientPerIP || !clientList.Exists(x => x.ip == client.ip));
-
-                if (!Config.instance.blockConnections && clientList.Count < Config.instance.maxConnections && nonExisting)
-                {
-                    clientList.Add(client);
-                    SendConnected(client);
-                    return true;
-                }
-
-                else
-                {
-                    Debug.Log("HandleClientAccepted: Blocked Client " + client.GetIdentifier() + " from Connecting");
-                    return false;
-                }
-            }
-        }
-
         private void HandleAmIConnected(MsgReference msgRef)
         {
             msgRef.client.didHeartBeat = true;
-            SayInstant(new MsgReference(ExtensionOpcodes.opAmIConnectedAck, null, msgRef.client));
+            Say(new MsgReference(ExtensionOpcodes.opAmIConnectedAck, null, msgRef.client));
         }
 
         private void HandleHeartbeat(MsgReference msgRef)
@@ -829,7 +869,7 @@ namespace _Emulator
         {
             if (!msgRef.client.isVersionSetUp)
             {
-                Debug.LogWarning($"Disconnecting client: Version check failed, client didn't send any version");
+                ServerDebugger.LogWarning($"Disconnecting client: Version check failed, client didn't send any version");
                 msgRef.client.Disconnect($"Version mismatch detected, the host is using a newer version ({Core.VersionStr})");
                 return;
             }
@@ -866,7 +906,7 @@ namespace _Emulator
             msgRef.client.isLoaded = true;
 
             if (debugHandle)
-                Debug.Log("HandleLoadComplete from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleLoadComplete from: " + msgRef.client.GetIdentifier());
         }
 
         private void HandleTimer(MsgReference msgRef)
@@ -883,7 +923,7 @@ namespace _Emulator
             }
 
             if (debugPing)
-                Debug.Log("HandleTimer from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.LogVerbose("HandleTimer from: " + msgRef.client.GetIdentifier());
             if (matchData.room.type == Room.ROOM_TYPE.BND)
             {
                 if (matchData.repeat <= 0)
@@ -931,7 +971,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int countdownTime);
 
             if (debugHandle)
-                Debug.Log("HandleMatchCountdown from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleMatchCountdown from: " + msgRef.client.GetIdentifier());
 
             if (msgRef.client.seq == matchData.masterSeq)
             {
@@ -951,7 +991,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int dest);
 
             if (debugHandle)
-                Debug.Log("HandleRoamout from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleRoamout from: " + msgRef.client.GetIdentifier());
 
             ChannelReference channelRef = channelManager.GetChannelByID(dest);
             if (channelRef != null)
@@ -974,7 +1014,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out string hashCode);
 
             if (debugHandle)
-                Debug.Log("HandleRoamin from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleRoamin from: " + msgRef.client.GetIdentifier());
 
             SendUserList(msgRef.client);
             SendRoamin(msgRef.client, msgRef.client.channel.channel.Id);
@@ -990,7 +1030,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out ushort modeMask);
 
             if (debugHandle)
-                Debug.Log("HandleRequestDownloadedMaps from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleRequestDownloadedMaps from: " + msgRef.client.GetIdentifier());
 
             SendDownloadedMaps(msgRef.client, nextPage);
         }
@@ -1003,7 +1043,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out ushort modeMask);
 
             if (debugHandle)
-                Debug.Log("HandleRequestRegisteredMaps from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleRequestRegisteredMaps from: " + msgRef.client.GetIdentifier());
 
             //SendRegisteredMaps(msgRef.client, nextPage);
         }
@@ -1018,7 +1058,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out string filter);
 
             if (debugHandle)
-                Debug.Log("HandleRequestRegisteredMaps from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleRequestRegisteredMaps from: " + msgRef.client.GetIdentifier());
 
             SendAllMaps(msgRef.client, nextPage);
         }
@@ -1059,7 +1099,7 @@ namespace _Emulator
             Say(new MsgReference(432, body, client));
 
             if (debugSend)
-                Debug.Log("SendRegisteredMaps to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendRegisteredMaps to: " + client.GetIdentifier());
         }
 
         private void HandleRequestUserMaps(MsgReference msgRef)
@@ -1067,7 +1107,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int page);
 
             if (debugHandle)
-                Debug.Log("HandleRequestUserMaps from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleRequestUserMaps from: " + msgRef.client.GetIdentifier());
 
             //SendUserMapSlots(msgRef.client);
             //SendUserMaps(msgRef.client, page);
@@ -1076,7 +1116,7 @@ namespace _Emulator
         private void HandleRequestUserList(MsgReference msgRef)
         {
             if (debugPing)
-                Debug.Log("HandleRequestUserList from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.LogVerbose("HandleRequestUserList from: " + msgRef.client.GetIdentifier());
 
             SendUserList(msgRef.client);
         }
@@ -1088,7 +1128,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out bool invite);
 
             if (debugHandle)
-                Debug.Log("HandleJoin from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleJoin from: " + msgRef.client.GetIdentifier());
 
             MatchData matchData = msgRef.client.channel.GetMatchByRoomNumber(roomNumber);
             if (roomNumber == matchData.room.No)
@@ -1124,7 +1164,7 @@ namespace _Emulator
         private void HandleBreakIntoRequest(MsgReference msgRef)
         {
             if (debugHandle)
-                Debug.Log("HandleBreakInto from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleBreakInto from: " + msgRef.client.GetIdentifier());
 
             MatchData matchData = msgRef.matchData;
 
@@ -1181,7 +1221,7 @@ namespace _Emulator
             MatchData matchData = msgRef.matchData;
 
             if (debugHandle)
-                Debug.Log("HandleLeave from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleLeave from: " + msgRef.client.GetIdentifier());
 
             SendLeave(msgRef.client);
             SendSetStatus(msgRef.client);
@@ -1271,7 +1311,7 @@ namespace _Emulator
             }
 
             if (debugHandle)
-                Debug.Log("HandleCreateRoom from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleCreateRoom from: " + msgRef.client.GetIdentifier());
 
             matchData.AddClient(msgRef.client);
 
@@ -1350,7 +1390,7 @@ namespace _Emulator
             }
 
             if (debugHandle)
-                Debug.Log("HandleRoomConfig from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleRoomConfig from: " + msgRef.client.GetIdentifier());
 
             SendRoomConfig(msgRef.client, SendType.BroadcastRoom);
             SendUpdateRoom(matchData);
@@ -1362,7 +1402,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int roomNumber);
 
             if (debugHandle)
-                Debug.Log("HandleRoomRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleRoomRequest from: " + msgRef.client.GetIdentifier());
 
             MatchData matchData = msgRef.client.channel.GetMatchByRoomNumber(roomNumber);
             SendRoom(msgRef.client);
@@ -1371,7 +1411,7 @@ namespace _Emulator
         private void HandleRoomListRequest(MsgReference msgRef)
         {
             if (debugHandle)
-                Debug.Log("HandleRoomListRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleRoomListRequest from: " + msgRef.client.GetIdentifier());
 
             SendRoomList(msgRef.client);
         }
@@ -1388,7 +1428,7 @@ namespace _Emulator
             }
 
             if (debugHandle)
-                Debug.Log("HandleResumeRoomRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleResumeRoomRequest from: " + msgRef.client.GetIdentifier());
 
             SendUpdateRoom(matchData);
         }
@@ -1401,10 +1441,10 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int slotNum);
 
             if (debugHandle)
-                Debug.Log("HandleTeamChangeRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleTeamChangeRequest from: " + msgRef.client.GetIdentifier());
 
             if (slotNum < -1 && slotNum > 15)
-                Debug.LogWarning("HandleTeamChangeRequest: Bad slot num " + slotNum + " from client: " + msgRef.client.GetIdentifier());
+                ServerDebugger.LogWarning("HandleTeamChangeRequest: Bad slot num " + slotNum + " from client: " + msgRef.client.GetIdentifier());
 
             else if (slotNum == -1)
             {
@@ -1425,10 +1465,10 @@ namespace _Emulator
             msgRef.msg._msg.Read(out sbyte lck);
 
             if (debugHandle)
-                Debug.Log("HandleSlotLockRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleSlotLockRequest from: " + msgRef.client.GetIdentifier());
 
             if (slotNum < 0 && slotNum > 15)
-                Debug.LogWarning("HandleSlotLockRequest: Bad slot num " + slotNum + " from client: " + msgRef.client.GetIdentifier());
+                ServerDebugger.LogWarning("HandleSlotLockRequest: Bad slot num " + slotNum + " from client: " + msgRef.client.GetIdentifier());
 
             else if (msgRef.client.seq == matchData.masterSeq)
             {
@@ -1447,7 +1487,7 @@ namespace _Emulator
             msgRef.client.status = (BrickManDesc.STATUS)status;
 
             if (debugHandle)
-                Debug.Log("HandleSetStatusRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleSetStatusRequest from: " + msgRef.client.GetIdentifier());
 
             SendSetStatus(msgRef.client);
         }
@@ -1461,11 +1501,11 @@ namespace _Emulator
             matchData.lobbyCountdownTime = 0;
 
             if (debugHandle)
-                Debug.Log("HandleStartRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleStartRequest from: " + msgRef.client.GetIdentifier());
 
             if (matchData.clientList.Find(x => x.status == BrickManDesc.STATUS.PLAYER_WAITING && x.seq != matchData.masterSeq) != null)
             {
-                Debug.LogWarning("HandleStartRequest: Not All Ready");
+                ServerDebugger.LogWarning("HandleStartRequest: Not All Ready");
                 return;
             }
 
@@ -1495,7 +1535,7 @@ namespace _Emulator
             }
 
             if (debugHandle)
-                Debug.Log("HandleWeaponHeldRatioRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleWeaponHeldRatioRequest from: " + msgRef.client.GetIdentifier());
 
             if (msgRef.client.status <= BrickManDesc.STATUS.PLAYER_LOADING)
             {
@@ -1519,7 +1559,7 @@ namespace _Emulator
         private void HandleP2PComplete(MsgReference msgRef)
         {
             if (debugHandle)
-                Debug.Log("HandleP2PComplete from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleP2PComplete from: " + msgRef.client.GetIdentifier());
 
             if (msgRef.client.status == BrickManDesc.STATUS.PLAYER_P2PING)
             {
@@ -1567,7 +1607,7 @@ namespace _Emulator
             sbyte premium = 0; // isPremium 0 || 1
             int durability = 100; //Durability int.MaxValue = Permanent
 
-            TItem template = TItemManager.Instance.dic.FirstOrDefault(x => x.Value.code == code).Value;
+            TItem template = tItemManager.dic.FirstOrDefault(x => x.Value.code == code).Value;
             if (template == null)
             {
                 SendCustomMessage("Item doesn't exist.", msgRef.client, SendType.Unicast);
@@ -1680,7 +1720,7 @@ namespace _Emulator
                     damageLog[key] += value;
             }
 
-            //Debug.Log("VictimType: " + victimType + " weaponBy: " + weaponBy);
+            //ServerDebugger.Log("VictimType: " + victimType + " weaponBy: " + weaponBy);
             if (victimType == 1 || weaponBy == -1)
             {
                 // We do NOT process mob kills here.
@@ -1690,7 +1730,7 @@ namespace _Emulator
             }
 
             if (debugHandle)
-                Debug.Log("HandleKillLogRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleKillLogRequest from: " + msgRef.client.GetIdentifier());
 
             ClientReference victimClient = matchData.clientList.Find(x => x.seq == victim);
             victimClient.deaths++;
@@ -1774,7 +1814,7 @@ namespace _Emulator
                         break;
 
                     case Room.ROOM_TYPE.BND:
-                        Debug.LogWarning(matchData.isBuildPhase);
+                        ServerDebugger.LogWarning(matchData.isBuildPhase);
                         //the emulator match data is currently in the wrong phase?
                         if (!matchData.isBuildPhase)
                         {
@@ -1821,7 +1861,7 @@ namespace _Emulator
                         //SendScore!!
 
                         // DEBUG:
-                        Debug.Log($"Explosion check wipe - Red: {deadRed}/{totalRed}, Blue: {deadBlue}/{totalBlue}");
+                        ServerDebugger.Log($"Explosion check wipe - Red: {deadRed}/{totalRed}, Blue: {deadBlue}/{totalBlue}");
 
                         if (deadBlue >= totalBlue)
                         {
@@ -1863,7 +1903,7 @@ namespace _Emulator
         private void HandleTeamScoreRequest(MsgReference msgRef)
         {
             if (debugHandle)
-                Debug.Log("HandleTeamScoreRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleTeamScoreRequest from: " + msgRef.client.GetIdentifier());
 
             SendTeamScore(msgRef.matchData);
         }
@@ -1875,7 +1915,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int brick);
 
             if (debugHandle)
-                Debug.Log("HandleDestroyBrickRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleDestroyBrickRequest from: " + msgRef.client.GetIdentifier());
 
             if (!(matchData.destroyedBricks.Exists(x => x == brick)))
             {
@@ -1889,7 +1929,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int mapId);
 
             if (debugHandle)
-                Debug.Log("HandleRegMapInfoRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleRegMapInfoRequest from: " + msgRef.client.GetIdentifier());
         }
 
         private void HandleInventoryData(MsgReference msgRef)
@@ -1910,7 +1950,7 @@ namespace _Emulator
                 msgRef.msg._msg.Read(out sbyte toolSlot);
 
                 // Fetch the item template
-                TItem template = TItemManager.Instance.Get<TItem>(code);
+                TItem template = tItemManager.Get<TItem>(code);
                 if (template != null)
                 {
                     try
@@ -1922,17 +1962,17 @@ namespace _Emulator
 
                     catch (Exception ex)
                     {
-                        Debug.LogWarning("HandleInventoryData: Couldn't add item " + template.name + " (" + template.code + ") | " + ex.Message);
+                        ServerDebugger.LogWarning("HandleInventoryData: Couldn't add item " + template.name + " (" + template.code + ") | " + ex.Message);
                     }
                 }
                 else
                 {
-                    Debug.LogWarning($"Template not found for code: {code}");
+                    ServerDebugger.LogWarning($"Template not found for code: {code}");
                 }
             }
 
             if (debugHandle)
-                Debug.Log($"HandleInventoryData from: {msgRef.client.GetIdentifier()}");
+                ServerDebugger.Log($"HandleInventoryData from: {msgRef.client.GetIdentifier()}");
 
             // Notify the client about the updated inventory
             SendInventory(msgRef.client);
@@ -1945,7 +1985,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out long itemSeq);
 
             if (debugHandle)
-                Debug.Log("HandleEquipRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleEquipRequest from: " + msgRef.client.GetIdentifier());
 
             Item item = msgRef.client.inventory.equipment.Find(x => x.Seq == itemSeq);
             if (item != null)
@@ -1996,7 +2036,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out long itemSeq);
 
             if (debugHandle)
-                Debug.Log("HandleUnequipRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleUnequipRequest from: " + msgRef.client.GetIdentifier());
 
             // Find the item in the inventory using the sequence number.
             Item item = msgRef.client.inventory.equipment.Find(x => x.Seq == itemSeq);
@@ -2032,7 +2072,7 @@ namespace _Emulator
         private void HandleClearShooterTools(MsgReference msgRef)
         {
             if (debugHandle)
-                Debug.Log("HandleClearShooterTools from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleClearShooterTools from: " + msgRef.client.GetIdentifier());
 
             for (int i = 0; i < msgRef.client.inventory.shooterTools.Length; i++)
             {
@@ -2050,7 +2090,7 @@ namespace _Emulator
         private void HandleClearWeaponSlots(MsgReference msgRef)
         {
             if (debugHandle)
-                Debug.Log("HandleClearWeaponSlots from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleClearWeaponSlots from: " + msgRef.client.GetIdentifier());
 
             for (int i = 0; i < msgRef.client.inventory.weaponChg.Length; i++)
             {
@@ -2071,7 +2111,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out long itemSeq);
 
             if (debugHandle)
-                Debug.Log("HandleSetShooterToolRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleSetShooterToolRequest from: " + msgRef.client.GetIdentifier());
 
 
             if (itemSeq < 0)
@@ -2116,7 +2156,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out long itemSeq);
 
             if (debugHandle)
-                Debug.Log("HandleSetWeaponSlotRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleSetWeaponSlotRequest from: " + msgRef.client.GetIdentifier());
 
             if (itemSeq < 0)
             {
@@ -2160,7 +2200,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int message);
 
             if (debugHandle)
-                Debug.Log("HandleRadioMsgRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleRadioMsgRequest from: " + msgRef.client.GetIdentifier());
 
             SendRadioMsg(seq, category, message, msgRef.matchData);
         }
@@ -2170,16 +2210,16 @@ namespace _Emulator
             msgRef.msg._msg.Read(out long seq);
             msgRef.msg._msg.Read(out string code);
 
-            Item item = MyInfoManager.Instance.inventory[seq];
+            Item item = msgRef.client.inventory.equipment.Find((t) => t.Seq == seq);
 
-            Debug.LogWarning("Found Item: " + item.Code + item.IsAmount + " amount: " + item.Amount);
+            ServerDebugger.LogWarning("Found Item: " + item.Code + item.IsAmount + " amount: " + item.Amount);
             item.Amount = item.Amount - 1;
-            Debug.LogWarning("New Amount " + item.Amount);
-            Debug.LogWarning("EnopughToConsume " + item.EnoughToConsume);
+            ServerDebugger.LogWarning("New Amount " + item.Amount);
+            ServerDebugger.LogWarning("EnopughToConsume " + item.EnoughToConsume);
             if (!item.EnoughToConsume)
             {
-                Debug.LogWarning("Remove Item");
-                MyInfoManager.Instance.inventory.Remove(item.Seq);
+                ServerDebugger.LogWarning("Remove Item");
+                msgRef.client.inventory.equipment.Remove(item);
             }
             TSpecial special = (TSpecial)item.Template;
             int forcePoints = msgRef.client.data.forcePoints = msgRef.client.data.forcePoints + int.Parse(special.param);
@@ -2218,7 +2258,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out string text);
 
             if (debugHandle)
-                Debug.Log("HandleChatRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleChatRequest from: " + msgRef.client.GetIdentifier());
 
             SendChat(msgRef.client, ChatText.CHAT_TYPE.NORMAL, text);
         }
@@ -2228,7 +2268,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out string text);
 
             if (debugHandle)
-                Debug.Log("HandleTeamChatRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleTeamChatRequest from: " + msgRef.client.GetIdentifier());
 
             SendChat(msgRef.client, ChatText.CHAT_TYPE.TEAM, text);
         }
@@ -2239,7 +2279,7 @@ namespace _Emulator
             msgRef.client.clientStatus = ClientReference.ClientStatus.Room;
 
             if (debugHandle)
-                Debug.Log("HandleResultDoneRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleResultDoneRequest from: " + msgRef.client.GetIdentifier());
 
             SendSetStatus(msgRef.client);
         }
@@ -2247,7 +2287,7 @@ namespace _Emulator
         public void HandleRespawnTicketRequest(MsgReference msgRef)
         {
             if (debugHandle)
-                Debug.Log("HandleRespawnTicketRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleRespawnTicketRequest from: " + msgRef.client.GetIdentifier());
 
             SendRespawnTicket(msgRef.client);
         }
@@ -2260,7 +2300,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out string prev);
 
             if (debugHandle)
-                Debug.Log("HandleWeaponChangeRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleWeaponChangeRequest from: " + msgRef.client.GetIdentifier());
 
             SendWeaponChange(msgRef.client, seq);
             SendPlayerWeaponChange(msgRef.client, prev, next);
@@ -2271,7 +2311,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int seq);
 
             if (debugHandle)
-                Debug.Log("HandleOpenDoorRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleOpenDoorRequest from: " + msgRef.client.GetIdentifier());
 
             SendOpenDoor(seq, msgRef.matchData);
         }
@@ -2281,7 +2321,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int seq);
 
             if (debugHandle)
-                Debug.Log("HandleCloseDoorRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleCloseDoorRequest from: " + msgRef.client.GetIdentifier());
         }
 
         private void HandleDisconnect(MsgReference msgRef)
@@ -2298,7 +2338,7 @@ namespace _Emulator
                 msgRef.msg._msg.Read(out int newMaster);
 
                 if (debugHandle)
-                    Debug.Log("HandleDelegateMasterRequest from: " + msgRef.client.GetIdentifier());
+                    ServerDebugger.Log("HandleDelegateMasterRequest from: " + msgRef.client.GetIdentifier());
 
                 matchData.masterSeq = newMaster;
                 SendMaster(null, matchData);
@@ -2312,13 +2352,13 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int brickSeq);
 
             if (debugHandle)
-                Debug.Log("HandleGetCannonRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleGetCannonRequest from: " + msgRef.client.GetIdentifier());
 
             if (!matchData.usedCannons.ContainsKey(brickSeq))
             {
                 matchData.usedCannons.Add(brickSeq, msgRef.client.seq);
                 SendGetCannon(msgRef.client.seq, brickSeq, matchData);
-                Debug.Log(matchData.usedCannons.Count);
+                ServerDebugger.Log(matchData.usedCannons.Count);
             }
         }
 
@@ -2329,7 +2369,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int brickSeq);
 
             if (debugHandle)
-                Debug.Log("HandleGetCannonRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleGetCannonRequest from: " + msgRef.client.GetIdentifier());
 
             if (matchData.usedCannons.ContainsKey(brickSeq))
             {
@@ -2346,7 +2386,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int trainId);
 
             if (debugHandle)
-                Debug.Log("HandleGetTrainRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleGetTrainRequest from: " + msgRef.client.GetIdentifier());
 
             if (!matchData.usedTrains.ContainsKey(trainId))
             {
@@ -2362,7 +2402,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int trainId);
 
             if (debugHandle)
-                Debug.Log("HandleEmptyTrainRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleEmptyTrainRequest from: " + msgRef.client.GetIdentifier());
 
             if (matchData.usedTrains.ContainsKey(trainId))
             {
@@ -2374,7 +2414,7 @@ namespace _Emulator
         private void HandleCacheBrickRequest(MsgReference msgRef)
         {
             if (debugHandle)
-                Debug.Log("HandleCacheBrickRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleCacheBrickRequest from: " + msgRef.client.GetIdentifier());
 
             if (msgRef.matchData.room.Type == ROOM_TYPE.MAP_EDITOR && !msgRef.matchData.cachedMap.isLoaded)
             {
@@ -2430,7 +2470,7 @@ namespace _Emulator
             MatchData matchData = msgRef.matchData;
 
             if (debugHandle)
-                Debug.Log("HandleAddBrickRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleAddBrickRequest from: " + msgRef.client.GetIdentifier());
 
             msgRef.msg._msg.Read(out byte brickIndex);
             msgRef.msg._msg.Read(out byte x);
@@ -2438,7 +2478,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out byte z);
             msgRef.msg._msg.Read(out byte rot);
 
-            Brick brick = BrickManager.Instance.GetBrick(brickIndex);
+            Brick brick = brickManager.GetBrick(brickIndex);
             if (brick == null || (brick.maxInstancePerMap > 0 && matchData.cachedMap.CountLimitedBrick(brickIndex) >= brick.maxInstancePerMap))
             {
                 return;
@@ -2458,79 +2498,13 @@ namespace _Emulator
             MatchData matchData = msgRef.matchData;
 
             if (debugHandle)
-                Debug.Log("HandleDelBrickRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleDelBrickRequest from: " + msgRef.client.GetIdentifier());
 
             msgRef.msg._msg.Read(out int seq);
 
             List<int> morphes = new List<int>();
             if (matchData.cachedMap.DelBrickInst(seq, ref morphes))
                 SendDelBrick(msgRef.client, seq);
-        }
-
-        private void HandleRegisterMapRequest(MsgReference msgRef)
-        {
-            MatchData matchData = msgRef.matchData;
-
-            if (debugHandle)
-                Debug.Log("HandleRegisterMap from: " + msgRef.client.GetIdentifier());
-
-            msgRef.msg._msg.Read(out int slot);
-            msgRef.msg._msg.Read(out ushort modeMask);
-            msgRef.msg._msg.Read(out int regHow);
-            msgRef.msg._msg.Read(out int point);
-            msgRef.msg._msg.Read(out int downloadFee);
-            msgRef.msg._msg.Read(out string msgEval);
-            msgRef.msg._msg.Read(out byte[] textureBuffer);
-
-            if (slot != matchData.cachedMap.map)
-            {
-                Debug.LogWarning($"HandleRegisterMapRequest: map mismatch. req={slot} cached={matchData.cachedMap.map}");
-                return;
-            }
-
-            // Thumbnail for the registered map
-            Texture2D thumbnail = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
-            thumbnail.LoadImage(textureBuffer);
-            thumbnail.Apply();
-
-            DateTime time = DateTime.Now;
-            int hashId = MapGenerator.instance.GetHashIdForTime(time);
-
-            // Create & register RegMap ONLY here
-            RegMap regMap = new RegMap(
-                hashId,
-                msgRef.client.name + "@Aurora",
-                matchData.cachedUMI.Alias,
-                time,
-                modeMask,
-                true, false,
-                0, 0, 0, 0, 0, 0, 0,
-                false
-            );
-
-            regMap.Thumbnail = thumbnail;
-
-            RegMapManager.Instance.Add(regMap);
-            RegMapManager.Instance.SetThumbnail(regMap.map, thumbnail);
-
-            // Save registered files under the RegMap ID (separate from user slot file)
-            regMap.Save();
-            matchData.cachedMap.Save(hashId, matchData.cachedMap.skybox);
-
-            // Keep the user slot as-is; optionally link regMap for current session info
-            matchData.cachedUMI.regMap = regMap;   // ok to remember it's registered now
-                                                   // DO NOT do: cachedUMI.slot = hashId
-                                                   // DO NOT do: cachedMap.map = hashId
-
-            // Pull current map list into the emulator (registered list changed)
-            regMaps = RegMapManager.Instance.dicRegMap.ToList();
-
-            MsgBody body = new MsgBody();
-
-            body.Write(matchData.cachedUMI.slot);
-            body.Write((int)regMap.ModeMask);
-
-            Say(new MsgReference(52, body, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));
         }
 
         public void SendDelBrick(ClientReference client, int brickSeq)
@@ -2545,7 +2519,7 @@ namespace _Emulator
             Say(new MsgReference(16, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("SendDelBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendDelBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
         }
 
         public void SendAddBrick(ClientReference client, BrickInst brick)
@@ -2565,7 +2539,7 @@ namespace _Emulator
             Say(new MsgReference(14, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("SendAddBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendAddBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
         }
 
         public void SendCacheBrick(ClientReference client, MatchData matchData = null, SendType sendType = SendType.Unicast)
@@ -2580,7 +2554,7 @@ namespace _Emulator
             brickList = userMap.dic.ToList();
 
             int chunkSize = 100;
-            int chunkCount = Mathf.CeilToInt((float)brickList.Count / (float)chunkSize);
+            int chunkCount = (int)Math.Ceiling((double)brickList.Count / chunkSize);
             int processedCount = 0;
 
             for (int chunk = 0; chunk < chunkCount; chunk++)
@@ -2623,7 +2597,7 @@ namespace _Emulator
                 Say(new MsgReference(21, body, client, sendType, matchData.channel, matchData, _doChunked: false));
             }
             if (debugSend)
-                Debug.Log("SendCacheBrick with " + chunkCount + " chunks to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendCacheBrick with " + chunkCount + " chunks to: " + client.GetIdentifier());
         }
 
         public void SendCacheBrickDone(ClientReference client, MatchData matchData = null, SendType sendType = SendType.Unicast)
@@ -2638,7 +2612,7 @@ namespace _Emulator
             body.Write(userMap.skybox);
             Say(new MsgReference(22, body, client, sendType, matchData.channel, matchData));
             if (debugSend)
-                Debug.Log("SendCacheBrickDone for map " + userMap.map + " to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendCacheBrickDone for map " + userMap.map + " to: " + client.GetIdentifier());
         }
 
         public void SendCopyright(ClientReference client)
@@ -2653,7 +2627,7 @@ namespace _Emulator
             Say(new MsgReference(53, body, client));
 
             if (debugSend)
-                Debug.Log("SendCopyRight to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendCopyRight to: " + client.GetIdentifier());
         }
 
         public void SendPremiumItems(ClientReference client)
@@ -2707,10 +2681,10 @@ namespace _Emulator
             if (debugSend)
             {
                 if (sendType == SendType.BroadcastRoom)
-                    Debug.Log("Broadcasted SendGetCannon for room no: " + matchData.room.No);
+                    ServerDebugger.LogVerbose("Broadcasted SendGetCannon for room no: " + matchData.room.No);
 
                 else
-                    Debug.Log("SendGetCannon to: " + client.GetIdentifier());
+                    ServerDebugger.LogVerbose("SendGetCannon to: " + client.GetIdentifier());
             }
         }
 
@@ -2723,7 +2697,7 @@ namespace _Emulator
             Say(new MsgReference(161, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendEmptyCannon for room no: " + matchData.room.No);
+                ServerDebugger.LogVerbose("Broadcasted SendEmptyCannon for room no: " + matchData.room.No);
         }
 
         public void SendGetTrain(int seq, int trainId, MatchData matchData, ClientReference client = null, SendType sendType = SendType.BroadcastRoom)
@@ -2738,10 +2712,10 @@ namespace _Emulator
             if (debugSend)
             {
                 if (sendType == SendType.BroadcastRoom)
-                    Debug.Log("Broadcasted SendGetTrain for room no: " + matchData.room.No);
+                    ServerDebugger.LogVerbose("Broadcasted SendGetTrain for room no: " + matchData.room.No);
 
                 else
-                    Debug.Log("SendGetTrain to: " + client.GetIdentifier());
+                    ServerDebugger.LogVerbose("SendGetTrain to: " + client.GetIdentifier());
             }
         }
 
@@ -2754,7 +2728,7 @@ namespace _Emulator
             Say(new MsgReference(554, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendEmptyTrain for room no: " + matchData.room.No);
+                ServerDebugger.LogVerbose("Broadcasted SendEmptyTrain for room no: " + matchData.room.No);
         }
 
         public void SendOpenDoor(int seq, MatchData matchData)
@@ -2766,7 +2740,7 @@ namespace _Emulator
             Say(new MsgReference(450, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendOpenDoor for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendOpenDoor for room no: " + matchData.room.No);
         }
 
         public void SendWeaponChange(ClientReference client, long seq)
@@ -2780,7 +2754,7 @@ namespace _Emulator
             Say(new MsgReference(415, body, client));
 
             if (debugSend)
-                Debug.Log("SendWeaponChange to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendWeaponChange to: " + client.GetIdentifier());
         }
 
         public void SendPlayerWeaponChange(ClientReference client, string prev, string next)
@@ -2794,7 +2768,7 @@ namespace _Emulator
             Say(new MsgReference(416, body, client, SendType.BroadcastRoomExclusive, client.channel, client.matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendPlayerWeaponChange for player: " + client.GetIdentifier());
+                ServerDebugger.Log("Broadcasted SendPlayerWeaponChange for player: " + client.GetIdentifier());
         }
         public void SendInventory(ClientReference client)
         {
@@ -2820,7 +2794,7 @@ namespace _Emulator
             Say(new MsgReference(25, body, null, SendType.BroadcastChannel, client.channel, client.matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendChat");
+                ServerDebugger.Log("Broadcasted SendChat");
         }
 
         public void SendRadioMsg(int seq, int category, int message, MatchData matchData)
@@ -2833,7 +2807,7 @@ namespace _Emulator
             Say(new MsgReference(96, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendRadioMsg for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendRadioMsg for room no: " + matchData.room.No);
         }
 
         public void SendItemPimps(ClientReference client)
@@ -2886,7 +2860,7 @@ namespace _Emulator
             Say(new MsgReference(491, body, client));
 
             if (debugSend)
-                Debug.Log("SendItemProperties to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendItemProperties to: " + client.GetIdentifier());
         }
 
         public void SendSetShooterTool(ClientReference client, sbyte slot, long itemSeq)
@@ -2899,7 +2873,7 @@ namespace _Emulator
             Say(new MsgReference(332, body, client));
 
             if (debugSend)
-                Debug.Log("SendSetShooterTool to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendSetShooterTool to: " + client.GetIdentifier());
         }
 
         public void SendSetWeaponSlot(ClientReference client, int slot, long itemSeq)
@@ -2912,7 +2886,7 @@ namespace _Emulator
             Say(new MsgReference(418, body, client));
 
             if (debugSend)
-                Debug.Log("SendSetWeaponSlot to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendSetWeaponSlot to: " + client.GetIdentifier());
         }
 
         public void SendShooterToolList(ClientReference client)
@@ -2938,7 +2912,7 @@ namespace _Emulator
             Say(new MsgReference(462, body, client));
 
             if (debugSend)
-                Debug.Log("SendShooterToolList to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendShooterToolList to: " + client.GetIdentifier());
         }
 
         public void SendWeaponSlotList(ClientReference client)
@@ -2964,7 +2938,7 @@ namespace _Emulator
             Say(new MsgReference(463, body, client));
 
             if (debugSend)
-                Debug.Log("SendWeaponSlotList to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendWeaponSlotList to: " + client.GetIdentifier());
         }
 
         public void SendEquip(ClientReference client, long itemSeq, string code)
@@ -2978,7 +2952,7 @@ namespace _Emulator
             Say(new MsgReference(36, body, client, SendType.Broadcast));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendEquip for client " + client.GetIdentifier() + " for room no: ");
+                ServerDebugger.Log("Broadcasted SendEquip for client " + client.GetIdentifier() + " for room no: ");
         }
 
         public void SendUnequip(ClientReference client, long itemSeq, string code)
@@ -2992,7 +2966,7 @@ namespace _Emulator
             Say(new MsgReference(38, body, client, SendType.Broadcast));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendUnequip for client " + client.GetIdentifier() + " for room no: ");
+                ServerDebugger.Log("Broadcasted SendUnequip for client " + client.GetIdentifier() + " for room no: ");
         }
 
         public void SendInventoryRequest(ClientReference client)
@@ -3004,7 +2978,7 @@ namespace _Emulator
             Say(new MsgReference(ExtensionOpcodes.opInventoryReq, body, client));
 
             if (debugSend)
-                Debug.Log("SendInventoryRequest to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendInventoryRequest to: " + client.GetIdentifier());
         }
 
         public void SendDestroyBrick(int brick, MatchData matchData)
@@ -3016,7 +2990,7 @@ namespace _Emulator
             Say(new MsgReference(77, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendDestroyBrick for brick " + brick + " for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendDestroyBrick for brick " + brick + " for room no: " + matchData.room.No);
         }
 
         public void SendDestroyedBrick(ClientReference client, int brick, MatchData matchData, SendType sendType = SendType.Unicast)
@@ -3030,9 +3004,9 @@ namespace _Emulator
             if (debugSend)
             {
                 if (sendType == SendType.Unicast)
-                    Debug.Log("SendDestroyedBrick to: " + client.GetIdentifier());
+                    ServerDebugger.Log("SendDestroyedBrick to: " + client.GetIdentifier());
                 else
-                    Debug.Log("Broadcasted SendDestroyedBrick for brick for room no: " + matchData.room.No);
+                    ServerDebugger.Log("Broadcasted SendDestroyedBrick for brick for room no: " + matchData.room.No);
             }
         }
 
@@ -3048,7 +3022,7 @@ namespace _Emulator
             Say(new MsgReference(69, body, null, SendType.BroadcastRoom, client.channel, client.matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendKillCount for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendKillCount for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
         }
 
         public void SendDeathCount(ClientReference client)
@@ -3063,7 +3037,7 @@ namespace _Emulator
             Say(new MsgReference(68, body, null, SendType.BroadcastRoom, client.channel, client.matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendDeatchCount for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendDeatchCount for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
         }
 
         public void SendAssistCount(ClientReference client)
@@ -3079,7 +3053,7 @@ namespace _Emulator
             Say(new MsgReference(185, body, null, SendType.BroadcastRoom, client.channel, client.matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendAssistCount for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendAssistCount for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
         }
 
         public void SendRoundScore(ClientReference client)
@@ -3094,7 +3068,7 @@ namespace _Emulator
             Say(new MsgReference(300, body, null, SendType.BroadcastRoom, client.channel, client.matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendRoundScore for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendRoundScore for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
         }
 
         public void SendKillLogEntry(KillLogEntry entry, MatchData matchData)
@@ -3112,7 +3086,7 @@ namespace _Emulator
             Say(new MsgReference(45, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendKillLogEntry for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendKillLogEntry for room no: " + matchData.room.No);
         }
 
         public void SendIndividualScore(MatchData matchData)
@@ -3124,7 +3098,7 @@ namespace _Emulator
             Say(new MsgReference(179, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendIndividualScore for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendIndividualScore for room no: " + matchData.room.No);
         }
 
         public void SendTeamScore(MatchData matchData)
@@ -3136,7 +3110,7 @@ namespace _Emulator
             Say(new MsgReference(67, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendTeamScore for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendTeamScore for room no: " + matchData.room.No);
         }
 
         public void SendMaster(ClientReference client, MatchData matchData)
@@ -3150,7 +3124,7 @@ namespace _Emulator
                 Say(new MsgReference(31, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
                 if (debugSend)
-                    Debug.Log("Broadcasted SendMaster for room no: " + matchData.room.No);
+                    ServerDebugger.Log("Broadcasted SendMaster for room no: " + matchData.room.No);
             }
 
             else
@@ -3158,7 +3132,7 @@ namespace _Emulator
                 Say(new MsgReference(31, body, client));
 
                 if (debugSend)
-                    Debug.Log("SendMaster to: " + client.GetIdentifier());
+                    ServerDebugger.Log("SendMaster to: " + client.GetIdentifier());
             }
         }
 
@@ -3171,7 +3145,7 @@ namespace _Emulator
             }
 
             if (debugSend)
-                Debug.Log("SendSlots to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendSlots to: " + client.GetIdentifier());
         }
 
         public void SendSlotLock(ClientReference client, MatchData matchData, sbyte index, SendType sendType = SendType.Unicast)
@@ -3185,9 +3159,9 @@ namespace _Emulator
             if (debugSend)
             {
                 if (sendType == SendType.Unicast)
-                    Debug.Log("SendSlotLock to: " + client.GetIdentifier());
+                    ServerDebugger.Log("SendSlotLock to: " + client.GetIdentifier());
                 else
-                    Debug.Log("Broadcasted SendSlotLock for room no " + matchData.room.No);
+                    ServerDebugger.Log("Broadcasted SendSlotLock for room no " + matchData.room.No);
             }
         }
 
@@ -3257,7 +3231,7 @@ namespace _Emulator
             Say(new MsgReference(MessageId.CS_ADD_ROOM_ACK, body, client, SendType.BroadcastChannel, matchData.channel, matchData));
             if (debugSend)
             {
-                Debug.Log("SendAddRoom to channel: " + matchData.channel.channel.Name);
+                ServerDebugger.Log("SendAddRoom to channel: " + matchData.channel.channel.Name);
             }
         }
 
@@ -3306,7 +3280,7 @@ namespace _Emulator
                 Say(new MsgReference(MessageId.CS_UPDATE_ROOM_ACK, body, null, SendType.BroadcastChannel, matchData.channel, matchData));
                 if (debugSend)
                 {
-                    Debug.Log("SendUpdateRoom to channel: " + matchData.channel.channel.Name);
+                    ServerDebugger.Log("SendUpdateRoom to channel: " + matchData.channel.channel.Name);
                 }
             } else
             {
@@ -3314,7 +3288,7 @@ namespace _Emulator
 
                 if (debugSend)
                 {
-                    Debug.Log("SendUpdateRoom to: " + client.GetIdentifier());
+                    ServerDebugger.Log("SendUpdateRoom to: " + client.GetIdentifier());
                 }
             }
 
@@ -3365,7 +3339,7 @@ namespace _Emulator
 
             if (debugSend)
             {
-                Debug.Log("SendRoom to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendRoom to: " + client.GetIdentifier());
             }
 
         }
@@ -3379,7 +3353,7 @@ namespace _Emulator
             Say(new MsgReference(6, body, null, SendType.BroadcastChannel, channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendDelRoom for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendDelRoom for room no: " + matchData.room.No);
         }
 
         public void SendRoomList(ClientReference client)
@@ -3421,7 +3395,7 @@ namespace _Emulator
             Say(new MsgReference(468, body, client));
 
             if (debugSend)
-                Debug.Log("SendRoomList to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendRoomList to: " + client.GetIdentifier());
         }
 
         public void SendCreateRoom(ClientReference client, bool success = true)
@@ -3437,7 +3411,7 @@ namespace _Emulator
             Say(new MsgReference(8, body, client));
 
             if (debugSend)
-                Debug.Log("SendCreateRoom to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendCreateRoom to: " + client.GetIdentifier());
         }
 
         public void SendJoin(ClientReference client)
@@ -3449,7 +3423,7 @@ namespace _Emulator
             Say(new MsgReference(29, body, client));
 
             if (debugSend)
-                Debug.Log("SendJoin to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendJoin to: " + client.GetIdentifier());
         }
 
         public void SendBreakInto(ClientReference client, int reply)
@@ -3461,7 +3435,7 @@ namespace _Emulator
             Say(new MsgReference(74, body, client));
 
             if (debugSend)
-                Debug.Log("SendBreakInto to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendBreakInto to: " + client.GetIdentifier());
         }
 
         public void SendEnter(ClientReference client)
@@ -3499,7 +3473,7 @@ namespace _Emulator
             Say(new MsgReference(10, body, client, SendType.BroadcastRoomExclusive, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendEnter for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendEnter for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
         }
 
         public void SendEnterSteam(ClientReference client)
@@ -3534,7 +3508,7 @@ namespace _Emulator
             Say(new MsgReference(ExtensionOpcodes.opEnterSteamAck, body, client, SendType.BroadcastRoomExclusive, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendEnterSteam for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendEnterSteam for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
         }
 
         public void SendLeave(ClientReference client)
@@ -3548,7 +3522,7 @@ namespace _Emulator
             Say(new MsgReference(11, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendLeave for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendLeave for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
         }
 
         public void SendSlotData(MatchData matchData)
@@ -3589,7 +3563,7 @@ namespace _Emulator
             Say(new MsgReference(ExtensionOpcodes.opSlotDataAck, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendSlotData for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendSlotData for room no: " + matchData.room.No);
         }
 
         public void SendSlotDataSteam(MatchData matchData)
@@ -3627,7 +3601,7 @@ namespace _Emulator
             Say(new MsgReference(ExtensionOpcodes.opSlotDataSteamAck, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendSlotDataSteam for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendSlotDataSteam for room no: " + matchData.room.No);
         }
 
         public void SendTeamChange(ClientReference client)
@@ -3643,7 +3617,7 @@ namespace _Emulator
             Say(new MsgReference(81, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendTeamChange for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendTeamChange for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
         }
 
         public void SendSetStatus(ClientReference client)
@@ -3658,7 +3632,7 @@ namespace _Emulator
             Say(new MsgReference(48, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendSetStatus for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendSetStatus for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
         }
 
         public void SendStart(MatchData matchData)
@@ -3670,7 +3644,7 @@ namespace _Emulator
             Say(new MsgReference(50, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendStart for room no: " + matchData.room.No);
+                ServerDebugger.Log("Broadcasted SendStart for room no: " + matchData.room.No);
         }
 
         public void SendPostLoadInit(ClientReference client)
@@ -3680,7 +3654,7 @@ namespace _Emulator
             Say(new MsgReference(ExtensionOpcodes.opPostLoadInitAck, body, client));
 
             if (debugSend)
-                Debug.Log("SendPostLoadInit to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendPostLoadInit to: " + client.GetIdentifier());
         }
 
         public void SendLoadComplete(ClientReference client)
@@ -3691,7 +3665,7 @@ namespace _Emulator
             Say(new MsgReference(43, body, null, SendType.BroadcastRoom, client.channel, client.matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendLoadComplete for: " + client.GetIdentifier());
+                ServerDebugger.Log("Broadcasted SendLoadComplete for: " + client.GetIdentifier());
         }
 
         public void SendMatchCountdown(MatchData matchData)
@@ -3702,7 +3676,7 @@ namespace _Emulator
             Say(new MsgReference(72, body, null, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("Broadcasted SendMatchCountdown for: " + matchData.countdownTime);
+                ServerDebugger.Log("Broadcasted SendMatchCountdown for: " + matchData.countdownTime);
         }
 
         public void SendTimer(ClientReference client)
@@ -3716,7 +3690,7 @@ namespace _Emulator
             Say(new MsgReference(66, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("SendTimer to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendTimer to: " + client.GetIdentifier());
         }
 
         public void SendRendezvousInfo(ClientReference client)
@@ -3730,7 +3704,7 @@ namespace _Emulator
             Say(new MsgReference(320, body, client));
 
             if (debugSend)
-                Debug.Log("SendRendezvousInfo to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendRendezvousInfo to: " + client.GetIdentifier());
         }
 
         public void SendRendezvousInfoSteam(ClientReference client)
@@ -3742,7 +3716,7 @@ namespace _Emulator
             Say(new MsgReference(ExtensionOpcodes.opRendezvousInfoSteamAck, body, client));
 
             if (debugSend)
-                Debug.Log("SendRendezvousInfoSteam to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendRendezvousInfoSteam to: " + client.GetIdentifier());
         }
 
         public void SendPlayerInitInfo(ClientReference client)
@@ -3759,7 +3733,7 @@ namespace _Emulator
             Say(new MsgReference(148, body, client));
 
             if (debugSend)
-                Debug.Log("SendPlayerInitInfo to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendPlayerInitInfo to: " + client.GetIdentifier());
 
             body = new MsgBody();
             body.Write(client.data.qjModeMask);
@@ -3769,7 +3743,7 @@ namespace _Emulator
             Say(new MsgReference(417, body, client));
 
             if (debugSend)
-                Debug.Log("SendPlayerOpt to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendPlayerOpt to: " + client.GetIdentifier());
         }
 
         public void SendChannels(ClientReference client)
@@ -3814,7 +3788,7 @@ namespace _Emulator
             Say(new MsgReference(141, body, client));
 
             if (debugSend)
-                Debug.Log("SendChannels to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendChannels to: " + client.GetIdentifier());
         }
 
         public void SendCurChannel(ClientReference client, int curChannelId = 1)
@@ -3825,7 +3799,7 @@ namespace _Emulator
             Say(new MsgReference(147, body, client));
 
             if (debugSend)
-                Debug.Log("SendCurChannel to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendCurChannel to: " + client.GetIdentifier());
         }
 
         public void SendLogin(ClientReference client, int loginChannelId = 1)
@@ -3837,7 +3811,7 @@ namespace _Emulator
             Say(new MsgReference(2, body, client));
 
             if (debugSend)
-                Debug.Log("SendLogin to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendLogin to: " + client.GetIdentifier());
         }
 
         public void SendPlayerInfo(ClientReference client)
@@ -3869,7 +3843,7 @@ namespace _Emulator
             Say(new MsgReference(27, body, client));
 
             if (debugSend)
-                Debug.Log("SendPlayerInfo to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendPlayerInfo to: " + client.GetIdentifier());
         }
 
         public void SendItemList(ClientReference client)
@@ -3890,7 +3864,7 @@ namespace _Emulator
             Say(new MsgReference(464, body, client));
 
             if (debugSend)
-                Debug.Log("SendItemList to: " + client.GetIdentifier());
+                ServerDebugger.Log("SendItemList to: " + client.GetIdentifier());
         }
 
         public void SendUserList(ClientReference client, SendType sendType = SendType.Unicast)
@@ -3909,7 +3883,7 @@ namespace _Emulator
             Say(new MsgReference(467, body, client, sendType));
 
             if (debugPing)
-                Debug.Log("SendUserList to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendUserList to: " + client.GetIdentifier());
         }
 
         public void SendRoamout(ClientReference client, int src, SendType sendType = SendType.Unicast)
@@ -3920,7 +3894,7 @@ namespace _Emulator
             Say(new MsgReference(144, body, client, sendType));
 
             if (debugSend)
-                Debug.Log("SendRoamout to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendRoamout to: " + client.GetIdentifier());
         }
 
         public void SendRoamin(ClientReference client, int dest, SendType sendType = SendType.Unicast)
@@ -3931,7 +3905,7 @@ namespace _Emulator
             Say(new MsgReference(146, body, client, sendType));
 
             if (debugSend)
-                Debug.Log("SendRoamin to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendRoamin to: " + client.GetIdentifier());
         }
 
         public void SendConnected(ClientReference client)
@@ -3940,13 +3914,13 @@ namespace _Emulator
             Say(new MsgReference(ExtensionOpcodes.opConnectedAck, body, client));
 
             if (debugSend)
-                Debug.Log("SendConnected to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendConnected to: " + client.GetIdentifier());
         }
 
         public void SendAllDownloadedMaps(ClientReference client)
         {
             int chunkSize = 100;
-            int chunkCount = Mathf.CeilToInt((float)regMaps.Count / (float)chunkSize);
+            int chunkCount = (int)Math.Ceiling((double)regMaps.Count / chunkSize);
             int processedCount = 0;
 
             for (int chunk = 0; chunk < chunkCount; chunk++)
@@ -3986,7 +3960,7 @@ namespace _Emulator
             }
 
             if (debugSend)
-                Debug.Log("SendAllDownloadedMaps to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendAllDownloadedMaps to: " + client.GetIdentifier());
         }
 
         public void SendAllUserMaps(ClientReference client)
@@ -3994,9 +3968,9 @@ namespace _Emulator
             const int chunkSize = 200;
 
             int total = regMaps.Count;
-            int chunkCount = Mathf.CeilToInt((float)total / chunkSize);
+            int chunkCount = (int)Math.Ceiling((double)total / chunkSize);
 
-            Debug.LogWarning("RegMapCount: " + total);
+            ServerDebugger.LogWarning("RegMapCount: " + total);
 
             int processed = 0;
 
@@ -4031,7 +4005,7 @@ namespace _Emulator
             }
 
             if (debugSend)
-                Debug.Log("SendAllUserMaps to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendAllUserMaps to: " + client.GetIdentifier());
         }
 
 
@@ -4108,7 +4082,13 @@ namespace _Emulator
             bool ok = true;
             try
             {
-                string cacheDir = Path.Combine(Application.dataPath, "Resources/Cache");
+                string dataPath = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    "BrickForce_Data"
+                );
+
+                string cacheDir = Path.Combine(dataPath, @"Resources\Cache");
+                ServerDebugger.LogWarning("CacheDirPath: " + cacheDir);
 
                 string geom = Path.Combine(cacheDir, "downloaded" + slot + ".geometry");
                 string umi = Path.Combine(cacheDir, "downloaded" + slot + ".umi.cache");
@@ -4119,7 +4099,7 @@ namespace _Emulator
             catch (Exception ex)
             {
                 ok = false;
-                Debug.LogError("HandleResetUserMapSlot: " + ex);
+                ServerDebugger.LogError("HandleResetUserMapSlot: " + ex);
             }
 
             SendResetAck(msgRef.client, result: ok ? 0 : 1, slot: slot);
@@ -4170,7 +4150,7 @@ namespace _Emulator
             Say(new MsgReference(426, body, client));
 
             if (debugSend)
-                Debug.Log("SendDownloadedMaps to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendDownloadedMaps to: " + client.GetIdentifier());
         }
 
         public void SendRegisteredMaps(ClientReference client, int page)
@@ -4209,7 +4189,7 @@ namespace _Emulator
             Say(new MsgReference(428, body, client));
 
             if (debugSend)
-                Debug.Log("SendRegisteredMaps to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendRegisteredMaps to: " + client.GetIdentifier());
         }
 
         public void SendUserMaps(ClientReference client, int page)
@@ -4240,7 +4220,7 @@ namespace _Emulator
             Say(new MsgReference(430, body, client));
 
             if (debugSend)
-                Debug.Log("SendUserMaps to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendUserMaps to: " + client.GetIdentifier());
         }
 
         public void SendCustomMessage(string message, ClientReference client = null, SendType sendType = SendType.Broadcast)
@@ -4261,7 +4241,7 @@ namespace _Emulator
             Say(new MsgReference(64, body, client));
 
             if (debugSend)
-                Debug.Log("SendRespawnTicket to: " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendRespawnTicket to: " + client.GetIdentifier());
         }
 
         private void HandleBeginChunkedBufferReceive(MsgReference msgRef)
@@ -4325,11 +4305,11 @@ namespace _Emulator
             msgRef.msg._msg.Read(out byte z);
             msgRef.msg._msg.Read(out byte rot);
 
-            //Debug.LogWarning($"LINE_REQ item:{item} code:{code} brickIndex:{brickIndex} at({x},{y},{z}) rot:{rot}");
+            //ServerDebugger.LogWarning($"LINE_REQ item:{item} code:{code} brickIndex:{brickIndex} at({x},{y},{z}) rot:{rot}");
 
             if (msgRef?.matchData?.cachedMap == null)
             {
-                Debug.LogError("LINE_REQ: matchData/cachedMap null");
+                ServerDebugger.LogError("LINE_REQ: matchData/cachedMap null");
                 SendLineFail(msgRef, -6);
                 return;
             }
@@ -4343,15 +4323,15 @@ namespace _Emulator
                 if (map.GetByCoord(x, y, z) != null)
                 {
                     // Success ACK but do not add (prevents the tool from stalling on overlaps)
-                    Debug.LogWarning("Trying to replace Brick with line tool.");
+                    ServerDebugger.LogWarning("Trying to replace Brick with line tool.");
                     SendLineAck(msgRef, playerSeq, /*newSeq*/ 0, /*template*/ 0, x, y, z, rot);
                     return;
                 }
 
-                Brick b = BrickManager.Instance.GetBrick(brickIndex); 
+                Brick b = brickManager.GetBrick(brickIndex); 
                 if (b == null)
                 {
-                    Debug.LogWarning($"LINE_REQ: unknown brick index={brickIndex}");
+                    ServerDebugger.LogWarning($"LINE_REQ: unknown brick index={brickIndex}");
                     SendLineFail(msgRef, -6);
                     return;
                 }
@@ -4364,7 +4344,7 @@ namespace _Emulator
 
                 if (!ok)
                 {
-                    Debug.LogError($"LINE_REQ: AddBrickInst failed newSeq={newSeq} template={b.index} at({x},{y},{z})");
+                    ServerDebugger.LogError($"LINE_REQ: AddBrickInst failed newSeq={newSeq} template={b.index} at({x},{y},{z})");
                     SendLineFail(msgRef, -6);
                     return;
                 }
@@ -4406,17 +4386,17 @@ namespace _Emulator
 
             if (msgRef?.matchData?.cachedMap == null)
             {
-                Debug.LogError("BULK_REQ: matchData/cachedMap null");
+                ServerDebugger.LogError("BULK_REQ: matchData/cachedMap null");
                 SendBulkFail(msgRef, -1);
                 return;
             }
 
             if (!flag.IsSet(OperationFlag.Delete))
             {
-                Brick targetBrick = BrickManager.Instance.GetBrick(targetIndex);
+                Brick targetBrick = brickManager.GetBrick(targetIndex);
                 if (targetBrick == null)
                 {
-                    Debug.LogWarning($"BULK_REQ: unknown target brick index={targetIndex}");
+                    ServerDebugger.LogWarning($"BULK_REQ: unknown target brick index={targetIndex}");
                     SendBulkFail(msgRef, 0x0);
                     return;
                 }
@@ -4428,16 +4408,16 @@ namespace _Emulator
             }
             if ((flag.IsSet(OperationFlag.OnlySource) && !flag.IsSet(OperationFlag.ExcludeSourceType)) || (!flag.IsSet(OperationFlag.OnlySource) && flag.IsSet(OperationFlag.ExcludeSourceType)))
             {
-                Brick sourceBrick = BrickManager.Instance.GetBrick(sourceIndex);
+                Brick sourceBrick = brickManager.GetBrick(sourceIndex);
                 if (sourceBrick == null)
                 {
-                    Debug.LogWarning($"BULK_REQ: unknown source brick index={sourceIndex}");
+                    ServerDebugger.LogWarning($"BULK_REQ: unknown source brick index={sourceIndex}");
                     SendBulkFail(msgRef, 0x1);
                     return;
                 }
             }
 
-            Debug.Log($"BULK_REQ: Trying to change {count} brick(s)");
+            ServerDebugger.Log($"BULK_REQ: Trying to change {count} brick(s)");
 
             int playerSeq = msgRef.client.seq;
 
@@ -4605,11 +4585,11 @@ namespace _Emulator
             msgRef.msg._msg.Read(out byte z);
             msgRef.msg._msg.Read(out byte rot);
 
-            //Debug.LogWarning($"REPLACE_REQ item:{item} code:{code} brickIndex:{brickIndex} at({x},{y},{z}) rot:{rot}");
+            //ServerDebugger.LogWarning($"REPLACE_REQ item:{item} code:{code} brickIndex:{brickIndex} at({x},{y},{z}) rot:{rot}");
 
             if (msgRef?.matchData?.cachedMap == null)
             {
-                Debug.LogError("HandleReplaceBrickRequest: matchData/cachedMap is null");
+                ServerDebugger.LogError("HandleReplaceBrickRequest: matchData/cachedMap is null");
                 SendReplaceFail(msgRef, -6);
                 return;
             }
@@ -4623,15 +4603,15 @@ namespace _Emulator
                 BrickInst old = map.Get(existingSeq);
                 if (old == null)
                 {
-                    Debug.LogError($"ReplaceBrick: existing seq not found: {existingSeq}");
+                    ServerDebugger.LogError($"ReplaceBrick: existing seq not found: {existingSeq}");
                     SendReplaceFail(msgRef, -6);
                     return;
                 }
 
-                Brick newBrick = BrickManager.Instance.GetBrick(brickIndex);
+                Brick newBrick = brickManager.GetBrick(brickIndex);
                 if (newBrick == null)
                 {
-                    Debug.LogWarning($"REPLACE_REQ: unknown brick index={brickIndex}");
+                    ServerDebugger.LogWarning($"REPLACE_REQ: unknown brick index={brickIndex}");
                     SendReplaceFail(msgRef, -6);
                     return;
                 }
@@ -4643,7 +4623,7 @@ namespace _Emulator
                 morphes.Clear();
                 if (!map.DelBrickInst(existingSeq, ref morphes))
                 {
-                    Debug.LogError($"ReplaceBrick: DelBrickInst failed for seq={existingSeq}");
+                    ServerDebugger.LogError($"ReplaceBrick: DelBrickInst failed for seq={existingSeq}");
                     SendReplaceFail(msgRef, -6);
                     return;
                 }
@@ -4651,7 +4631,7 @@ namespace _Emulator
                 morphes.Clear();
                 if (!map.AddBrickInst(newSeq, brickIndex, old.PosX, old.PosY, old.PosZ, old.Rot, ref morphes))
                 {
-                    Debug.LogError($"ReplaceBrick: AddBrickInst failed newSeq={newSeq} template={brickIndex} at ({old.PosX},{old.PosY},{old.PosZ})");
+                    ServerDebugger.LogError($"ReplaceBrick: AddBrickInst failed newSeq={newSeq} template={brickIndex} at ({old.PosX},{old.PosY},{old.PosZ})");
                     SendReplaceFail(msgRef, -6);
                     return;
                 }
@@ -4699,61 +4679,11 @@ namespace _Emulator
                 BrickInst bi = match.cachedMap.Get(seq);
                 if (bi == null)
                 {
-                    Debug.LogWarning($"MORPH_BRICK_REQ: unknown brick seq={seq}");
+                    ServerDebugger.LogWarning($"MORPH_BRICK_REQ: unknown brick seq={seq}");
                     return;
                 }
                 bi.Code = code;
             }
-        }
-
-        private void HandleSaveMap(MsgReference msgRef)
-        {
-            msgRef.msg._msg.Read(out int slot);
-            msgRef.msg._msg.Read(out byte[] textureBuffer);
-
-            MatchData matchData = msgRef.matchData;
-
-            DateTime time = DateTime.Now;
-
-            // Generate ModeMask (if you still want it saved/used locally, keep it here; otherwise remove)
-            ushort modeMask = GenerateModeMask(matchData.cachedMap.dic);
-
-            // Load thumbnail from chunked buffer (local slot thumbnail)
-            Texture2D thumbnail = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
-            thumbnail.LoadImage(textureBuffer);
-            thumbnail.Apply();
-            if (debugSend) Debug.Log("Load Thumbnail (SaveMap)");
-
-            // IMPORTANT: Do NOT touch RegMapManager here.
-            // Only update the user map metadata (UMI) for this slot.
-            // (Alias/BrickCount come from cachedUMI; adjust if you store alias elsewhere.)
-            UserMapInfoManager.Instance.AddOrUpdate(
-                slot,
-                matchData.cachedUMI.Alias,
-                matchData.cachedUMI.BrickCount,
-                time,
-                0 // premium
-            );
-            UserMapInfoManager.Instance.SetThumbnail(slot, thumbnail);
-            UserMapInfoManager.Instance.CurMapName = matchData.cachedUMI.Alias;
-
-            // Update current working map references WITHOUT registering
-            matchData.cachedMap.map = slot;          // working map id stays "slot"
-            matchData.cachedUMI.slot = slot;         // slot stays 1..12
-            matchData.cachedUMI.regMap = null;       // NOT registered on save
-
-            // Save files as user-slot files (local)
-            // geometry: downloaded{slot}.geometry
-            matchData.cachedMap.Save(slot, matchData.cachedMap.skybox);
-
-            // if you have a cache save method for UMI on server-side:
-            //matchData.cachedUMI.SaveCache();
-            // If not, UserMapInfoManager probably handles it; otherwise add it there.
-
-            MsgBody msgBody = new MsgBody();
-            msgBody.Write(slot);
-            msgBody.Write(0);
-            Say(new MsgReference(40, msgBody, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));
         }
 
         private void HandleChangeEditorPermissionRequest(MsgReference msgRef)
@@ -4772,7 +4702,7 @@ namespace _Emulator
         private void HandleCommonOpt(MsgReference msgRef)
         {
             msgRef.msg._msg.Read(out int opt);
-            Debug.LogWarning("SaveCommonOpt: " + opt);
+            ServerDebugger.LogWarning("SaveCommonOpt: " + opt);
         }
 
         public static ushort GenerateModeMask(Dictionary<int, BrickInst> brickInstances)
@@ -4919,7 +4849,7 @@ namespace _Emulator
             MatchData matchData = msgRef.matchData;
 
             if (debugHandle)
-                Debug.Log("HandleDelBrickRequest from: " + msgRef.client.GetIdentifier());
+                ServerDebugger.Log("HandleDelBrickRequest from: " + msgRef.client.GetIdentifier());
 
             msgRef.msg._msg.Read(out int length);
             List<int> morphes = new List<int>();
@@ -4949,7 +4879,7 @@ namespace _Emulator
             Say(new MsgReference(480, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("SendBatchDeleteBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
+                ServerDebugger.LogVerbose("SendBatchDeleteBrick for room no " + matchData.room.No + " " + client.GetIdentifier());
         }
 
         public void HandleMissionPointRequest(MsgReference msgRef)
@@ -4959,7 +4889,7 @@ namespace _Emulator
             MatchData matchData = msgRef.client.matchData;
             //Missing Server Logic Here
             MsgBody body = new MsgBody();
-            Debug.Log("RedPoint: " + redPoint + " BluePoint: " + bluePoint);
+            ServerDebugger.Log("RedPoint: " + redPoint + " BluePoint: " + bluePoint);
 
             body.Write(redPoint);
             body.Write(bluePoint);
@@ -4967,7 +4897,7 @@ namespace _Emulator
             Say(new MsgReference(509, body, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("HandleMissionPointRequest for room no " + matchData.room.No + " " + msgRef.client.GetIdentifier());
+                ServerDebugger.LogVerbose("HandleMissionPointRequest for room no " + matchData.room.No + " " + msgRef.client.GetIdentifier());
         }
 
         public void HandleCoreHPReq(MsgReference msgRef)
@@ -4976,7 +4906,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int blueHp);
             MatchData matchData = msgRef.client.matchData;
             MsgBody body = new MsgBody();
-            Debug.Log("RedHp: " + redHp + " BlueHp: " + blueHp);
+            ServerDebugger.Log("RedHp: " + redHp + " BlueHp: " + blueHp);
             //if hp <= 0 end match
             if (redHp <= 0 || blueHp <= 0)
             {
@@ -4989,7 +4919,7 @@ namespace _Emulator
             Say(new MsgReference(181, body, msgRef.client, SendType.BroadcastRoom, matchData.channel, matchData));
 
             if (debugSend)
-                Debug.Log("HandleCoreHPReq for room no " + matchData.room.No + " " + msgRef.client.GetIdentifier());
+                ServerDebugger.LogVerbose("HandleCoreHPReq for room no " + matchData.room.No + " " + msgRef.client.GetIdentifier());
         }
 
         private void HandleInflictedDamage(MsgReference msgRef)
@@ -5038,13 +4968,13 @@ namespace _Emulator
             // 1 score per ~7 damage.
             //
             // Damage reward formula:
-            int reward = Mathf.Max(1, totalDamage / 7);
+            int reward = Math.Max(1, totalDamage / 7);
 
             // Add to overall player score
             client.score += reward;
 
-            // Optionally: Debug log
-            // Debug.Log($"[InflictedDamage] {client.name} inflicted {totalDamage} → +{reward} score");
+            // Optionally: ServerDebugger log
+            // ServerDebugger.Log($"[InflictedDamage] {client.name} inflicted {totalDamage} → +{reward} score");
 
             MsgBody msg = new MsgBody();
             msg.Write(client.seq);      // val  → player sequence ID
@@ -5207,9 +5137,9 @@ namespace _Emulator
 
             // The client passes the prize CODE here, not a unique seq
             req.Read(out long item);
-            Debug.Log(item);
+            ServerDebugger.Log(item);
             req.Read(out int index);      // tile index
-            Debug.Log(index);
+            ServerDebugger.Log(index);
             req.Read(out int amount);
             req.Read(out bool wasKey);
             req.Read(out bool freeCoin);
@@ -5232,7 +5162,7 @@ namespace _Emulator
             TcTItem reward = tc.TcTItemToArray()[index];
 
             // 3. Load template from TItemManager
-            TItem template = TItemManager.Instance.Get<TItem>(reward.code.ToString());
+            TItem template = tItemManager.Get<TItem>(reward.code.ToString());
             if (template == null)
             {
                 MsgBody fail = new MsgBody();
@@ -5329,22 +5259,6 @@ namespace _Emulator
             Say(new MsgReference(89, body, msgRef.client, SendType.Unicast));
         }
 
-        private void HandleChangeUserMapAliasRequest(MsgReference msgRef)
-        {
-            msgRef.msg._msg.Read(out int slot);
-            msgRef.msg._msg.Read(out string newAlias);
-
-            UserMapInfoManager.Instance.Get(slot).Alias = newAlias;
-            bool ok = UserMapInfoManager.Instance.Get(slot).SaveCache();
-
-            MsgBody body = new MsgBody();
-            body.Write(ok ? 1 : 0); //success
-            body.Write((sbyte)slot);
-            body.Write(newAlias);
-
-            Say(new MsgReference(55, body, msgRef.client, SendType.Unicast));
-        }
-
         private void HandleVersionCheck(MsgReference msg)
         {
             ClientReference client = msg.client;
@@ -5355,7 +5269,7 @@ namespace _Emulator
             client.isVersionSetUp = true;
             if (client.isHost)
             {
-                SayInstant(new MsgReference(ExtensionOpcodes.opVersionCheckAck, new MsgBody(), client));
+                Say(new MsgReference(ExtensionOpcodes.opVersionCheckAck, new MsgBody(), client));
                 return;
             }
 
@@ -5368,7 +5282,7 @@ namespace _Emulator
             if (clientMajor == -1)
             {
                 // We are pretty sure the client has an unknown version if this is -1
-                Debug.LogWarning($"Disconnecting client: Version check failed, client sent invalid version");
+                ServerDebugger.LogWarning($"Disconnecting client: Version check failed, client sent invalid version");
                 client.Disconnect($"Version mismatch detected, the host is using a newer version ({Core.VersionStr})");
                 return;
             }
@@ -5377,16 +5291,16 @@ namespace _Emulator
             int result = Core.Version.CompareTo(clientVersion);
             if (result != 0)
             {
-                Debug.LogWarning($"Disconnecting client: Version check failed, expected {Core.VersionStr} but got {clientVersion}");
+                ServerDebugger.LogWarning($"Disconnecting client: Version check failed, expected {Core.VersionStr} but got {clientVersion}");
                 string relation = result < 0 ? "an older" : "a newer";
                 client.Disconnect($"Version mismatch detected, the host is using {relation} version ({Core.VersionStr})");
                 return;
             }
             if (debugHandle)
             {
-                Debug.Log($"Version check succeeded, got host version {Core.VersionStr} and client version {clientVersion}");
+                ServerDebugger.Log($"Version check succeeded, got host version {Core.VersionStr} and client version {clientVersion}");
             }
-            SayInstant(new MsgReference(ExtensionOpcodes.opVersionCheckAck, new MsgBody(), client));
+            Say(new MsgReference(ExtensionOpcodes.opVersionCheckAck, new MsgBody(), client));
         }
     }
 }

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
-using _Emulator.Network;
 using Steamworks;
 using Debug = UnityEngine.Debug;
 
@@ -24,7 +23,7 @@ namespace _Emulator
         public CSteamID steamID = CSteamID.Nil;
         public bool isSteam = false;
         public volatile bool didHeartBeat = false;
-        public float lastHeartBeatTime;
+        public float heartBeatToleranceTime;
         public float loginToleranceTime;
         public string name;
         public int seq;
@@ -58,7 +57,7 @@ namespace _Emulator
         {
             this.emulator = emulator;
             this.sendKey = emulator.sendKey;
-            lastHeartBeatTime = float.MaxValue;
+            heartBeatToleranceTime = 0f;
             loginToleranceTime = 0f;
             socket = _socket;
             name = _name;
@@ -86,7 +85,7 @@ namespace _Emulator
         {
             this.emulator = emulator;
             this.sendKey = emulator.sendKey;
-            lastHeartBeatTime = float.MaxValue;
+            heartBeatToleranceTime = 0f;
             loginToleranceTime = 0f;
             steamID = _steamID;
             name = _name;
