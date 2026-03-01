@@ -794,10 +794,7 @@ namespace _Emulator
                             {
                                 roomType = BfUtils.RoomTypeToString(match.room.Type);
                                 roomStatus = BfUtils.RoomStatusToString(match.room.Status);
-                                if (match.room.Type == ROOM_TYPE.MAP_EDITOR)
-                                    mapAlias = UserMapInfoManager.Instance.CurMapName;
-                                else
-                                    mapAlias = match.room.CurMapAlias;
+                                mapAlias = match.room.CurMapAlias;
                                 return true;
                             }
                         }

@@ -10,6 +10,7 @@ using System.Net;
 using static Brick;
 using Steamworks;
 using System.Linq;
+using System.Runtime.Remoting.Metadata.W3cXsd2001;
 
 namespace _Emulator
 {
@@ -589,8 +590,18 @@ namespace _Emulator
 
         public void hSockTcpRegisterReq(int slot, ushort modeMask, int regHow, int point, int downloadFee, byte[] thumbnail, string msgEval)
 		{
-            UserMapInfo umi = UserMapInfoManager.Instance.Get(slot);
-
+            UserMapInfoManager mapInfoMng = UserMapInfoManager.Instance;
+            if (mapInfoMng.CurSlot != slot)
+            {
+                Actor.Instance.ShowDelayedMessage("Map slots don't align, can't register");
+                return;
+            }
+            string mapName = ClientExtension.instance.buildModeMapName;
+            if (RoomManager.Instance.Master != MyInfoManager.Instance.Seq)
+            {
+                Actor.Instance.ShowDelayedMessage(string.Format(StringMgr.Instance.Get("REGISTER_FAIL"), mapName));
+                return;
+            }
             // Thumbnail for the registered map
             Texture2D thumbnailTex = new Texture2D(128, 128, TextureFormat.RGB24, mipmap: false);
             thumbnailTex.LoadImage(thumbnail);
@@ -602,8 +613,8 @@ namespace _Emulator
             // Create & register RegMap ONLY here
             RegMap regMap = new RegMap(
                 hashId,
-                ClientExtension.instance.name + "@Aurora",
-                umi.Alias,
+                MyInfoManager.Instance.name + "@Aurora",
+                mapName,
                 time,
                 modeMask,
                 true, false,
@@ -618,12 +629,28 @@ namespace _Emulator
 
             // Save registered files under the RegMap ID (separate from user slot file)
             regMap.Save();
+            //Save current Map (slot)
+            UserMapInfoManager.Instance.AddOrUpdate(slot, ClientExtension.instance.buildModeMapName, BrickManager.Instance.Count, time, (sbyte)0);
+            UserMapInfoManager.Instance.SetThumbnail(slot, thumbnailTex);
+            UserMap map = BrickManager.Instance.userMap;
+            map.Save(slot, map.skybox);
+            //Save as newly registered Map
+            UserMapInfoManager.Instance.AddOrUpdate(hashId, ClientExtension.instance.buildModeMapName, BrickManager.Instance.Count, time, (sbyte)0);
+            map.Save(hashId, map.skybox);
 
-            MsgBody body = new MsgBody();
-
-            body.Write(umi.slot);
-            body.Write((int)regMap.ModeMask);
-            CSNetManager.Instance.Sock.HandleCS_REGISTER_ACK(body);
+            if (slot < 0)
+            {
+                Actor.Instance.ShowDelayedMessage(StringMgr.Instance.Get("FAIL_TO_REGISTER"));
+            }
+            else
+            {
+                UserMapInfo userMapInfo = UserMapInfoManager.Instance.Get(hashId);
+                if (userMapInfo != null)
+                {
+                    MyInfoManager.Instance.IsModified = false;
+                    Actor.Instance.ShowDelayedMessage(string.Format(StringMgr.Instance.Get("REGISTER_SUCCESS"), userMapInfo.Alias));
+                }
+            }
         }
 
         public void hUserMapReq(int page)
@@ -1088,7 +1115,6 @@ namespace _Emulator
             int brickCount = BrickManager.Instance.Count;
             mapInfoMng.AddOrUpdate(slot, mapName, brickCount, time, (sbyte) 0);
             mapInfoMng.SetThumbnail(slot, thumb);
-            mapInfoMng.Get(slot).SaveCache();
             UserMap map = BrickManager.Instance.userMap;
             map.Save(slot, map.skybox);
             Actor.Instance.ShowDelayedMessage(string.Format(StringMgr.Instance.Get("SAVE_SUCCESS"), mapName));

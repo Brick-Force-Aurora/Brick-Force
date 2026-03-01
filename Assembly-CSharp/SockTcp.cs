@@ -4535,7 +4535,7 @@ public class SockTcp
 		MessageBoxMgr.Instance.AddMessage(StringMgr.Instance.Get("FAIL_TO_UPDATE_SCRIPT"));
 	}
 
-	public void HandleCS_REGISTER_ACK(MsgBody msg)
+	private void HandleCS_REGISTER_ACK(MsgBody msg)
 	{
 		msg.Read(out byte val);
 		msg.Read(out int val2);
