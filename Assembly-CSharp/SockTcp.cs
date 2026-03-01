@@ -3629,6 +3629,7 @@ public class SockTcp
 		Say(65, msgBody);
 	}
 
+	// Hooked
 	public void SendCS_CHANGE_USERMAP_ALIAS_REQ(int slot, string alias)
 	{
 		MsgBody msgBody = new MsgBody();
@@ -6777,7 +6778,7 @@ public class SockTcp
 		}
 	}
 
-	private void HandleCS_CHANGE_USERMAP_ALIAS_ACK(MsgBody msg)
+	public void HandleCS_CHANGE_USERMAP_ALIAS_ACK(MsgBody msg)
 	{
 		msg.Read(out int val);
 		msg.Read(out sbyte val2);

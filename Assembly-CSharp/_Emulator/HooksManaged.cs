@@ -131,6 +131,10 @@ namespace _Emulator
         static MethodInfo hSockTcpUserMapReq = typeof(HooksManaged).GetMethod("hUserMapReq", BindingFlags.Public | BindingFlags.Instance);
         static ManagedHook SockTcpUserMapReqHook;
 
+        static MethodInfo oSockTcpChangeUserMapAliasReq = typeof(SockTcp).GetMethod("HandleCS_CHANGE_USERMAP_ALIAS_ACK", BindingFlags.Public | BindingFlags.Instance);
+        static MethodInfo hSockTcpChangeUserMapAliasReq = typeof(HooksManaged).GetMethod("hChangeUserMapAlias", BindingFlags.Public | BindingFlags.Instance);
+        static ManagedHook SockTcpChangeUserMapAliasReqHook;
+
         static MethodInfo oSockTcpResetUserMapSlotReq= typeof(SockTcp).GetMethod("SendCS_RESET_USER_MAP_SLOTS_REQ", BindingFlags.Public | BindingFlags.Instance);
         static MethodInfo hSockTcpResetUserMapSlotReq = typeof(HooksManaged).GetMethod("hResetUserMapSlotReq", BindingFlags.Public | BindingFlags.Instance);
         static ManagedHook SockTcpResetUserMapSlotReqHook;
@@ -698,6 +702,18 @@ namespace _Emulator
                     Debug.LogError("Local ResetUserMapSlot failed: " + ex);
                 }
             }
+        }
+
+        public void hChangeUserMapAlias(int slot, string alias)
+        {
+            UserMapInfoManager.Instance.Get(slot).Alias = alias;
+            bool ok = UserMapInfoManager.Instance.Get(slot).SaveCache();
+
+            MsgBody body = new MsgBody();
+            body.Write(ok ? 1 : 0); //success
+            body.Write((sbyte)slot);
+            body.Write(alias);
+            CSNetManager.Instance.Sock.HandleCS_CHANGE_USERMAP_ALIAS_ACK(body);
         }
 
         public void hMyDownloadMapReq(int prevPage, int nextPage, int indexer, ushort modeMask)
@@ -1361,6 +1377,8 @@ namespace _Emulator
             DoPagePanelHook.ApplyHook();
             DownloadMapFrameOnGUIHook = new ManagedHook(oDownloadMapFrameOnGUI, hDownloadMapFrameOnGUI);
             DownloadMapFrameOnGUIHook.ApplyHook();
+            SockTcpChangeUserMapAliasReqHook = new ManagedHook(oSockTcpChangeUserMapAliasReq, hSockTcpChangeUserMapAliasReq);
+            SockTcpChangeUserMapAliasReqHook.ApplyHook();
         }
     }
 }

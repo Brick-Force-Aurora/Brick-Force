@@ -5259,22 +5259,6 @@ namespace _Emulator
             Say(new MsgReference(89, body, msgRef.client, SendType.Unicast));
         }
 
-        private void HandleChangeUserMapAliasRequest(MsgReference msgRef)
-        {
-            msgRef.msg._msg.Read(out int slot);
-            msgRef.msg._msg.Read(out string newAlias);
-
-            UserMapInfoManager.Instance.Get(slot).Alias = newAlias;
-            bool ok = UserMapInfoManager.Instance.Get(slot).SaveCache();
-
-            MsgBody body = new MsgBody();
-            body.Write(ok ? 1 : 0); //success
-            body.Write((sbyte)slot);
-            body.Write(newAlias);
-
-            Say(new MsgReference(55, body, msgRef.client, SendType.Unicast));
-        }
-
         private void HandleVersionCheck(MsgReference msg)
         {
             ClientReference client = msg.client;
