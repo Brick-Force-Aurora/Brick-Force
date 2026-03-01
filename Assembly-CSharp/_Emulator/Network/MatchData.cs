@@ -36,7 +36,16 @@ namespace _Emulator
         public int blueKillCount;
 
         //Build only
-        public UserMap cachedMap;
+        private UserMap _cachedMap;
+        public UserMap cachedMap
+        {
+            get => _cachedMap;
+            set
+            {
+                value.IsClientside = false;
+                _cachedMap = value;
+            }
+        }
         public UserMapInfo cachedUMI;
         public bool mapCached;
 
