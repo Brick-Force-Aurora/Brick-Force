@@ -66,7 +66,11 @@ namespace _Emulator
                 string brickName = stringMgr.Get(brick.brickAlias, LangOptManager.LANG_OPT.ENGLISH);
                 if (brickName.Length == 0)
                 {
-                    brickName = brick.brickName;
+                    brickName = stringMgr.Get(brick.brickName, LangOptManager.LANG_OPT.ENGLISH);
+                    if (brickName.Length == 0)
+                    {
+                        brickName = brick.brickName;
+                    }
                 }
                 brickName = brickName.ToLower().Replace(' ', '_').Replace("(", "").Replace(")", "");
                 if (limits.ContainsKey(brickName))
