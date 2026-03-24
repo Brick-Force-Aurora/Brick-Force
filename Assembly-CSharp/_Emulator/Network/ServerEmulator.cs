@@ -4985,9 +4985,9 @@ namespace _Emulator
             msgRef.client.lastOpenedChestSeq = -1;
             //update chest?
             //update inv
-            ClientExtension.instance.inventory.Apply();
-            ClientExtension.instance.inventory.Save();
-            ClientExtension.instance.SendInventoryData();
+            msgRef.client.inventory.Apply();
+            msgRef.client.inventory.Save();
+            //ClientExtension.instance.SendInventoryData();
         }
 
         private void HandleCS_TC_ENTER_REQ(MsgReference msgRef)
