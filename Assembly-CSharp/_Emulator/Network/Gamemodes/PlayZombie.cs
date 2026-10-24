@@ -304,6 +304,19 @@ namespace _Emulator
             HandleZombieScoreRequest(msgRef);
 
             ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_ROUND_END_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+
+            SendRoundRespawnTickets(data);
+        }
+
+        private void SendRoundRespawnTickets(MatchData data)
+        {
+            int start = UnityEngine.Random.Range(0, 64);
+            for (int i = 0; i < data.clientList.Count; i++)
+            {
+                MsgBody body = new MsgBody();
+                body.Write(start + i);
+                ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_RESPAWN_TICKET_ACK, body, data.clientList[i]));
+            }
         }
 
         public void HandleZombieScoreRequest(MsgReference msgRef)

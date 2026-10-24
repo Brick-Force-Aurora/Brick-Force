@@ -193,17 +193,6 @@ namespace _Emulator
             }
             deadRedPlayers.Clear();
             deadBluePlayers.Clear();
-            if (room.Type == Room.ROOM_TYPE.ZOMBIE)
-            {
-                foreach (ClientReference client in clientList)
-                {
-                    //Does not work
-                    ServerEmulator.instance.SendRespawnTicket(client);
-                }
-
-                if (ServerEmulator.instance.debugHandle)
-                    UnityEngine.Debug.Log($"[ZombieSpawn] Reassigned {clientList.Count} random tickets for next round.");
-            }
         }
 
         public void Shutdown()
