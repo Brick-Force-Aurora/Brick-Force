@@ -17,7 +17,7 @@ namespace _Emulator
         public Item[] activeSlots;
         public string[] equipmentString;
         public string[] weaponChgString;
-        public const int maxItems = 400;
+        public const int maxItems = 1600;
         public bool isLocal;
         private bool loading;
         public bool serverSyncPending;
