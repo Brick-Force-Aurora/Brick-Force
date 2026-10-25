@@ -1750,12 +1750,12 @@ namespace _Emulator
                     matchData.deadRedPlayers.Add(victimClient.seq);
             }
             SendDeathCount(victimClient);
+ 
+            //fix for suicide finally?
+            bool suicide = killer == victim;
 
-            if (killer == victim)
-                killer = damageLog.OrderByDescending(x => x.Value).FirstOrDefault().Key;
-
-            ClientReference killerClient = matchData.clientList.Find(x => x.seq == killer);
-            if (killer != victim)
+            ClientReference killerClient = suicide ? null : matchData.clientList.Find(x => x.seq == killer);
+            if (!suicide)
             {
                 killerClient.kills++;
                 SendKillCount(killerClient);
@@ -1763,7 +1763,7 @@ namespace _Emulator
 
             foreach (KeyValuePair<int, int> entry in damageLog)
             {
-                if (entry.Key != victim)
+                if (!suicide && entry.Key != victim)
                 {
                     if (entry.Key != killer)
                     {
@@ -1780,13 +1780,6 @@ namespace _Emulator
                     }
 
                 }
-            }
-            //Fix for hosting killing fall damage?
-            // does not work
-            if (weaponBy == 0)
-            {
-                killerType = 0;
-                killer = 0;
             }
             KillLogEntry killLogEntry = new KillLogEntry(id, killerType, killer, victimType, victim, (Weapon.BY)weaponBy, slot, category, hitpart, damageLog);
             matchData.killLog.Add(killLogEntry);
