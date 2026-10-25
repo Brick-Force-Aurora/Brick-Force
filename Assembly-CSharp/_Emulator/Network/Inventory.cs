@@ -64,6 +64,16 @@ namespace _Emulator
             foreach (Item item in equipment)
             {
                 MyInfoManager.Instance.SetItem(item.Seq, item.Code, item.Usage, item.Remain, 0, 1000);
+                //Always MaxUp Weapons
+                if (item.Template.type != TItem.TYPE.WEAPON) continue;
+                Item gameItem = MyInfoManager.Instance.GetItemBySequence(item.Seq);
+                if (gameItem == null) continue;
+                foreach (PIMP prop in new[] { PIMP.PROP_ATK_POW, PIMP.PROP_ACCURACY, PIMP.PROP_RECOIL,
+                                  PIMP.PROP_RPM, PIMP.PROP_AMMO_MAX, PIMP.PROP_ATTACK_SPEED })
+                {
+                    gameItem.upgradeProps[(int)prop].use = true;
+                    gameItem.upgradeProps[(int)prop].grade = 10;
+                }
             }
             GameObject mainObject = GameObject.Find("Main");
             Lobby lobby = mainObject.GetComponent<Lobby>();
