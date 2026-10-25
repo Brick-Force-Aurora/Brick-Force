@@ -3506,7 +3506,7 @@ namespace _Emulator
                 ServerDebugger.Log("Broadcasted SendEnterSteam for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
         }
 
-        public void SendLeave(ClientReference client)
+        public void SendLeave(ClientReference client, SendType sendType = SendType.BroadcastRoom)
         {
             MatchData matchData = client.matchData;
 
@@ -3514,7 +3514,7 @@ namespace _Emulator
 
             body.Write(client.seq);
 
-            Say(new MsgReference(11, body, client, SendType.BroadcastRoom, matchData.channel, matchData));
+            Say(new MsgReference(11, body, client, sendType, matchData.channel, matchData));
 
             if (debugSend)
                 ServerDebugger.Log("Broadcasted SendLeave for client " + client.GetIdentifier() + " for room no: " + matchData.room.No);
@@ -5253,12 +5253,31 @@ namespace _Emulator
 
         private void HandleKickRequest(MsgReference msgRef)
         {
-            //not tested/ server side remove?
             msgRef.msg._msg.Read(out int seq);
-            //msgRef.matchData.RemoveClient(clientList.Find(client => client.seq == seq));
+
+            MatchData matchData = msgRef.matchData;
+            if (matchData == null || msgRef.client.seq != matchData.masterSeq || seq == msgRef.client.seq)
+                return;
+
+            ClientReference target = matchData.clientList.Find(client => client.seq == seq);
+            if (target == null)
+                return;
+
+            SendSetStatus(target);
+
+            // The kicked client leaves the room when it receives its own seq, the others show the kick message
+            SendKick(target);
             MsgBody body = new MsgBody();
             body.Write(seq);
-            Say(new MsgReference(89, body, msgRef.client, SendType.Unicast));
+            Say(new MsgReference(89, body, target, SendType.BroadcastRoomExclusive, matchData.channel, matchData));
+
+            // Removes the kicked player's descriptor on the remaining clients
+            SendLeave(target, SendType.BroadcastRoomExclusive);
+
+            matchData.RemoveClient(target);
+
+            if (debugHandle)
+                ServerDebugger.Log("HandleKickRequest: " + msgRef.client.GetIdentifier() + " kicked " + target.GetIdentifier());
         }
 
         private void HandleVersionCheck(MsgReference msg)
