@@ -4234,6 +4234,10 @@ namespace _Emulator
         private void HandleGetBack2SpawnerRequest(MsgReference msgRef)
         {
             MatchData data = msgRef.matchData;
+
+            if (data.room.Type == ROOM_TYPE.CAPTURE_THE_FLAG)
+                playCaptureTheFlag.SendRoundRespawnTickets(data);
+
             MsgBody msg = new MsgBody();
             Say(new MsgReference(263, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }

@@ -93,6 +93,22 @@ namespace _Emulator
             ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_CTF_CAPTURE_FLAG_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
         }
 
+        public void SendRoundRespawnTickets(MatchData data)
+        {
+            foreach (bool red in new[] { true, false })
+            {
+                List<ClientReference> team = data.clientList.FindAll(x => x.slot != null && x.slot.isRed == red);
+                ClientReference master = team.Find(x => x.seq == data.masterSeq);
+                int next = master != null ? master.seq + 1 : UnityEngine.Random.Range(0, 64);
+                foreach (ClientReference client in team)
+                {
+                    MsgBody body = new MsgBody();
+                    body.Write(client == master ? master.seq : next++);
+                    ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_RESPAWN_TICKET_ACK, body, client));
+                }
+            }
+        }
+
         public void HandleCTFScoreRequest(MsgReference msgRef)
         {
             MatchData data = msgRef.matchData;
