@@ -1646,6 +1646,7 @@ namespace _Emulator
             TItem template = tItemManager.dic.FirstOrDefault(x => x.Value.code == code).Value;
             if (template == null)
             {
+                SendBuyFailed(msgRef.client, code, -1);
                 SendCustomMessage("Item doesn't exist.", msgRef.client, SendType.Unicast);
                 return;
             }
@@ -1721,7 +1722,24 @@ namespace _Emulator
 
             }
             else
-                SendCustomMessage("Couldn't create item " + template.name, msgRef.client, SendType.Unicast);
+            {
+                bool owned = msgRef.client.inventory.equipment.Exists(x => x.Template.code == template.code);
+                SendBuyFailed(msgRef.client, code, owned ? -2 : -4);
+                if (!owned)
+                    SendCustomMessage("Couldn't create item " + template.name + " (inventory full: " + msgRef.client.inventory.equipment.Count + "/" + Inventory.maxItems + ")", msgRef.client, SendType.Unicast);
+            }
+        }
+
+        // -1 no such item, -2 already owned, -3 not enough money, -4 unknown error
+        private void SendBuyFailed(ClientReference client, string code, long errorCode)
+        {
+            MsgBody body = new MsgBody();
+            body.Write(errorCode);
+            body.Write(code);
+            body.Write(0);
+            body.Write((sbyte)0);
+            body.Write(0);
+            Say(new MsgReference(122, body, client, SendType.Unicast));
         }
 
         private void HandleKillLogRequest(MsgReference msgRef)
