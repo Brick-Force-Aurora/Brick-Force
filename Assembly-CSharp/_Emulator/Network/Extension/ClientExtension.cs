@@ -817,6 +817,7 @@ namespace _Emulator
         {
             MsgBody body = new MsgBody();
 
+            inventory.serverSyncPending = false;
             body.Write(inventory.equipment.Count);
 
             // Write each item's slot (category) and code

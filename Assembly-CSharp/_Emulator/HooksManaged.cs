@@ -409,11 +409,13 @@ namespace _Emulator
 			SockTcpKilllogAckHook.CallOriginal(CSNetManager.Instance.Sock, new object[] { msg });
 		}
 
-		public void hMyInfoManagerSetItemUsage(long seq, string code, Item.USAGE usage)
-		{
-			Item item = ClientExtension.instance.inventory.equipment.Find(x => x.Seq == seq);
-			if (item != null)
-				item.Usage = usage;
+        public void hMyInfoManagerSetItemUsage(long seq, string code, Item.USAGE usage)
+        {
+            Item item = ClientExtension.instance.inventory.equipment.Find(x => x.Seq == seq);
+            if (item != null) { 
+                item.Usage = usage;
+                ClientExtension.instance.inventory.Save();
+            }
 
 			MyInfoManagerSetItemUsageHook.CallOriginal(MyInfoManager.Instance, new object[] { seq, code, usage });
 		}
@@ -1318,7 +1320,7 @@ namespace _Emulator
                 }
 
 				// Local inventory hack
-				ClientExtension.instance.inventory.AddItem(tItem, false, remain, uSAGE);
+				ClientExtension.instance.inventory.AddItem(tItem, false, remain, uSAGE, true);
             }
         }
 

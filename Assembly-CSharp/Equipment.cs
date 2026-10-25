@@ -386,7 +386,8 @@ public class Equipment
 	{
         ClientExtension.instance.inventory.Apply();
         ClientExtension.instance.inventory.Save();
-        ClientExtension.instance.SendInventoryData();
+        if (ClientExtension.instance.inventory.serverSyncPending)
+            ClientExtension.instance.SendInventoryData();
         mainTab = 0;
 		subTab[mainTab] = 0;
 		for (int i = 0; i < GlobalVars.Instance.equipParentDirNames.Length; i++)

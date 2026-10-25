@@ -18,7 +18,9 @@ namespace _Emulator
         public string[] equipmentString;
         public string[] weaponChgString;
         public const int maxItems = 400;
-        public const string activeStatePathDefault = "Config\\InventoryActive.json";
+        public bool isLocal;
+        private bool loading;
+        public bool serverSyncPending;
 
         public Inventory(int _seq, bool load = false)
         {
@@ -30,9 +32,30 @@ namespace _Emulator
 
             if (load)
             {
+                isLocal = true;
                 LoadInventoryFromDisk();
-                LoadActiveState();
             }
+        }
+
+        private void SaveChanges()
+        {
+            if (isLocal && !loading)
+                Save();
+        }
+
+        private static string GetBackupPath(string filePath)
+        {
+            return Path.Combine(Path.GetDirectoryName(filePath), Path.GetFileNameWithoutExtension(filePath) + ".backup" + Path.GetExtension(filePath));
+        }
+
+        private static void WriteFileAtomic(string filePath, string text)
+        {
+            string tempPath = filePath + ".tmp";
+            File.WriteAllText(tempPath, text);
+            if (File.Exists(filePath))
+                File.Replace(tempPath, filePath, GetBackupPath(filePath));
+            else
+                File.Move(tempPath, filePath);
         }
 
         public void Apply()
@@ -82,7 +105,7 @@ namespace _Emulator
             return item;
         }
 
-        public Item AddItem(TItem template, bool sort = false, int amount = -1, Item.USAGE usage = Item.USAGE.UNEQUIP)
+        public Item AddItem(TItem template, bool sort = false, int amount = -1, Item.USAGE usage = Item.USAGE.UNEQUIP, bool fromServer = false)
         {
             var item = CreateItem(template, sort, amount, usage);
             if (item == null)
@@ -93,6 +116,9 @@ namespace _Emulator
             if (sort)
                 Sort();
 
+            if (!fromServer && isLocal && !loading)
+                serverSyncPending = true;
+            SaveChanges();
             return item;
         }
 
@@ -100,6 +126,7 @@ namespace _Emulator
         {
             Item item = equipment.Find(x => x.Seq == seq && x.IsWeaponSlotAble);
             Item oldItem = equipment.Find(x => x.toolSlot == slot && x.IsWeaponSlotAble);
+            bool changed = oldItem != item;
 
             if (oldItem != null)
                 oldItem.toolSlot = -1;
@@ -109,12 +136,15 @@ namespace _Emulator
                 item.toolSlot = slot;
 
             GenerateActiveChange();
+            if (changed)
+                SaveChanges();
         }
 
         public void AddToolSlot(long seq, sbyte slot)
         {
             Item item = equipment.Find(x => x.Seq == seq && x.IsShooterSlotAble);
             Item oldItem = equipment.Find(x => x.toolSlot == slot && x.IsShooterSlotAble);
+            bool changed = oldItem != item;
 
             if (oldItem != null)
                 oldItem.toolSlot = -1;
@@ -124,19 +154,25 @@ namespace _Emulator
                 item.toolSlot = slot;
 
             GenerateActiveTools();
+            if (changed)
+                SaveChanges();
         }
 
         public void RemoveItem(Item item)
         {
-            equipment.Remove(item);
+            if (equipment.Remove(item))
+            {
+                if (isLocal && !loading)
+                    serverSyncPending = true;
+                SaveChanges();
+            }
             UpdateActiveEquipment();
         }
 
         public void RemoveItem(long seq)
         {
             Item item = equipment.Find(x => x.Seq == seq);
-            equipment.Remove(item);
-            UpdateActiveEquipment();
+            RemoveItem(item);
         }
 
         public void Sort()
@@ -146,22 +182,23 @@ namespace _Emulator
 
         public void GenerateActiveSlots()
         {
-            //activeSlots = new Item[19];
+            Array.Clear(activeSlots, 0, activeSlots.Length);
             List<Item> activeItems = equipment.FindAll(x => x.Usage == Item.USAGE.EQUIP && x.Template.type < TItem.TYPE.SPECIAL);
             equipmentString = new string[activeItems.Count];
             for (int i = 0; i < activeItems.Count; i++)
             {
                 equipmentString[i] = activeItems[i].Code;
                 int index = SlotToIndex(activeItems[i].Template.slot);
-                activeSlots[index] = activeItems[i];
+                if (index >= 0 && index < activeSlots.Length)
+                    activeSlots[index] = activeItems[i];
             }
         }
 
         public void GenerateActiveTools()
         {
-            //shooterTools = new Item[10];
-            List<Item> activeTools = equipment.FindAll(x => x.IsShooterSlotAble && x.toolSlot >= 0);
-            for (int i = 0; i < activeTools.Count && i < shooterTools.Length; i++)
+            Array.Clear(shooterTools, 0, shooterTools.Length);
+            List<Item> activeTools = equipment.FindAll(x => x.IsShooterSlotAble && x.toolSlot >= 0 && x.toolSlot < shooterTools.Length);
+            for (int i = 0; i < activeTools.Count; i++)
             {
                 shooterTools[activeTools[i].toolSlot] = activeTools[i];
             }
@@ -169,10 +206,10 @@ namespace _Emulator
 
         public void GenerateActiveChange()
         {
-            //weaponChg = new Item[10];
-            List<Item> activeChange = equipment.FindAll(x => x.IsWeaponSlotAble && x.toolSlot >= 0);
+            Array.Clear(weaponChg, 0, weaponChg.Length);
+            List<Item> activeChange = equipment.FindAll(x => x.IsWeaponSlotAble && x.toolSlot >= 0 && x.toolSlot < weaponChg.Length);
             weaponChgString = new string[activeChange.Count];
-            for (int i = 0; i < activeChange.Count && i < weaponChg.Length; i++)
+            for (int i = 0; i < activeChange.Count; i++)
             {
                 weaponChgString[i] = activeChange[i].Code;
                 weaponChg[activeChange[i].toolSlot] = activeChange[i];
@@ -184,12 +221,17 @@ namespace _Emulator
             GenerateActiveSlots();
             GenerateActiveTools();
             GenerateActiveChange();
-
-            SaveActiveState();
         }
 
-        // Do not call on server with default path
-        public void Save(string filePath = "Config\\Inventory.json")
+        public void Save(string filePath = null)
+        {
+            if (filePath == null && !isLocal)
+                return;
+
+            SaveInventory(filePath ?? "Config\\Inventory.json");
+        }
+
+        private void SaveInventory(string filePath)
         {
             try
             {
@@ -198,6 +240,7 @@ namespace _Emulator
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath));
 
                 var data = new JsonData();
+                data.SetJsonType(JsonType.Array);
                 foreach (var item in equipment)
                 {
                     var itemData = new JsonData();
@@ -222,7 +265,7 @@ namespace _Emulator
                 };
 
                 JsonMapper.ToJson(data, writer);
-                File.WriteAllText(filePath, stringBuilder.ToString());
+                WriteFileAtomic(filePath, stringBuilder.ToString());
 
                 Debug.Log($"Equipment successfully saved to {filePath}.");
             }
@@ -234,6 +277,23 @@ namespace _Emulator
 
         // Do not call on server with default path
         public void LoadInventoryFromDisk(string filePath = "Config\\Inventory.json")
+        {
+            bool wasLoading = loading;
+            loading = true;
+            try
+            {
+                LoadInventoryFromDiskInternal(filePath);
+            }
+            finally
+            {
+                loading = wasLoading;
+            }
+
+            if (isLocal && !loading)
+                serverSyncPending = true;
+        }
+
+        private void LoadInventoryFromDiskInternal(string filePath)
         {
             // Ensure the directory exists
             Directory.CreateDirectory(Path.GetDirectoryName(filePath));
@@ -270,9 +330,10 @@ namespace _Emulator
 
             else
             {
+                List<Item> previousEquipment = equipment;
                 try
                 {
-                    equipment.Clear();
+                    equipment = new List<Item>();
                     var json = File.ReadAllText(filePath);
                     var data = JsonMapper.ToObject(json);
                     foreach (JsonData item in data)
@@ -300,124 +361,19 @@ namespace _Emulator
                 catch (Exception ex)
                 {
                     Debug.LogError("LoadInventoryFromDisk: " + ex.Message);
+
+                    equipment = previousEquipment;
+
+                    string backupPath = GetBackupPath(filePath);
+                    if (filePath != backupPath && File.Exists(backupPath))
+                    {
+                        LoadInventoryFromDisk(backupPath);
+                        return;
+                    }
                 }
             }
 
             UpdateActiveEquipment();
-        }
-
-
-        private void SaveActiveState(string filePath = activeStatePathDefault)
-        {
-            try
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(filePath));
-
-                // Persist by code so it works across sessions without relying on seq values.
-                var root = new JsonData();
-
-                var equipArr = new JsonData();
-                for (int i = 0; i < activeSlots.Length; i++)
-                    equipArr.Add(activeSlots[i] != null ? activeSlots[i].Code : null);
-
-                var toolsArr = new JsonData();
-                for (int i = 0; i < shooterTools.Length; i++)
-                    toolsArr.Add(shooterTools[i] != null ? shooterTools[i].Code : null);
-
-                var changeArr = new JsonData();
-                for (int i = 0; i < weaponChg.Length; i++)
-                    changeArr.Add(weaponChg[i] != null ? weaponChg[i].Code : null);
-
-                root["activeSlots"] = equipArr;
-                root["shooterTools"] = toolsArr;
-                root["weaponChg"] = changeArr;
-
-                var sb = new StringBuilder();
-                var writer = new JsonWriter(sb)
-                {
-                    PrettyPrint = true,
-                    IndentValue = 2
-                };
-                JsonMapper.ToJson(root, writer);
-                File.WriteAllText(filePath, sb.ToString());
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"Failed to save active state to {filePath}: {ex.Message}");
-            }
-        }
-
-        private void LoadActiveState(string filePath = activeStatePathDefault)
-        {
-            try
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(filePath));
-                if (!File.Exists(filePath))
-                    return;
-
-                var json = File.ReadAllText(filePath);
-                var root = JsonMapper.ToObject(json);
-
-                // Reset existing toolSlot assignments for slot-able items
-                foreach (var it in equipment)
-                {
-                    if (it.IsShooterSlotAble || it.IsWeaponSlotAble)
-                        it.toolSlot = -1;
-                }
-
-                // Apply shooter tools (toolSlot 0..9)
-                if (root.Keys.Contains("shooterTools"))
-                {
-                    var arr = root["shooterTools"];
-                    for (int i = 0; i < arr.Count && i < shooterTools.Length; i++)
-                    {
-                        if (arr[i] == null) continue;
-                        string code = (string)arr[i];
-                        var item = equipment.FirstOrDefault(x => x.Code == code && x.IsShooterSlotAble);
-                        if (item != null)
-                            item.toolSlot = (sbyte)i;
-                    }
-                }
-
-                // Apply weapon change (toolSlot 0..9)
-                if (root.Keys.Contains("weaponChg"))
-                {
-                    var arr = root["weaponChg"];
-                    for (int i = 0; i < arr.Count && i < weaponChg.Length; i++)
-                    {
-                        if (arr[i] == null) continue;
-                        string code = (string)arr[i];
-                        var item = equipment.FirstOrDefault(x => x.Code == code && x.IsWeaponSlotAble);
-                        if (item != null)
-                            item.toolSlot = (sbyte)i;
-                    }
-                }
-
-                // Apply equip slots: mark those codes as EQUIP (only for non-special, like your GenerateActiveSlots filter)
-                if (root.Keys.Contains("activeSlots"))
-                {
-                    // First, clear EQUIP for normal wearable slots (keep SPECIAL logic unchanged)
-                    foreach (var it in equipment)
-                    {
-                        if (it.Template != null && it.Template.type < TItem.TYPE.SPECIAL)
-                            it.Usage = Item.USAGE.UNEQUIP;
-                    }
-
-                    var arr = root["activeSlots"];
-                    for (int i = 0; i < arr.Count && i < activeSlots.Length; i++)
-                    {
-                        if (arr[i] == null) continue;
-                        string code = (string)arr[i];
-                        var item = equipment.FirstOrDefault(x => x.Code == code);
-                        if (item != null && item.Template.type < TItem.TYPE.SPECIAL)
-                            item.Usage = Item.USAGE.EQUIP;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"LoadActiveState: {ex.Message}");
-            }
         }
 
         public static int SlotToIndex(TItem.SLOT slot)

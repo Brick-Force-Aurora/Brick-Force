@@ -1652,7 +1652,12 @@ namespace _Emulator
                     default:
                         break;
                 }
-
+                if (canBuy)
+                {
+                    Item added = msgRef.client.inventory.AddItem(template);
+                    if (added != null)
+                        item = added;
+                }
                 MsgBody body = new MsgBody();
                 body.Write(canBuy ? item.Seq : -3);
                 body.Write(item.Code);
@@ -1660,6 +1665,9 @@ namespace _Emulator
                 body.Write(Convert.ToSByte(item.IsPremium));
                 body.Write(item.Durability);
                 Say(new MsgReference(122, body, msgRef.client, SendType.Unicast));
+
+                if (canBuy)
+                    SendItemPimps(msgRef.client, new List<Item> { item });
 
                 /*MsgBody body = new MsgBody();
                 body.Write(canBuy ? item.Seq : -3);
@@ -1954,7 +1962,8 @@ namespace _Emulator
                     {
                         var item = msgRef.client.inventory.AddItem(template, false, -1, (Item.USAGE)usage);
                         //var item = msgRef.client.inventory.AddItem(template, false, -1, (Item.USAGE)Enum.Parse(typeof(Item.USAGE), usage, true));
-                        item.toolSlot = toolSlot;
+                        if (item != null)
+                            item.toolSlot = toolSlot;
                     }
 
                     catch (Exception ex)
@@ -2111,38 +2120,9 @@ namespace _Emulator
                 ServerDebugger.Log("HandleSetShooterToolRequest from: " + msgRef.client.GetIdentifier());
 
 
-            if (itemSeq < 0)
-            {
-                msgRef.client.inventory.shooterTools[slot].toolSlot = -1;
-                msgRef.client.inventory.shooterTools[slot] = null;
-            }
+            if (slot >= 0 && slot < msgRef.client.inventory.shooterTools.Length)
+                msgRef.client.inventory.AddToolSlot(itemSeq, slot);
 
-            else
-            {
-                Item item = msgRef.client.inventory.equipment.Find(x => x.Seq == itemSeq);
-
-                if (item != null)
-                {
-                    if (item.toolSlot >= 0)
-                    {
-                        Item dupeItem = msgRef.client.inventory.shooterTools[item.toolSlot];
-                        if (dupeItem != null)
-                            msgRef.client.inventory.shooterTools[dupeItem.toolSlot] = null;
-                    }
-
-                    Item oldItem = msgRef.client.inventory.shooterTools[slot];
-                    if (oldItem != null)
-                    {
-                        oldItem.toolSlot = -1;
-                        msgRef.client.inventory.shooterTools[slot] = null;
-                    }
-
-                    item.toolSlot = slot;
-                    msgRef.client.inventory.shooterTools[slot] = item;
-                }
-            }
-
-            msgRef.client.inventory.UpdateActiveEquipment();
             SendShooterToolList(msgRef.client);
             //SendSetShooterTool(msgRef.client, slot, item.Seq);
         }
@@ -2155,37 +2135,9 @@ namespace _Emulator
             if (debugHandle)
                 ServerDebugger.Log("HandleSetWeaponSlotRequest from: " + msgRef.client.GetIdentifier());
 
-            if (itemSeq < 0)
-            {
-                msgRef.client.inventory.weaponChg[slot].toolSlot = -1;
-                msgRef.client.inventory.weaponChg[slot] = null;
-            }
+            if (slot >= 0 && slot < msgRef.client.inventory.weaponChg.Length)
+                msgRef.client.inventory.AddWeaponSlot(itemSeq, (sbyte)slot);
 
-            else
-            {
-                Item item = msgRef.client.inventory.equipment.Find(x => x.Seq == itemSeq);
-                if (item != null)
-                {
-                    if (item.toolSlot >= 0)
-                    {
-                        Item dupeItem = msgRef.client.inventory.weaponChg[item.toolSlot];
-                        if (dupeItem != null)
-                            msgRef.client.inventory.weaponChg[dupeItem.toolSlot] = null;
-                    }
-
-                    Item oldItem = msgRef.client.inventory.weaponChg[slot];
-                    if (oldItem != null)
-                    {
-                        oldItem.toolSlot = -1;
-                        msgRef.client.inventory.shooterTools[slot] = null;
-                    }
-
-                    item.toolSlot = (sbyte)slot;
-                    msgRef.client.inventory.shooterTools[slot] = item;
-                }
-            }
-
-            msgRef.client.inventory.GenerateActiveChange();
             SendWeaponSlotList(msgRef.client);
             //SendSetWeaponSlot(msgRef.client, slot, item.Seq);
         }
@@ -2208,7 +2160,11 @@ namespace _Emulator
             msgRef.msg._msg.Read(out string code);
 
             Item item = msgRef.client.inventory.equipment.Find((t) => t.Seq == seq);
-
+            if (item == null || !(item.Template is TSpecial))
+            {
+                ServerDebugger.LogWarning("HandleChargeForcePoint: Item " + seq + " (" + code + ") not found for " + msgRef.client.GetIdentifier());
+                return;
+            }
             ServerDebugger.LogWarning("Found Item: " + item.Code + item.IsAmount + " amount: " + item.Amount);
             item.Amount = item.Amount - 1;
             ServerDebugger.LogWarning("New Amount " + item.Amount);
@@ -2807,9 +2763,9 @@ namespace _Emulator
                 ServerDebugger.Log("Broadcasted SendRadioMsg for room no: " + matchData.room.No);
         }
 
-        public void SendItemPimps(ClientReference client)
+        public void SendItemPimps(ClientReference client, List<Item> items = null)
         {
-            List<Item> weapons = client.inventory.equipment.FindAll(x => x.Template.type == TItem.TYPE.WEAPON);
+            List<Item> weapons = (items ?? client.inventory.equipment).FindAll(x => x.Template.type == TItem.TYPE.WEAPON);
             for (int i = 0; i < weapons.Count; i++)
             {
                 SendItemPimp(client, weapons[i], PIMP.PROP_ATK_POW, 10);
@@ -2940,30 +2896,36 @@ namespace _Emulator
 
         public void SendEquip(ClientReference client, long itemSeq, string code)
         {
-            MsgBody body = new MsgBody();
+            SendEquipChange(36, client, itemSeq, code);
 
+            if (debugSend)
+                ServerDebugger.Log("SendEquip for client " + client.GetIdentifier());
+        }
+
+        private void SendEquipChange(ushort id, ClientReference client, long itemSeq, string code)
+        {
+            MsgBody body = new MsgBody();
             body.Write(client.seq);
             body.Write(itemSeq);
             body.Write(code);
+            Say(new MsgReference(id, body, client, SendType.Unicast));
 
-            Say(new MsgReference(36, body, client, SendType.Broadcast));
-
-            if (debugSend)
-                ServerDebugger.Log("Broadcasted SendEquip for client " + client.GetIdentifier() + " for room no: ");
+            if (client.matchData != null && client.clientStatus >= ClientReference.ClientStatus.Room)
+            {
+                MsgBody roomBody = new MsgBody();
+                roomBody.Write(client.seq);
+                roomBody.Write(itemSeq);
+                roomBody.Write(code);
+                Say(new MsgReference(id, roomBody, client, SendType.BroadcastRoomExclusive, client.matchData.channel, client.matchData));
+            }
         }
 
         public void SendUnequip(ClientReference client, long itemSeq, string code)
         {
-            MsgBody body = new MsgBody();
-
-            body.Write(client.seq);
-            body.Write(itemSeq);
-            body.Write(code);
-
-            Say(new MsgReference(38, body, client, SendType.Broadcast));
+            SendEquipChange(38, client, itemSeq, code);
 
             if (debugSend)
-                ServerDebugger.Log("Broadcasted SendUnequip for client " + client.GetIdentifier() + " for room no: ");
+                ServerDebugger.Log("SendUnequip for client " + client.GetIdentifier());
         }
 
         public void SendInventoryRequest(ClientReference client)
@@ -4985,8 +4947,8 @@ namespace _Emulator
             msgRef.client.lastOpenedChestSeq = -1;
             //update chest?
             //update inv
-            msgRef.client.inventory.Apply();
-            msgRef.client.inventory.Save();
+            //msgRef.client.inventory.Apply();
+            //msgRef.client.inventory.Save();
             //ClientExtension.instance.SendInventoryData();
         }
 
@@ -5183,15 +5145,18 @@ namespace _Emulator
             Say(new MsgReference(380, msg, msgRef.client, SendType.Unicast));
 
             // 6. Add item to player inventory
-            msgRef.client.inventory.AddItem(template, false, reward.opt * 86400);
-            //ClientExtension.instance.inventory.AddItem(template, false, reward.opt * 86400);
-            //msgRef.client.myInfo.ReceivePrize(
-              //  0,           // seq is ignored by your ReceivePrize implementation unless >0
-             //   code,
-             //   Item.USAGE.NOT_USING,
-             //   amount,
-              //  durability
-            //);
+            Item rewardItem = msgRef.client.inventory.AddItem(template, false, reward.opt * 86400);
+            if (rewardItem != null)
+            {
+                // Same message as a purchase, the client adds the item to its inventory and saves it
+                MsgBody itemAck = new MsgBody();
+                itemAck.Write(rewardItem.Seq);
+                itemAck.Write(rewardItem.Code);
+                itemAck.Write(rewardItem.Template.IsAmount ? rewardItem.Amount : rewardItem.Remain);
+                itemAck.Write(Convert.ToSByte(rewardItem.IsPremium));
+                itemAck.Write(rewardItem.Durability);
+                Say(new MsgReference(122, itemAck, msgRef.client, SendType.Unicast));
+            }
         }
         private void SendChestUpdate(ClientReference client, TcStatus tc)
         {
