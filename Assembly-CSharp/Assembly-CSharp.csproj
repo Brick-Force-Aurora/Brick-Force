@@ -799,6 +799,7 @@
     <Compile Include="_Emulator\Network\Gamemodes\PlayTeamDeathMatch.cs" />
     <Compile Include="_Emulator\Network\Gamemodes\PlayZombie.cs" />
     <Compile Include="_Emulator\Network\ShopEmulator.cs" />
+    <Compile Include="_Emulator\Network\WeaponDrop.cs" />
     <Compile Include="_Emulator\Network\Extension\ClientExtension.cs" />
     <Compile Include="_Emulator\Network\ClientReference.cs" />
     <Compile Include="_Emulator\Network\Extension\ExtensionOpcodes.cs" />

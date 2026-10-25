@@ -30,7 +30,7 @@ namespace _Emulator
             room.isBreakInto = Convert.ToBoolean(parameters[4]);
             match.isBalance = Convert.ToBoolean(parameters[5]);
             match.useBuildGun = Convert.ToBoolean(parameters[6]);
-            room.isDropItem = /*Convert.ToBoolean(parameters[7]);*/ false;
+            room.isDropItem = Convert.ToBoolean(parameters[7]);
 
             UnpackTimerOption(room.timelimit, out int buildTime, out int battleTime, out int repeats);
             match.buildPhaseTime = buildTime;

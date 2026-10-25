@@ -28,7 +28,7 @@ namespace _Emulator
             room.isBreakInto = Convert.ToBoolean(parameters[4]);
             match.isBalance = Convert.ToBoolean(parameters[5]);
             room.isWanted = Convert.ToBoolean(parameters[6]);
-            room.isDropItem = /*Convert.ToBoolean(parameters[7]);*/ false;
+            room.isDropItem = Convert.ToBoolean(parameters[7]);
             match.useBuildGun = false;
         }
 

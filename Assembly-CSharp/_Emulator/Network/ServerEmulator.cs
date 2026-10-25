@@ -35,6 +35,8 @@ namespace _Emulator
         private BrickManager brickManager;
         private TItemManager tItemManager;
         private bool waitForShutDown = false;
+        private const int WeaponDropLifetimeMs = 60000;
+        private const int WeaponDropMaxPerRoom = 64;
 
         public readonly IGameMode[] gameModes;
         public readonly BuildMapEdit buildMapEdit;
@@ -160,6 +162,8 @@ namespace _Emulator
             register(MessageId.CS_MISSION_POINT_REQ, HandleMissionPointRequest);
             register(MessageId.CS_GET_TRAIN_REQ, HandleGetTrainRequest);
             register(MessageId.CS_EMPTY_TRAIN_REQ, HandleEmptyTrainRequest);
+            register(MessageId.CS_DROP_ITEM_REQ, HandleDropRequest);
+            register(MessageId.CS_PICKUP_DROPPED_ITEM_REQ, HandlePickupRequest);
 
             registerCustom(ExtensionOpcodes.opInventoryAck, HandleInventoryData);
             registerCustom(ExtensionOpcodes.opDisconnectReq, HandleDisconnect);
@@ -915,6 +919,7 @@ namespace _Emulator
 
             if (msgRef.client.seq == matchData.masterSeq)
             {
+                RemoveExpiredWeaponDrops(matchData);
                 matchData.remainTime = remainTime;
                 matchData.playTime = playTime;
             }
@@ -1568,6 +1573,22 @@ namespace _Emulator
 
                 SendCannons(msgRef.client);
                 SendTrains(msgRef.client);
+                if (matchData.droppedWeapons.Count == 0)
+                    return;
+
+                MsgBody body = new MsgBody();
+                body.Write(matchData.droppedWeapons.Count);
+                foreach (WeaponDrop drop in matchData.droppedWeapons.Values)
+                {
+                    body.Write(drop.seq);
+                    body.Write(drop.code);
+                    body.Write(drop.ammo);
+                    body.Write(drop.ammo2);
+                    body.Write(drop.x);
+                    body.Write(drop.y);
+                    body.Write(drop.z);
+                }
+                Say(new MsgReference(531, body, msgRef.client));
             }
         }
 
@@ -5282,6 +5303,98 @@ namespace _Emulator
                 ServerDebugger.Log($"Version check succeeded, got host version {Core.VersionStr} and client version {clientVersion}");
             }
             Say(new MsgReference(ExtensionOpcodes.opVersionCheckAck, new MsgBody(), client));
+        }
+
+        private void HandleDropRequest(MsgReference msgRef)
+        {
+            MatchData data = msgRef.matchData;
+            msgRef.msg._msg.Read(out string code);
+            msgRef.msg._msg.Read(out int ammo);
+            msgRef.msg._msg.Read(out int ammo2);
+            msgRef.msg._msg.Read(out float x);
+            msgRef.msg._msg.Read(out float y);
+            msgRef.msg._msg.Read(out float z);
+
+            if (data == null || !data.room.isDropItem || string.IsNullOrEmpty(code))
+                return;
+
+            while (data.droppedWeapons.Count >= WeaponDropMaxPerRoom)
+            {
+                int oldest = int.MaxValue;
+                foreach (int seq in data.droppedWeapons.Keys)
+                    oldest = Math.Min(oldest, seq);
+                Remove(data, oldest);
+            }
+
+            WeaponDrop drop = new WeaponDrop
+            {
+                seq = data.nextDropSeq++,
+                code = code,
+                ammo = ammo,
+                ammo2 = ammo2,
+                x = x,
+                y = y,
+                z = z,
+                expires = Environment.TickCount + WeaponDropLifetimeMs
+            };
+            data.droppedWeapons.Add(drop.seq, drop);
+
+            MsgBody body = new MsgBody();
+            body.Write(drop.seq);
+            body.Write(drop.code);
+            body.Write(drop.ammo);
+            body.Write(drop.ammo2);
+            body.Write(drop.x);
+            body.Write(drop.y);
+            body.Write(drop.z);
+            Say(new MsgReference(527, body, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+
+        private void HandlePickupRequest(MsgReference msgRef)
+        {
+            MatchData data = msgRef.matchData;
+            msgRef.msg._msg.Read(out int itemSeq);
+
+            if (data == null)
+                return;
+
+            if (!data.droppedWeapons.ContainsKey(itemSeq))
+            {
+                MsgBody fail = new MsgBody();
+                fail.Write(itemSeq);
+                Say(new MsgReference(533, fail, msgRef.client));
+                return;
+            }
+
+            data.droppedWeapons.Remove(itemSeq);
+            MsgBody body = new MsgBody();
+            body.Write(msgRef.client.seq);
+            body.Write(itemSeq);
+            Say(new MsgReference(529, body, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+        }
+
+        public void RemoveExpiredWeaponDrops(MatchData data)
+        {
+            if (data.droppedWeapons.Count == 0)
+                return;
+
+            int now = Environment.TickCount;
+            List<int> gone = new List<int>();
+            foreach (WeaponDrop drop in data.droppedWeapons.Values)
+            {
+                if (now - drop.expires >= 0)
+                    gone.Add(drop.seq);
+            }
+            foreach (int seq in gone)
+                Remove(data, seq);
+        }
+
+        private void Remove(MatchData data, int seq)
+        {
+            data.droppedWeapons.Remove(seq);
+            MsgBody body = new MsgBody();
+            body.Write(seq);
+            Say(new MsgReference(530, body, null, SendType.BroadcastRoom, data.channel, data));
         }
     }
 }

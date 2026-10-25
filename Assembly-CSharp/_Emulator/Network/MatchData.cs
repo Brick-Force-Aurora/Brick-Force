@@ -19,6 +19,8 @@ namespace _Emulator
         public bool isBalance;
         public bool roomCreated;
         public int lastKillLogId = -1;
+        public readonly Dictionary<int, WeaponDrop> droppedWeapons = new Dictionary<int, WeaponDrop>();
+        public int nextDropSeq = 1;
         public List<ClientReference> clientList;
         public List<SlotData> slots;
         public List<SlotData> blueSlots;
@@ -136,6 +138,7 @@ namespace _Emulator
             destroyedBricks.Clear();
             usedCannons.Clear();
             usedTrains.Clear();
+            droppedWeapons.Clear();
             killLog.Clear();
             redKillCount = 0;
             blueKillCount = 0;
@@ -178,6 +181,7 @@ namespace _Emulator
             destroyedBricks.Clear();
             usedCannons.Clear();
             usedTrains.Clear();
+            droppedWeapons.Clear();
             killLog.Clear();
             roundInit = true;
             humanPlayers = new List<int>();
