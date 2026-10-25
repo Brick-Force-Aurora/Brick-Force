@@ -1130,6 +1130,12 @@ namespace _Emulator
             MatchData matchData = msgRef.client.channel.GetMatchByRoomNumber(roomNumber);
             if (roomNumber == matchData.room.No)
             {
+                if (matchData.GetNextFreeSlot() == null)
+                {
+                    SendCustomMessage("The room is full.", msgRef.client, SendType.Unicast);
+                    return;
+                }
+
                 matchData.AddClient(msgRef.client);
 
                 SendJoin(msgRef.client);
@@ -1361,7 +1367,9 @@ namespace _Emulator
             matchData.isBalance = Convert.ToBoolean(teamBalance);
             matchData.room.isDropItem = Convert.ToBoolean(itemPickup);
             matchData.room.CurMapAlias = whereAlias;
+            Room.ROOM_TYPE oldType = matchData.room.Type;
             matchData.room.Type = (Room.ROOM_TYPE)type;
+            bool slotsChanged = matchData.ChangeLayout(oldType);
 
             if ((Room.ROOM_TYPE)type == Room.ROOM_TYPE.BUNGEE)
             {
@@ -1390,6 +1398,16 @@ namespace _Emulator
                 ServerDebugger.Log("HandleRoomConfig from: " + msgRef.client.GetIdentifier());
 
             SendRoomConfig(msgRef.client, SendType.BroadcastRoom);
+
+            if (slotsChanged)
+            {
+                for (sbyte i = 0; i < matchData.slots.Count; i++)
+                    SendSlotLock(msgRef.client, matchData, i, SendType.BroadcastRoom);
+                if (isSteam)
+                    SendSlotDataSteam(matchData);
+                else
+                    SendSlotData(matchData);
+            }
             SendUpdateRoom(matchData);
         }
 

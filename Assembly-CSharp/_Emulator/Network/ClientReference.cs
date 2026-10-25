@@ -257,7 +257,7 @@ namespace _Emulator
 
         public bool AssignSlot(SlotData _slot)
         {
-            if (_slot.isUsed || _slot.isLocked)
+            if (_slot == null || _slot.isUsed || _slot.isLocked)
                 return false;
 
             DetachSlot();

@@ -396,6 +396,10 @@ namespace _Emulator
             is8SlotLayout = (roomType == Room.ROOM_TYPE.BUNGEE || roomType == Room.ROOM_TYPE.MISSION);
             totalSlots = is8SlotLayout ? 8 : 16;
 
+            ApplyLayout();
+            for (int i = totalSlots; i < slots.Count; i++)
+                slots[i].ToggleLock(true);
+
             // DM/Zombie = NO TEAMS
             isTeamMode = !(roomType == Room.ROOM_TYPE.INDIVIDUAL || roomType == Room.ROOM_TYPE.ZOMBIE);
 
@@ -434,43 +438,13 @@ namespace _Emulator
 
         public SlotData GetNextFreeSlot()
         {
-            // 1) Deathmatch style (16 slots)
             if (room.Type == Room.ROOM_TYPE.INDIVIDUAL ||
-                room.Type == Room.ROOM_TYPE.ZOMBIE)
+                room.Type == Room.ROOM_TYPE.ZOMBIE ||
+                room.Type == Room.ROOM_TYPE.BUNGEE)
             {
                 return slots.Find(s => !s.isUsed && !s.isLocked);
             }
 
-            // 2) Bungee or Mission — limit to 8 total players
-            if (room.Type == Room.ROOM_TYPE.BUNGEE ||
-                room.Type == Room.ROOM_TYPE.MISSION)
-            {
-                int totalUsed = slots.FindAll(s => s.isUsed).Count;
-                if (totalUsed >= 8)
-                    return null; // no more allowed
-
-                // Try balance between teams
-                int redCount = redSlots.FindAll(x => x.isUsed).Count;
-                int blueCount = blueSlots.FindAll(x => x.isUsed).Count;
-
-                // Pick team with fewer players
-                if (blueCount >= redCount)
-                {
-                    var redFree = redSlots.Find(x => !x.isUsed && !x.isLocked);
-                    if (redFree != null) return redFree;
-
-                    return blueSlots.Find(x => !x.isUsed && !x.isLocked);
-                }
-                else
-                {
-                    var blueFree = blueSlots.Find(x => !x.isUsed && !x.isLocked);
-                    if (blueFree != null) return blueFree;
-
-                    return redSlots.Find(x => !x.isUsed && !x.isLocked);
-                }
-            }
-
-            // 3) Normal team modes (max 16)
             {
                 int redCount = redSlots.FindAll(x => x.isUsed).Count;
                 int blueCount = blueSlots.FindAll(x => x.isUsed).Count;
@@ -495,41 +469,73 @@ namespace _Emulator
 
         public SlotData GetNextFreeSlotOnOtherTeam(SlotData slot)
         {
-            bool isLimited8 = (room.Type == Room.ROOM_TYPE.BUNGEE ||
-                               room.Type == Room.ROOM_TYPE.MISSION);
+            SlotData free = (slot.isRed ? blueSlots : redSlots).Find(x => !x.isUsed && !x.isLocked);
+            if (free != null)
+                return free;
 
-            // Count globally
-            int totalUsed = slots.FindAll(x => x.isUsed).Count;
-
-            // If in 8-slot mode and already full, no switch possible
-            if (isLimited8 && totalUsed >= 8)
+            if (Uses8SlotLayout)
                 return null;
+            return (slot.isRed ? redSlots : blueSlots).Find(x => !x.isUsed && !x.isLocked);
+        }
 
-            // Player was on Red team (0–7), look for Blue
-            if (slot.slotIndex < 8)
+        public bool Uses8SlotLayout
+        {
+            get { return room.Type == Room.ROOM_TYPE.BUNGEE || room.Type == Room.ROOM_TYPE.MISSION; }
+        }
+
+        public void ApplyLayout()
+        {
+            bool small = Uses8SlotLayout;
+            redSlots = slots.GetRange(0, small ? 4 : 8);
+            blueSlots = slots.GetRange(small ? 4 : 8, small ? 4 : 8);
+            for (int i = 0; i < slots.Count; i++)
+                slots[i].isRed = i < (small ? 4 : 8);
+        }
+
+        public bool ChangeLayout(Room.ROOM_TYPE oldType)
+        {
+            bool wasSmall = oldType == Room.ROOM_TYPE.BUNGEE || oldType == Room.ROOM_TYPE.MISSION;
+            if (wasSmall == Uses8SlotLayout)
+                return false;
+
+            ApplyLayout();
+            for (int i = 0; i < slots.Count; i++)
             {
-                // Try Blue first
-                SlotData freeBlue = blueSlots.Find(x => !x.isUsed && !x.isLocked);
-                if (freeBlue != null)
-                    return freeBlue;
-
-                // If Blue full, fallback Red (only used in normal 16-slot modes)
-                if (!isLimited8)
-                    return redSlots.Find(x => !x.isUsed && !x.isLocked);
-
-                return null;
+                if (Uses8SlotLayout)
+                {
+                    slots[i].isLocked = i >= 8;
+                }
+                else
+                {
+                    slots[i].isLocked = false;
+                }
             }
-            else // Player was on Blue team (8–15), look for Red
+
+            List<ClientReference> homeless = clientList.FindAll(x => x.slot != null && x.slot.isLocked);
+            foreach (ClientReference client in homeless)
             {
-                SlotData freeRed = redSlots.Find(x => !x.isUsed && !x.isLocked);
-                if (freeRed != null)
-                    return freeRed;
-
-                if (!isLimited8)
-                    return blueSlots.Find(x => !x.isUsed && !x.isLocked);
-
-                return null;
+                client.slot.isUsed = false;
+                client.slot.client = null;
+                client.slot = null;
             }
+            foreach (ClientReference client in homeless)
+            {
+                SlotData free = GetNextFreeSlot();
+                if (free == null)
+                {
+                    Debug.LogWarning("ChangeLayout: no free slot left for " + client.GetIdentifier());
+                    continue;
+                }
+                client.AssignSlot(free);
+            }
+
+            for (int i = 0; i < slots.Count; i++)
+            {
+                if (slots[i].isUsed)
+                    slots[i].isLocked = false;
+            }
+            room.MaxPlayer = slots.FindAll(x => !x.isLocked).Count;
+            return true;
         }
 
         public SlotData FindSlotByClient(ClientReference client)
