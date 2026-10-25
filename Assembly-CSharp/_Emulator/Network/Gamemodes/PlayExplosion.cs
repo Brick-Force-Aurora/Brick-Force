@@ -47,6 +47,7 @@ namespace _Emulator
             msgRef.msg._msg.Read(out int ny);
             msgRef.msg._msg.Read(out int nz);
             MatchData data = msgRef.matchData;
+            data.bombPlanted = true;
             MsgBody msg = new MsgBody();
             msg.Write(msgRef.client.seq); //Installer
             msg.Write(bomb); //target

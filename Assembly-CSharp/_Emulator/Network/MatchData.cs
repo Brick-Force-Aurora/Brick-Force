@@ -75,6 +75,7 @@ namespace _Emulator
         //Defusion
         public List<int> deadRedPlayers = new List<int>();
         public List<int> deadBluePlayers = new List<int>();
+        public bool bombPlanted;
 
         public MatchData()
         {
@@ -170,6 +171,7 @@ namespace _Emulator
             zombieCurrentRound = 1;
             deadRedPlayers.Clear();
             deadBluePlayers.Clear();
+            bombPlanted = false;
         }
 
         // Method to reset data for a new round
@@ -197,6 +199,7 @@ namespace _Emulator
             }
             deadRedPlayers.Clear();
             deadBluePlayers.Clear();
+            bombPlanted = false;
         }
 
         public void Shutdown()

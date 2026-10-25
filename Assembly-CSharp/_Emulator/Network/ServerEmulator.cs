@@ -935,7 +935,8 @@ namespace _Emulator
             }
             else if (matchData.room.type == Room.ROOM_TYPE.EXPLOSION)
             {
-                if (matchData.remainTime <= 0)
+                // A planted bomb ends the round by blast or defuse, not by the timer
+                if (matchData.remainTime <= 0 && !matchData.bombPlanted)
                 {
                     if (matchData.redScore >= matchData.room.goal || matchData.blueScore >= matchData.room.goal)
                     {
@@ -1891,23 +1892,25 @@ namespace _Emulator
                         if((Weapon.BY)weaponBy == Weapon.BY.CLOCKBOMB)
                             break;
 
-                        int totalRed = matchData.redSlots.Count(x => x.isUsed);
-                        int totalBlue = matchData.blueSlots.Count(x => x.isUsed);
+                        // redSlots (0-7) are the planting team, their deaths are filed in deadBluePlayers above
+                        int totalPlanters = matchData.redSlots.Count(x => x.isUsed);
+                        int totalDefenders = matchData.blueSlots.Count(x => x.isUsed);
 
-                        int deadRed = matchData.deadRedPlayers.Count;
-                        int deadBlue = matchData.deadBluePlayers.Count;
+                        int deadPlanters = matchData.deadBluePlayers.Count;
+                        int deadDefenders = matchData.deadRedPlayers.Count;
 
                         //SendScore!!
 
                         // DEBUG:
-                        ServerDebugger.Log($"Explosion check wipe - Red: {deadRed}/{totalRed}, Blue: {deadBlue}/{totalBlue}");
+                        ServerDebugger.Log($"Explosion check wipe - Planters: {deadPlanters}/{totalPlanters}, Defenders: {deadDefenders}/{totalDefenders}, bombPlanted: {matchData.bombPlanted}");
 
-                        if (deadBlue >= totalBlue)
+                        // With the bomb planted the defenders have to defuse it, so dead planters do not end the round
+                        if (deadPlanters >= totalPlanters && !matchData.bombPlanted)
                         {
                             matchData.blueScore++;
                             playExplosion.HandleRoundEnd(msgRef, 1);
                         }
-                        else if (deadRed >= totalRed)
+                        else if (deadDefenders >= totalDefenders)
                         {
                             matchData.redScore++;
                             playExplosion.HandleRoundEnd(msgRef, 0); 
