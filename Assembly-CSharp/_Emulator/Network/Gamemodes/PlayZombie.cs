@@ -105,10 +105,10 @@ namespace _Emulator
             }
 
             msg.Write(status);
-            msg.Write(data.playTime);
-            msg.Write(data.zombieCountdown);
+            msg.Write(time);
+            msg.Write(countDown);
 
-            ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_ZOMBIE_STATUS_ACK, msg, msgRef.client, SendType.BroadcastRoom, data.channel, data));
+            ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_ZOMBIE_STATUS_ACK, msg, msgRef.client, SendType.BroadcastRoomExclusive, data.channel, data));
         }
 
         public void HandleZombieObserverRequest(MsgReference msgRef)
