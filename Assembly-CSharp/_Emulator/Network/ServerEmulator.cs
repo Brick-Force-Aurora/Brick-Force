@@ -1610,7 +1610,6 @@ namespace _Emulator
             msgBody.Read(out int buyHow);
             msgBody.Read(out int option);
             msgBody.Read(out byte val);
-            //TODO needEquip
             msgBody.Read(out bool needEqup);
             //seq is error code or unique id
             //Read(out long val); seq
@@ -1686,6 +1685,9 @@ namespace _Emulator
 
                 if (canBuy)
                     SendItemPimps(msgRef.client, new List<Item> { item });
+
+                if (canBuy && needEqup)
+                    EquipItem(msgRef.client, item);
 
                 /*MsgBody body = new MsgBody();
                 body.Write(canBuy ? item.Seq : -3);
@@ -2006,43 +2008,45 @@ namespace _Emulator
 
             Item item = msgRef.client.inventory.equipment.Find(x => x.Seq == itemSeq);
             if (item != null)
+                EquipItem(msgRef.client, item);
+        }
+
+        private void EquipItem(ClientReference client, Item item)
+        {
+            if (!item.IsEquipable)
+                return;
+
+            int index = Inventory.SlotToIndex(item.Template.slot);
+            if (index != -1 && index < client.inventory.activeSlots.Length)
             {
-                if (!item.IsEquipable)
-                    return;
-
-                int index = Inventory.SlotToIndex(item.Template.slot);
-                if (index != -1 && index < msgRef.client.inventory.activeSlots.Length)
+                Item oldItem = client.inventory.activeSlots[index];
+                if (oldItem != null)
                 {
-                    Item oldItem = msgRef.client.inventory.activeSlots[index];
-                    if (oldItem != null)
-                    {
-                        oldItem.Usage = Item.USAGE.UNEQUIP;
-                        msgRef.client.inventory.activeSlots[index] = null;
-                        SendUnequip(msgRef.client, oldItem.Seq, oldItem.Code);
-                    }
+                    oldItem.Usage = Item.USAGE.UNEQUIP;
+                    client.inventory.activeSlots[index] = null;
+                    SendUnequip(client, oldItem.Seq, oldItem.Code);
                 }
-
-                if (item.Code == "s92" || item.Code == "s09" || item.Code == "s08" || item.Code == "s07")
-                {
-                    string[] targetCodes = { "s92", "s09", "s08", "s07" };
-
-                    // Find and unequip any items with matching codes in equipment
-                    foreach (string code in targetCodes)
-                    {
-                        Item equippedItem = msgRef.client.inventory.equipment.Find(x => x.Code == code);
-                        if (equippedItem != null)
-                        {
-                            equippedItem.Usage = Item.USAGE.UNEQUIP;
-                            SendUnequip(msgRef.client, equippedItem.Seq, equippedItem.Code);
-                        }
-                    }
-                }
-
-                item.Usage = Item.USAGE.EQUIP;
-                msgRef.client.inventory.GenerateActiveSlots();
-
-                SendEquip(msgRef.client, item.Seq, item.Code);
             }
+
+            if (item.Code == "s92" || item.Code == "s09" || item.Code == "s08" || item.Code == "s07")
+            {
+                string[] targetCodes = { "s92", "s09", "s08", "s07" };
+
+                foreach (string code in targetCodes)
+                {
+                    Item equippedItem = client.inventory.equipment.Find(x => x.Code == code);
+                    if (equippedItem != null)
+                    {
+                        equippedItem.Usage = Item.USAGE.UNEQUIP;
+                        SendUnequip(client, equippedItem.Seq, equippedItem.Code);
+                    }
+                }
+            }
+
+            item.Usage = Item.USAGE.EQUIP;
+            client.inventory.GenerateActiveSlots();
+
+            SendEquip(client, item.Seq, item.Code);
         }
 
         private void HandleUnequipRequest(MsgReference msgRef)
