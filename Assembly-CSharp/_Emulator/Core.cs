@@ -93,6 +93,8 @@ namespace _Emulator
             Application.runInBackground = true;
             BuildOption.Instance.Props.UseP2pHolePunching = true;
             BuildOption.Instance.Props.isDuplicateExcuteAble = true;
+            BuildOption.Instance.Props.escapeMode = true;
+            BuildOption.Instance.Props.Awake();
         }
 
 
