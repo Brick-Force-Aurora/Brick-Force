@@ -351,14 +351,14 @@ namespace _Emulator
 		public void hPimpManagerLoad()
 		{
 			PimpManager.Instance.LoadFromLocalFileSystem();
-			PimpManager.Instance.updateValue((int)UPGRADE_CAT.HANDGUN, (int)PIMP.PROP_RPM, 9, 400);
+			/*PimpManager.Instance.updateValue((int)UPGRADE_CAT.HANDGUN, (int)PIMP.PROP_RPM, 9, 400);
 			for (PIMP pimp = PIMP.PROP_ATK_POW; pimp < PIMP.PROP_MAX; pimp++)
 			{
 				for (int lv = 0; lv < 10; lv++)
 				{
 					PimpManager.Instance.updateValue((int)UPGRADE_CAT.OTHER, (int)pimp, lv, 0f);
 				}
-			}
+			}*/
 		}
 
 		private void hP2PManagerReliableSend(uint to, byte id, P2PMsgBody mb)
