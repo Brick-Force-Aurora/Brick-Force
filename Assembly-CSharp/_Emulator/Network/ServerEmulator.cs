@@ -2825,12 +2825,14 @@ namespace _Emulator
             List<Item> weapons = (items ?? client.inventory.equipment).FindAll(x => x.Template.type == TItem.TYPE.WEAPON);
             for (int i = 0; i < weapons.Count; i++)
             {
-                SendItemPimp(client, weapons[i], PIMP.PROP_ATK_POW, 10);
-                SendItemPimp(client, weapons[i], PIMP.PROP_ACCURACY, 10);
-                SendItemPimp(client, weapons[i], PIMP.PROP_RECOIL, 10);
-                SendItemPimp(client, weapons[i], PIMP.PROP_RPM, 10);
-                SendItemPimp(client, weapons[i], PIMP.PROP_AMMO_MAX, 10);
-                SendItemPimp(client, weapons[i], PIMP.PROP_ATTACK_SPEED, 10);
+                if (weapons[i].Template.upgradeCategory == TItem.UPGRADE_CATEGORY.NONE)
+                    continue;
+
+                for (int prop = 0; prop < weapons[i].upgradeProps.Length; prop++)
+                {
+                    if (UpgradePropManager.Instance.UseProp((int)weapons[i].Template.upgradeCategory, prop))
+                        SendItemPimp(client, weapons[i], (PIMP)prop, 10);
+                }
             }
         }
 
