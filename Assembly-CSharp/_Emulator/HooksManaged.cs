@@ -351,6 +351,11 @@ namespace _Emulator
 		public void hPimpManagerLoad()
 		{
 			PimpManager.Instance.LoadFromLocalFileSystem();
+			// Hand guns: +20 rpm per level (+200 at level 10) instead of +10 per level from pimp.txt
+			for (int lv = 0; lv < 10; lv++)
+			{
+				PimpManager.Instance.updateValue((int)UPGRADE_CAT.HANDGUN, (int)PIMP.PROP_RPM, lv, 20 * (lv + 1));
+			}
 			/*PimpManager.Instance.updateValue((int)UPGRADE_CAT.HANDGUN, (int)PIMP.PROP_RPM, 9, 400);
 			for (PIMP pimp = PIMP.PROP_ATK_POW; pimp < PIMP.PROP_MAX; pimp++)
 			{
