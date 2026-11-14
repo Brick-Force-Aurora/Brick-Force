@@ -320,6 +320,18 @@ public class EquipCoordinator : MonoBehaviour
 		return true;
 	}
 
+	private void SetLeftWeaponItemSeq(long itemSeq)
+	{
+		if (WeaponLeft != null)
+		{
+			WeaponFunction component = WeaponLeft.GetComponent<WeaponFunction>();
+			if (null != component)
+			{
+				component.ItemSeq = itemSeq;
+			}
+		}
+	}
+
 	public bool PickupFromFromInstance(long itemSeq)
 	{
 		Item itemBySequence = MyInfoManager.Instance.GetItemBySequence(itemSeq);
@@ -352,6 +364,7 @@ public class EquipCoordinator : MonoBehaviour
 			return false;
 		}
 		component.ItemSeq = itemSeq;
+		SetLeftWeaponItemSeq(itemSeq);
 		equipments[(int)weaponType] = gameObject;
 		prevWeaponType = -1;
 		currentWeaponType = (int)weaponType;
@@ -1053,6 +1066,7 @@ public class EquipCoordinator : MonoBehaviour
 			if (!(null == component))
 			{
 				component.ItemSeq = itemSeq;
+				SetLeftWeaponItemSeq(itemSeq);
 				equipments[weaponType] = gameObject;
 				prevWeaponType = -1;
 				currentWeaponType = weaponType;
