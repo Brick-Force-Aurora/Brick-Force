@@ -164,6 +164,8 @@ namespace _Emulator
             register(MessageId.CS_EMPTY_TRAIN_REQ, HandleEmptyTrainRequest);
             register(MessageId.CS_DROP_ITEM_REQ, HandleDropRequest);
             register(MessageId.CS_PICKUP_DROPPED_ITEM_REQ, HandlePickupRequest);
+            register(MessageId.CS_INDIVIDUAL_SCORE_REQ, HandleIndividualScoreRequest);
+            register(MessageId.CS_BUNGEE_SCORE_REQ, HandleBungeeScoreRequest);
 
             registerCustom(ExtensionOpcodes.opInventoryAck, HandleInventoryData);
             registerCustom(ExtensionOpcodes.opDisconnectReq, HandleDisconnect);
@@ -5301,6 +5303,33 @@ namespace _Emulator
 
             if (debugHandle)
                 ServerDebugger.Log("HandleKickRequest: " + msgRef.client.GetIdentifier() + " kicked " + target.GetIdentifier());
+        }
+
+        private void SendInt(MessageId id, int value, ClientReference client)
+        {
+            MsgBody body = new MsgBody();
+            body.Write(value);
+            Say(new MsgReference(id, body, client));
+        }
+
+        private void HandleIndividualScoreRequest(MsgReference msgRef)
+        {
+            MatchData match = msgRef.client.matchData;
+            if (match == null)
+                return;
+
+            // The escape mode listens to its own message
+            MessageId id = match.room.Type == Room.ROOM_TYPE.ESCAPE ? MessageId.CS_ESCAPE_SCORE_ACK : MessageId.CS_INDIVIDUAL_SCORE_ACK;
+            SendInt(id, match.redScore, msgRef.client);
+        }
+
+        private void HandleBungeeScoreRequest(MsgReference msgRef)
+        {
+            MatchData match = msgRef.client.matchData;
+            if (match == null)
+                return;
+
+            SendInt(MessageId.CS_BUNGEE_SCORE_ACK, match.redScore, msgRef.client);
         }
 
         private void HandleVersionCheck(MsgReference msg)
