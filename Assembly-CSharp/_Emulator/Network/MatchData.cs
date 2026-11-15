@@ -32,6 +32,10 @@ namespace _Emulator
         public ChannelReference channel;
         public Room room;
 
+        // Sense bomb gadgets: gadget seq -> owner seq
+        public readonly Dictionary<int, int> gadgets = new Dictionary<int, int>();
+        public int nextGadgetSeq = 1;
+
         //Killcount (CTF, Defusion)
         public int redKillCount;
         public int blueKillCount;
@@ -172,6 +176,7 @@ namespace _Emulator
             deadRedPlayers.Clear();
             deadBluePlayers.Clear();
             bombPlanted = false;
+            gadgets.Clear();
         }
 
         // Method to reset data for a new round
@@ -200,6 +205,7 @@ namespace _Emulator
             deadRedPlayers.Clear();
             deadBluePlayers.Clear();
             bombPlanted = false;
+            gadgets.Clear();
         }
 
         public void Shutdown()

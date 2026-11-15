@@ -166,6 +166,8 @@ namespace _Emulator
             register(MessageId.CS_PICKUP_DROPPED_ITEM_REQ, HandlePickupRequest);
             register(MessageId.CS_INDIVIDUAL_SCORE_REQ, HandleIndividualScoreRequest);
             register(MessageId.CS_BUNGEE_SCORE_REQ, HandleBungeeScoreRequest);
+            register(MessageId.CS_INSTALL_GADGET_REQ, HandleInstallGadgetRequest);
+            register(MessageId.CS_GADGET_ACTION_REQ, HandleGadgetActionRequest);
 
             registerCustom(ExtensionOpcodes.opInventoryAck, HandleInventoryData);
             registerCustom(ExtensionOpcodes.opDisconnectReq, HandleDisconnect);
@@ -5330,6 +5332,64 @@ namespace _Emulator
                 return;
 
             SendInt(MessageId.CS_BUNGEE_SCORE_ACK, match.redScore, msgRef.client);
+        }
+
+        private void HandleInstallGadgetRequest(MsgReference msgRef)
+        {
+            ClientReference client = msgRef.client;
+            MatchData match = client.matchData;
+            if (match == null)
+                return;
+
+            MsgBody request = msgRef.msg._msg;
+            request.Read(out int gadget);
+            request.Read(out float px);
+            request.Read(out float py);
+            request.Read(out float pz);
+            request.Read(out float nx);
+            request.Read(out float ny);
+            request.Read(out float nz);
+
+            int gadgetSeq = match.nextGadgetSeq++;
+            match.gadgets[gadgetSeq] = client.seq;
+
+            MsgBody body = new MsgBody();
+            body.Write(gadgetSeq);
+            body.Write(gadget);
+            body.Write(0);
+            body.Write(client.seq);
+            body.Write(px);
+            body.Write(py);
+            body.Write(pz);
+            body.Write(nx);
+            body.Write(ny);
+            body.Write(nz);
+            Say(new MsgReference(MessageId.CS_GADGET_ACK, body, null, SendType.BroadcastRoom, match.channel, match));
+        }
+
+        private void HandleGadgetActionRequest(MsgReference msgRef)
+        {
+            ClientReference client = msgRef.client;
+            MatchData match = client.matchData;
+            if (match == null)
+                return;
+
+            msgRef.msg._msg.Read(out int gadgetSeq);
+            msgRef.msg._msg.Read(out int action);
+
+            // Only the owner can detonate a gadget, and only once
+            if (!match.gadgets.TryGetValue(gadgetSeq, out int owner) || owner != client.seq)
+                return;
+            match.gadgets.Remove(gadgetSeq);
+
+            MsgBody actionBody = new MsgBody();
+            actionBody.Write(gadgetSeq);
+            actionBody.Write(action);
+            Say(new MsgReference(MessageId.CS_GADGET_ACTION_ACK, actionBody, client));
+
+            MsgBody removeBody = new MsgBody();
+            removeBody.Write(gadgetSeq);
+            Say(new MsgReference(MessageId.CS_GADGET_REMOVE_ACK, removeBody, null, SendType.BroadcastRoom, match.channel, match));
         }
 
         private void HandleVersionCheck(MsgReference msg)
