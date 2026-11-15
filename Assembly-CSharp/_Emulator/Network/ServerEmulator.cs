@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Steamworks;
 using static Room;
@@ -257,6 +258,12 @@ namespace _Emulator
         private volatile int tps = 0;
         public int TPS { get => tps; }
 
+        [DllImport("winmm.dll")]
+        private static extern uint timeBeginPeriod(uint period);
+
+        [DllImport("winmm.dll")]
+        private static extern uint timeEndPeriod(uint period);
+
         private void WorkerLoop()
         {
             ServerDebugger.Log($"Worker started. ThreadId={Thread.CurrentThread.ManagedThreadId} Name={Thread.CurrentThread.Name} IsBackground={Thread.CurrentThread.IsBackground}");
@@ -265,6 +272,9 @@ namespace _Emulator
             Stopwatch watch = new Stopwatch();
             long delta = 0;
             long frequency = (long)Math.Floor(Stopwatch.Frequency / 120d), remaining;
+            long ticksPerMs = Stopwatch.Frequency / 1000;
+            // Without this Thread.Sleep(1) can take up to 15 ms on Windows
+            try { timeBeginPeriod(1); } catch (Exception) { }
             int tick = 0;
             long second = 0;
             watch.Start();
@@ -286,22 +296,22 @@ namespace _Emulator
                 {
                     break;
                 }
+                // Sleep through most of the tick and only spin for the last 2 ms.
+                // The old loop compared ticks to a 10 ms threshold although a tick is only 8.3 ms,
+                // so it never slept and kept one core at 100 % for the whole match.
                 remaining = frequency - watch.ElapsedTicks;
-                while (remaining > MS * 10)
+                while (remaining > ticksPerMs * 2)
                 {
-                    Thread.Sleep((int)(remaining - MS * 5));
+                    Thread.Sleep(1);
                     remaining = frequency - watch.ElapsedTicks;
                 }
-                if (remaining < MS)
+                while (remaining > 0)
                 {
-                    continue;
-                }
-                while (remaining > MS)
-                {
-                    Thread.SpinWait((int) (remaining * 0.025));
+                    Thread.SpinWait(50);
                     remaining = frequency - watch.ElapsedTicks;
                 }
             }
+            try { timeEndPeriod(1); } catch (Exception) { }
         }
 
         private void WorkerDoWork(int currentTick, float deltaTicks)
@@ -1833,13 +1843,11 @@ namespace _Emulator
                     {
                         ClientReference assistClient = matchData.clientList.Find(x => x.seq == entry.Key);
                         assistClient.assists++;
-                        assistClient.score += entry.Value;
                         SendAssistCount(assistClient);
                     }
 
                     else
                     {
-                        killerClient.score += entry.Value;
                         SendRoundScore(killerClient);
                     }
 
@@ -4948,65 +4956,85 @@ namespace _Emulator
                 ServerDebugger.LogVerbose("HandleCoreHPReq for room no " + matchData.room.No + " " + msgRef.client.GetIdentifier());
         }
 
+        // 1 score per 7 damage dealt
+        private const int DamagePerScore = 7;
+        private const int MaxDamagePerReport = 1000;
+        // Match end rewards per score point (same ratios the zombie mode used before)
+        private const float PointsPerScore = 0.4f;
+        private const float XpPerScore = 0.5f;
+
+        // The victim reports the damage it took, keyed by the attacker, so the score belongs to the attackers
         private void HandleInflictedDamage(MsgReference msgRef)
         {
-            ClientReference client = msgRef.client;
+            ClientReference victim = msgRef.client;
             MatchData matchData = msgRef.matchData;
-
-            // How many entries the client sends
-            msgRef.msg._msg.Read(out int count);
-
-            if (count <= 0)
+            if (matchData == null)
                 return;
 
-            int totalDamage = 0;
+            msgRef.msg._msg.Read(out int count);
+
+            bool teamRoom = matchData.room.Type == Room.ROOM_TYPE.TEAM_MATCH
+                || matchData.room.Type == Room.ROOM_TYPE.CAPTURE_THE_FLAG
+                || matchData.room.Type == Room.ROOM_TYPE.EXPLOSION
+                || matchData.room.Type == Room.ROOM_TYPE.BND;
 
             for (int i = 0; i < count; i++)
             {
-                msgRef.msg._msg.Read(out int targetSeq);
+                msgRef.msg._msg.Read(out int attackerSeq);
                 msgRef.msg._msg.Read(out int damage);
 
-                // Ignore invalid data
-                if (damage <= 0)
+                if (damage <= 0 || attackerSeq == victim.seq)
                     continue;
 
-                // Damage must be applied to someone inside the same match
-                ClientReference target = matchData.clientList.Find(x => x.seq == targetSeq);
-                if (target == null)
+                ClientReference attacker = matchData.clientList.Find(x => x.seq == attackerSeq);
+                if (attacker == null)
                     continue;
 
-                // Prevent cheating (client should never send huge values)
-                if (damage > 200)
-                    damage = 200;
+                // No score for hurting the own team
+                if (teamRoom && attacker.slot != null && victim.slot != null && attacker.slot.isRed == victim.slot.isRed)
+                    continue;
 
-                totalDamage += damage;
+                if (damage > MaxDamagePerReport)
+                    damage = MaxDamagePerReport;
+
+                // Keep the remainder so small hits are neither lost nor rounded up
+                int total = attacker.damageCarry + damage;
+                int reward = total / DamagePerScore;
+                attacker.damageCarry = total % DamagePerScore;
+                if (reward <= 0)
+                    continue;
+
+                attacker.score += reward;
+                SendRoundScore(attacker);
             }
+        }
 
-            if (totalDamage <= 0)
-                return;
+        // Called once by every game mode right before it sends the match results
+        public void ApplyMatchRewards(MatchData matchData)
+        {
+            foreach (ClientReference client in matchData.clientList)
+            {
+                int points = (int)(client.score * PointsPerScore);
+                int xp = (int)(client.score * XpPerScore);
 
-            // -----------------------------------------
-            //  REWARD CALCULATION (DAMAGE ONLY)
-            // -----------------------------------------
-            // Brick-Force rewarded small score per damage point.
-            // Recommended balanced value:
-            //
-            // 1 score per ~7 damage.
-            //
-            // Damage reward formula:
-            int reward = Math.Max(1, totalDamage / 7);
+                client.rewardPoints = points;
+                client.rewardXp = xp;
+                client.rewardPrevXp = client.data.xp;
+                client.data.xp = (int)Math.Min((long)client.data.xp + xp, int.MaxValue);
+                client.rewardNextXp = client.data.xp;
+                client.data.forcePoints = (int)Math.Min((long)client.data.forcePoints + points, int.MaxValue);
 
-            // Add to overall player score
-            client.score += reward;
-
-            // Optionally: ServerDebugger log
-            // ServerDebugger.Log($"[InflictedDamage] {client.name} inflicted {totalDamage} → +{reward} score");
-
-            MsgBody msg = new MsgBody();
-            msg.Write(client.seq);      // val  → player sequence ID
-            msg.Write(client.score);    // val2 → updated score
-
-            Say(new MsgReference(300, msg, msgRef.client, SendType.Unicast));
+                if (points > 0)
+                {
+                    MsgBody body = new MsgBody();
+                    body.Write(client.data.forcePoints);
+                    body.Write(client.data.brickPoints);
+                    body.Write(client.data.tokens);
+                    body.Write(client.data.coins);
+                    body.Write(client.data.starDust);
+                    Say(new MsgReference(102, body, client, SendType.Unicast));
+                }
+            }
         }
 
         private void HandleCS_TC_LEAVE_REQ(MsgReference msgRef)

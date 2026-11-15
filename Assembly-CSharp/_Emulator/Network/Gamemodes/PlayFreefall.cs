@@ -53,6 +53,7 @@ namespace _Emulator
 
         private void SendMatchEnd(MatchData matchData)
         {
+            ServerEmulator.instance.ApplyMatchRewards(matchData);
             MsgBody body = new MsgBody();
 
             body.Write(matchData.clientList.Count);
@@ -65,11 +66,11 @@ namespace _Emulator
                 body.Write(matchData.clientList[i].deaths);
                 body.Write(matchData.clientList[i].assists);
                 body.Write(matchData.clientList[i].score);
-                body.Write(0); //points
-                body.Write(0); //xp
+                body.Write(matchData.clientList[i].rewardPoints); //points
+                body.Write(matchData.clientList[i].rewardXp); //xp
                 body.Write(0); //mission
-                body.Write(matchData.clientList[i].data.xp);
-                body.Write(matchData.clientList[i].data.xp);
+                body.Write(matchData.clientList[i].rewardPrevXp);
+                body.Write(matchData.clientList[i].rewardNextXp);
                 body.Write((long)0); //buff
                 body.Write(matchData.clientList[i].kills); //param kill?
             }

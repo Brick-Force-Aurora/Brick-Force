@@ -8,6 +8,8 @@ namespace _Emulator
     public enum P2PExtensionOpcodes : byte
     {
         opPeerPublicHand = 100,
-        opPeerPrivateHand
+        opPeerPrivateHand,
+        opPeerPing,
+        opPeerPong
     }
 }

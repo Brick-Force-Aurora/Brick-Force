@@ -126,6 +126,7 @@ namespace _Emulator
 
         static void SendMatchEnd(MatchData matchData)
         {
+            ServerEmulator.instance.ApplyMatchRewards(matchData);
             //fix this
             for (int team = 0; team < 2; team++)
             {
@@ -150,11 +151,11 @@ namespace _Emulator
                     body.Write(matchData.clientList[i].deaths);
                     body.Write(matchData.clientList[i].assists);
                     body.Write(matchData.clientList[i].score);
-                    body.Write(0); //points
-                    body.Write(0); //xp
+                    body.Write(matchData.clientList[i].rewardPoints); //points
+                    body.Write(matchData.clientList[i].rewardXp); //xp
                     body.Write(0); //mission
-                    body.Write(matchData.clientList[i].data.xp);
-                    body.Write(matchData.clientList[i].data.xp);
+                    body.Write(matchData.clientList[i].rewardPrevXp);
+                    body.Write(matchData.clientList[i].rewardNextXp);
                     body.Write((long)0); //buff
                 }
                 ServerEmulator.instance.Say(new MsgReference((ushort)MessageId.CS_BLAST_MODE_END_ACK, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam, matchData.channel, matchData));

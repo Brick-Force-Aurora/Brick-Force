@@ -347,13 +347,12 @@ namespace _Emulator
 
         private void SendZombieMatchEnd(MatchData matchData)
         {
+            ServerEmulator.instance.ApplyMatchRewards(matchData);
             MsgBody body = new MsgBody();
 
             body.Write(matchData.clientList.Count);
             for (int i = 0; i < matchData.clientList.Count; i++)
             {
-                int points = (int)(matchData.clientList[i].score * 0.4);
-                int xp = (int)(matchData.clientList[i].score * 0.5);
                 body.Write(matchData.clientList[i].slot.isRed);
                 body.Write(matchData.clientList[i].seq);
                 body.Write(matchData.clientList[i].name);
@@ -361,11 +360,11 @@ namespace _Emulator
                 body.Write(0); // zombie victory
                 body.Write(matchData.clientList[i].assists);
                 body.Write(matchData.clientList[i].score);
-                body.Write(points); //points
-                body.Write(xp); //xp
+                body.Write(matchData.clientList[i].rewardPoints); //points
+                body.Write(matchData.clientList[i].rewardXp); //xp
                 body.Write(0); //mission
-                body.Write(matchData.clientList[i].data.xp);
-                body.Write(matchData.clientList[i].data.xp + xp);
+                body.Write(matchData.clientList[i].rewardPrevXp);
+                body.Write(matchData.clientList[i].rewardNextXp);
                 body.Write((long)0); //buff
             }
 

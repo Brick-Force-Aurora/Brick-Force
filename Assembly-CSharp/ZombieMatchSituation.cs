@@ -184,7 +184,7 @@ public class ZombieMatchSituation : MonoBehaviour
 			}
 			else if (avgPing < float.PositiveInfinity)
 			{
-				text2 = avgPing.ToString("0.###");
+				text2 = (avgPing * 1000f).ToString("0") + " ms";
 				clrText2 = ((avgPing > 0.3f) ? Color.red : ((!(avgPing > 0.1f)) ? Color.green : Color.yellow));
 				clrOutline = GlobalVars.txtEmptyColor;
 			}

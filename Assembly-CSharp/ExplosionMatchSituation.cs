@@ -135,7 +135,7 @@ public class ExplosionMatchSituation : MonoBehaviour
 			}
 			else if (avgPing < float.PositiveInfinity)
 			{
-				text = avgPing.ToString("0.###");
+				text = (avgPing * 1000f).ToString("0") + " ms";
 				clrText = ((avgPing > 0.3f) ? Color.red : ((!(avgPing > 0.1f)) ? Color.green : Color.yellow));
 				clrOutline = GlobalVars.txtEmptyColor;
 			}

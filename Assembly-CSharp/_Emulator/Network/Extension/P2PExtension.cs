@@ -28,6 +28,8 @@ namespace _Emulator
             P2PManager.Instance.readQueue = new Queue();
             P2PManager.Instance.recv = new P2PMsg4Recv();
             P2PManager.Instance.rendezvousPointed = true;
+            peerRtt.Clear();
+            MyInfoManager.Instance.PingTime = 0f;
         }
         public void AddSteam(int seq, CSteamID steamID, byte playerflag)
         {
@@ -98,11 +100,91 @@ namespace _Emulator
                 case P2PExtensionOpcodes.opPeerPublicHand:
                     HandlePeerPublicHandSteam(msg._msg, msg._steamIDFrom);
                     break;
+                case P2PExtensionOpcodes.opPeerPing:
+                    HandlePeerPingSteam(msg._msg, msg._steamIDFrom);
+                    break;
+                case P2PExtensionOpcodes.opPeerPong:
+                    HandlePeerPongSteam(msg._msg, msg._steamIDFrom);
+                    break;
                 default:
                     result = false;
                     break;
             }
             return result;
+        }
+
+        // Round trip time (seconds) per peer, smoothed.
+        private readonly Dictionary<CSteamID, float> peerRtt = new Dictionary<CSteamID, float>();
+        private const float rttSmoothing = 0.3f;
+
+        // Called once per second: pings every peer, the pong gives the round trip time
+        public void SendPingSteam()
+        {
+            if (!isSteam || P2PManager.Instance.dic == null)
+                return;
+
+            foreach (KeyValuePair<int, Peer> item in P2PManager.Instance.dic)
+            {
+                Peer peer = item.Value;
+                if (!peer.isSteam || peer.P2pStatus == Peer.P2P_STATUS.NONE || peer.steamID == SteamUser.GetSteamID())
+                    continue;
+
+                try
+                {
+                    P2PMsgBody p2PMsgBody = new P2PMsgBody();
+                    p2PMsgBody.Write(Time.realtimeSinceStartup);
+                    P2PMsg4Send p2PMsg4Send = new P2PMsg4Send((byte)P2PExtensionOpcodes.opPeerPing, ushort.MaxValue, P2PManager.Seq2Slot((uint)MyInfoManager.Instance.Seq), byte.MaxValue, p2PMsgBody, byte.MaxValue);
+                    SteamNetworkingManager.instance.SendMessageToPeer(peer.steamID, p2PMsg4Send);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError("Error, " + ex.Message.ToString() + " : P2PExtension.SendPingSteam");
+                }
+            }
+        }
+
+        private void HandlePeerPingSteam(P2PMsgBody msg, CSteamID steamID)
+        {
+            msg.Read(out float sentTime);
+
+            try
+            {
+                // Echo the timestamp back unchanged
+                P2PMsgBody p2PMsgBody = new P2PMsgBody();
+                p2PMsgBody.Write(sentTime);
+                P2PMsg4Send p2PMsg4Send = new P2PMsg4Send((byte)P2PExtensionOpcodes.opPeerPong, ushort.MaxValue, P2PManager.Seq2Slot((uint)MyInfoManager.Instance.Seq), byte.MaxValue, p2PMsgBody, byte.MaxValue);
+                SteamNetworkingManager.instance.SendMessageToPeer(steamID, p2PMsg4Send);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("HandlePeerPingSteam Error, " + ex.Message.ToString());
+            }
+        }
+
+        private void HandlePeerPongSteam(P2PMsgBody msg, CSteamID steamID)
+        {
+            msg.Read(out float sentTime);
+
+            float rtt = Time.realtimeSinceStartup - sentTime;
+            if (rtt < 0f)
+                return;
+
+            peerRtt.TryGetValue(steamID, out float old);
+            peerRtt[steamID] = old > 0f ? old + (rtt - old) * rttSmoothing : rtt;
+
+            // Own ping is the average over the peers still in the match; other players get it via PEER_PING
+            float sum = 0f;
+            int count = 0;
+            foreach (KeyValuePair<int, Peer> item in P2PManager.Instance.dic)
+            {
+                if (item.Value.isSteam && peerRtt.TryGetValue(item.Value.steamID, out float value))
+                {
+                    sum += value;
+                    count++;
+                }
+            }
+            if (count > 0)
+                MyInfoManager.Instance.PingTime = sum / count;
         }
 
         public void SendPeerPrivateHandSteam(CSteamID steamID)

@@ -846,6 +846,7 @@ public class P2PManager : MonoBehaviour
 				SendRandezvousPing();
 				SendP2pStatus();
 				SendPing();
+				P2PExtension.instance.SendPingSteam();
 			}
 
 			lock (this)

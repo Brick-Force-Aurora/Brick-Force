@@ -161,6 +161,7 @@ namespace _Emulator
                 clientList[i].assists = 0;
                 clientList[i].isZombie = false;
                 clientList[i].score = 0;
+                clientList[i].damageCarry = 0;
             }
             roundInit = true;
             humanPlayers = new List<int>();
@@ -220,6 +221,7 @@ namespace _Emulator
                 client.kills = 0;
                 client.assists = 0;
                 client.score = 0;
+                client.damageCarry = 0;
                 room.CurPlayer = clientList.Count;
             }
 
@@ -362,6 +364,7 @@ namespace _Emulator
             client.kills = 0;
             client.assists = 0;
             client.score = 0;
+            client.damageCarry = 0;
             clientList.Remove(client);
             room.CurPlayer = clientList.Count;
 

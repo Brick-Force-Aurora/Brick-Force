@@ -33,6 +33,11 @@ namespace _Emulator
         public int deaths = 0;
         public int assists = 0;
         public int score = 0;
+        public int damageCarry = 0;
+        public int rewardPoints = 0;
+        public int rewardXp = 0;
+        public int rewardPrevXp = 0;
+        public int rewardNextXp = 0;
         public bool isZombie = false;
         public bool buildModeRequestedMap = false;
         public bool isBreakingInto;

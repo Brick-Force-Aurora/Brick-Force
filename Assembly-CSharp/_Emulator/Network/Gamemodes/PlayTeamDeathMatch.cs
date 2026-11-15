@@ -43,6 +43,7 @@ namespace _Emulator
 
         public void SendTeamMatchEnd(MatchData matchData)
         {
+            ServerEmulator.instance.ApplyMatchRewards(matchData);
             for (int team = 0; team < 2; team++)
             {
                 MsgBody body = new MsgBody();
@@ -62,11 +63,11 @@ namespace _Emulator
                     body.Write(matchData.clientList[i].deaths);
                     body.Write(matchData.clientList[i].assists);
                     body.Write(matchData.clientList[i].score);
-                    body.Write(0); //points
-                    body.Write(0); //xp
+                    body.Write(matchData.clientList[i].rewardPoints); //points
+                    body.Write(matchData.clientList[i].rewardXp); //xp
                     body.Write(0); //mission
-                    body.Write(matchData.clientList[i].data.xp);
-                    body.Write(matchData.clientList[i].data.xp);
+                    body.Write(matchData.clientList[i].rewardPrevXp);
+                    body.Write(matchData.clientList[i].rewardNextXp);
                     body.Write((long)0); //buff
                 }
                 emulator.Say(new MsgReference(70, body, null, team == 0 ? SendType.BroadcastBlueTeam : SendType.BroadcastRedTeam, matchData.channel, matchData));

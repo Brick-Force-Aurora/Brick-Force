@@ -89,6 +89,7 @@ namespace _Emulator
 
         private void SendEscapeMatchEnd(MatchData matchData)
         {
+            ServerEmulator.instance.ApplyMatchRewards(matchData);
             MsgBody body = new MsgBody();
             body.Write(matchData.clientList.Count);
             foreach (ClientReference client in matchData.clientList)
@@ -100,11 +101,11 @@ namespace _Emulator
                 body.Write(client.deaths);
                 body.Write(client.assists);
                 body.Write(client.score);
-                body.Write(0);              // points
-                body.Write(0);              // xp
+                body.Write(client.rewardPoints); // points
+                body.Write(client.rewardXp);     // xp
                 body.Write(0);              // mission
-                body.Write(client.data.xp);
-                body.Write(client.data.xp);
+                body.Write(client.rewardPrevXp);
+                body.Write(client.rewardNextXp);
                 body.Write((long)0);        // buff
                 body.Write(0);              // param
             }

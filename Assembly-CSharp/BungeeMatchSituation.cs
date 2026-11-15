@@ -165,15 +165,15 @@ public class BungeeMatchSituation : MonoBehaviour
 			{
 				if (avgPing > 0.3f)
 				{
-					LabelUtil.TextOut(new Vector2(pingX, y), avgPing.ToString("0.###"), "MiniLabel", Color.red, GlobalVars.txtEmptyColor, TextAnchor.MiddleCenter);
+					LabelUtil.TextOut(new Vector2(pingX, y), (avgPing * 1000f).ToString("0") + " ms", "MiniLabel", Color.red, GlobalVars.txtEmptyColor, TextAnchor.MiddleCenter);
 				}
 				else if (avgPing > 0.1f)
 				{
-					LabelUtil.TextOut(new Vector2(pingX, y), avgPing.ToString("0.###"), "MiniLabel", Color.yellow, GlobalVars.txtEmptyColor, TextAnchor.MiddleCenter);
+					LabelUtil.TextOut(new Vector2(pingX, y), (avgPing * 1000f).ToString("0") + " ms", "MiniLabel", Color.yellow, GlobalVars.txtEmptyColor, TextAnchor.MiddleCenter);
 				}
 				else
 				{
-					LabelUtil.TextOut(new Vector2(pingX, y), avgPing.ToString("0.###"), "MiniLabel", Color.green, GlobalVars.txtEmptyColor, TextAnchor.MiddleCenter);
+					LabelUtil.TextOut(new Vector2(pingX, y), (avgPing * 1000f).ToString("0") + " ms", "MiniLabel", Color.green, GlobalVars.txtEmptyColor, TextAnchor.MiddleCenter);
 				}
 			}
 			else
