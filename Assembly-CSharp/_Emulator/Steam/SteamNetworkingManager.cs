@@ -64,34 +64,42 @@ namespace _Emulator
             }
         }
 
+        private readonly IntPtr[] receiveBuffers = new IntPtr[16];
+        private const int maxReceiveRounds = 8;
+
         private void HandleReceiveNetwork()
         {
             foreach (SteamNetworkingChannel channel in channels)
             {
                 SteamChannelHandler handler = handlers[(int)channel];
-                IntPtr[] receiveBuffers = new IntPtr[16];
-                int nMessages = SteamNetworkingMessages.ReceiveMessagesOnChannel((int)channel, receiveBuffers, receiveBuffers.Length);
-                if (handler == null)
+                int nMessages;
+                int rounds = 0;
+                do
                 {
-                    // We ignore this channel :)
-                    continue;
-                }
-                for (int i = 0; i < nMessages; i++)
-                {
-                    try
+                    nMessages = SteamNetworkingMessages.ReceiveMessagesOnChannel((int)channel, receiveBuffers, receiveBuffers.Length);
+                    for (int i = 0; i < nMessages; i++)
                     {
-                        SteamNetworkingMessage_t steamMsg = (SteamNetworkingMessage_t)Marshal.PtrToStructure(receiveBuffers[i], typeof(SteamNetworkingMessage_t));
-                        byte[] msg = new byte[steamMsg.m_cbSize];
-                        Marshal.Copy(steamMsg.m_pData, msg, 0, msg.Length);
-                        if (SteamManager.debug)
-                            Debug.Log("Steam - Received " + msg.Length + " bytes from " + steamMsg.m_identityPeer.GetSteamID() + " via " + channel);
-                        handler.Enqueue(steamMsg.m_identityPeer.GetSteamID(), msg);
+                        try
+                        {
+                            if (handler != null)
+                            {
+                                SteamNetworkingMessage_t steamMsg = (SteamNetworkingMessage_t)Marshal.PtrToStructure(receiveBuffers[i], typeof(SteamNetworkingMessage_t));
+                                byte[] msg = new byte[steamMsg.m_cbSize];
+                                Marshal.Copy(steamMsg.m_pData, msg, 0, msg.Length);
+                                if (SteamManager.debug)
+                                    Debug.Log("Steam - Received " + msg.Length + " bytes from " + steamMsg.m_identityPeer.GetSteamID() + " via " + channel);
+                                handler.Enqueue(steamMsg.m_identityPeer.GetSteamID(), msg);
+                            }
+                        }
+                        finally
+                        {
+                            SteamNetworkingMessage_t.Release(receiveBuffers[i]);
+                        }
                     }
-                    finally
-                    {
-                        Marshal.DestroyStructure(receiveBuffers[i], typeof(SteamNetworkingMessage_t));
-                    }
+                    rounds++;
                 }
+                while (nMessages == receiveBuffers.Length && rounds < maxReceiveRounds);
+
                 if (handler is ImmediateSteamChannelHandler immediate)
                 {
                     immediate.Dequeue();
