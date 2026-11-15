@@ -81,11 +81,13 @@ public class EquipCoordinator : MonoBehaviour
 		for (int i = 0; i < usables.Length; i++)
 		{
 			string empty = string.Empty;
+			long itemSeq = 0L;
 			if (usables[i] != 4)
 			{
 				TItem.SLOT slot = (TItem.SLOT)(2 + usables[i]);
 				Item currentWeaponBySlot = MyInfoManager.Instance.GetCurrentWeaponBySlot(slot);
 				empty = currentWeaponBySlot.Code;
+				itemSeq = currentWeaponBySlot.Seq;
 			}
 			else
 			{
@@ -94,7 +96,7 @@ public class EquipCoordinator : MonoBehaviour
 			equipments[usables[i]] = null;
 			if (empty.Length > 0)
 			{
-				equipments[usables[i]] = Equip(empty);
+				equipments[usables[i]] = EquipWithSeq(empty, itemSeq);
 			}
 		}
 		prevWeaponType = -1;
@@ -115,11 +117,13 @@ public class EquipCoordinator : MonoBehaviour
 		for (int i = 0; i < usables.Length; i++)
 		{
 			string empty = string.Empty;
+			long itemSeq = 0L;
 			if (usables[i] != 4)
 			{
 				TItem.SLOT slot = (TItem.SLOT)(2 + usables[i]);
 				Item currentWeaponBySlot = MyInfoManager.Instance.GetCurrentWeaponBySlot(slot);
 				empty = currentWeaponBySlot.Code;
+				itemSeq = currentWeaponBySlot.Seq;
 			}
 			else
 			{
@@ -128,7 +132,7 @@ public class EquipCoordinator : MonoBehaviour
 			equipments[usables[i]] = null;
 			if (empty.Length > 0)
 			{
-				equipments[usables[i]] = Equip(empty);
+				equipments[usables[i]] = EquipWithSeq(empty, itemSeq);
 			}
 		}
 		prevWeaponType = -1;
@@ -318,6 +322,24 @@ public class EquipCoordinator : MonoBehaviour
 		prevWeaponType = -1;
 		currentWeaponType = (int)weaponType;
 		return true;
+	}
+
+	// Equips a weapon and remembers which inventory item it is, so the weapon takes its stats/upgrades from
+	// exactly that item (a plain Equip() only finds the item by code among the equipped ones, which is wrong
+	// for weapons chosen via weapon change). UNUP BUG-FIX
+	private GameObject EquipWithSeq(string itemCode, long itemSeq)
+	{
+		GameObject gameObject = Equip(itemCode);
+		if (gameObject != null && itemSeq > 0)
+		{
+			WeaponFunction component = gameObject.GetComponent<WeaponFunction>();
+			if (null != component)
+			{
+				component.ItemSeq = itemSeq;
+			}
+			SetLeftWeaponItemSeq(itemSeq);
+		}
+		return gameObject;
 	}
 
 	private void SetLeftWeaponItemSeq(long itemSeq)
